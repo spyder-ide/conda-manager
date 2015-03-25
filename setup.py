@@ -33,6 +33,11 @@ setup(
     description='A stand alone PyQt/PySide GUI application for managing conda '
                 'packages and environments.',
     long_description=readme(),
+    entry_points={
+        'gui_scripts': [
+            'conda-manager = conda_manager.app.main:main'
+        ]
+    },
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: X11 Applications :: Qt',

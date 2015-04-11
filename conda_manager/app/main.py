@@ -2,7 +2,9 @@
 Application entry point
 """
 import sys
+
 from qtpy.QtWidgets import QApplication
+
 from .main_window import MainWindow
 
 

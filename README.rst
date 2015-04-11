@@ -19,9 +19,9 @@
 About
 -----
 
-**conda-manager** is a stand alone Qt application providing a friendly 
-graphical user interface for the management (update, downgrade,
-installation and removal) of `conda`_ packages and environments.
+**conda-manager** is a stand alone Qt application (PySide, PyQt4, PyQt5)
+providing a friendly graphical user interface for the management (update, 
+downgrade, installation and removal) of `conda`_ packages and environments.
 
 - `Issue tracker`_
 - `Contributing`_

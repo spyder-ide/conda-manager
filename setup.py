@@ -8,7 +8,7 @@ from setuptools import setup, find_packages
 
 
 def read_version():
-    with open("conda-manager/__init__.py") as f:
+    with open("conda_manager/__init__.py") as f:
         lines = f.read().splitlines()
         for l in lines:
             if "__version__" in l:

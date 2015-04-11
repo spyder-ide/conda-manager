@@ -1,15 +1,12 @@
 # -*- coding:utf-8 -*-
 #
-# Copyright © 2009-2011 Pierre Raybaut
+# Copyright © 2015 Gonzalo Peña-Castellanos (@goanpeca)
+#
 # Licensed under the terms of the MIT License
-# (see spyderlib/__init__.py for details)
+"""
+Conda Package Manager Plugin
+"""
 
-"""Conda Package Manager Plugin"""
-
-# pylint: disable=C0103
-# pylint: disable=R0903
-# pylint: disable=R0911
-# pylint: disable=R0201
 
 from spyderlib.qt.QtCore import Qt
 from spyderlib.qt.QtGui import QVBoxLayout, QGroupBox, QGridLayout

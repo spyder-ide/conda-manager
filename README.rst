@@ -16,8 +16,17 @@
    :target: https://travis-ci.org/spyder-ide/conda-manager
    :alt: Travis-CI build status
 
-About
------
+
+Status
+------
+This package used to be a core plugin of the Spyder-IDE but was recently migrated into a standalone module.
+
+This package is **NOT** (yet) operational. Please do not download, or install through pip. 
+
+This will be fixed soon! Sorry for the inconvenience.
+
+Description
+-----------
 
 **conda-manager** is a stand alone Qt application (PySide, PyQt4, PyQt5)
 providing a friendly graphical user interface for the management (update, 
@@ -42,8 +51,8 @@ License
 This project is licensed under the MIT license.
 
 
-Installation
-------------
+Installation (NOT WORKING)
+--------------------------
 ::
 
   pip install conda-manager

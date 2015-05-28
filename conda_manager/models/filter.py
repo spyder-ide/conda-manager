@@ -1,6 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+MultiColumnSortFilterProxy Implements a QSortFilterProxyModel that allows for
+custom filtering on several columns.
 """
 
-"""
+from qtpy.QtCore import QSortFilterProxyModel
+
+from ..utils import constants
 
 
 class MultiColumnSortFilterProxy(QSortFilterProxyModel):
@@ -21,11 +27,11 @@ class MultiColumnSortFilterProxy(QSortFilterProxyModel):
     """
     def __init__(self, parent=None):
         super(MultiColumnSortFilterProxy, self).__init__(parent)
-        # if parent is stored as self.parent then PySide gives the following 
+        # if parent is stored as self.parent then PySide gives the following
         # TypeError: 'CondaPackagesTable' object is not callable
         self._parent = parent
         self._filter_string = ''
-        self._filter_status = ALL
+        self._filter_status = constants.ALL
         self._filter_functions = {}
 
     def set_filter(self, text, status):
@@ -62,7 +68,7 @@ class MultiColumnSortFilterProxy(QSortFilterProxyModel):
         self.invalidateFilter()
 
     def remove_filter_function(self, name):
-        """Removes the filter function associated with name, if it exists
+        """Removes the filter function associated with name, if it exists.
 
         name : hashable object
         """
@@ -71,9 +77,9 @@ class MultiColumnSortFilterProxy(QSortFilterProxyModel):
             self.invalidateFilter()
 
     def filterAcceptsRow(self, row_num, parent):
-        """Qt override
+        """Qt override.
 
-        Reimplemented from base class to allow the use of custom filtering
+        Reimplemented from base class to allow the use of custom filtering.
         """
         model = self.sourceModel()
 
@@ -84,4 +90,3 @@ class MultiColumnSortFilterProxy(QSortFilterProxyModel):
                  self._filter_functions.values()]
 
         return False not in tests  # Changes this to any or all!
-

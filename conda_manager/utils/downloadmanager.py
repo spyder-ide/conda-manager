@@ -1,10 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+
+"""
+
+import os
+import os.path as osp
+
+from qtpy.QtCore import QByteArray, QObject, QUrl
+from qtpy.QtNetwork import QNetworkAccessManager, QNetworkRequest
+
+from ..utils.py3compat import to_text_string
+
+
+# TODO: Change to use requests library instead of Qt ....
+
 class DownloadManager(QObject):
-    """Synchronous download manager
+    """Synchronous download manager.
 
-    used http://qt-project.org/doc/qt-4.8/
-    network-downloadmanager-downloadmanager-cpp.html
-
-    as inspiration
+    http://qt-project.org/doc/qt-4.8/network-downloadmanager-downloadmanager-cpp.html
+    as inspiration.
     """
     def __init__(self, parent, on_finished_func, on_progress_func, save_path):
         super(DownloadManager, self).__init__(parent)
@@ -147,4 +161,3 @@ class DownloadManager(QObject):
     def stop_download(self):
         """ """
         pass
-

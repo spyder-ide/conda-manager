@@ -3,22 +3,22 @@
 # Copyright © 2015 Gonzalo Peña-Castellanos (@goanpeca)
 #
 # Licensed under the terms of the MIT License
+
 """
-Conda Package Manager Plugin
+Conda Package Manager Plugin.
 """
 
+import gettext
 
-from spyderlib.qt.QtCore import Qt
-from spyderlib.qt.QtGui import QVBoxLayout, QGroupBox, QGridLayout
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QGridLayout, QGroupBox, QVBoxLayout
 
-# Local imports
-from spyderlib.baseconfig import get_translation, DEV
-_ = get_translation("p_condapackages", dirname="spyderplugins")
-from spyderlib.utils.qthelpers import get_icon
 from spyderlib.plugins import SpyderPluginMixin, PluginConfigPage
 
-from spyderplugins.widgets.condapackagesgui import (CondaPackagesWidget,
-                                                    CONDA_PATH)
+from conda_manager.widgets import CondaPackagesWidget
+from conda_manager.utils import get_icon
+
+_ = gettext.gettext
 
 
 class CondaPackagesConfigPage(PluginConfigPage):
@@ -52,7 +52,7 @@ class CondaPackagesConfigPage(PluginConfigPage):
         vlayout.addStretch(1)
         self.setLayout(vlayout)
 
-        # signals
+        # Signals
         self.checkbox_proxy.clicked.connect(self.proxy_settings)
         self.proxy_settings()
 
@@ -71,8 +71,8 @@ class CondaPackagesConfigPage(PluginConfigPage):
 
 
 class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
-    """Conda package manager based on conda and conda-api """
-    CONF_SECTION = 'condapackages'
+    """Conda package manager based on conda and conda-api."""
+    CONF_SECTION = 'conda_manager'
     CONFIGWIDGET_CLASS = CondaPackagesConfigPage
 
     def __init__(self, parent=None):
@@ -124,11 +124,12 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         pass
 
     # ------ Public API -------------------------------------------------------
-
+    def set_env(self, env):
+        """ """
+        # TODO:
 
 # =============================================================================
 # The following statements are required to register this 3rd party plugin:
 # =============================================================================
 # Only register plugin if conda is found on the system
-if CONDA_PATH and DEV:
-    PLUGIN_CLASS = CondaPackages
+PLUGIN_CLASS = CondaPackages

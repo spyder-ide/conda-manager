@@ -1,65 +1,40 @@
 # -*- coding: utf-8 -*-
-#
-# Copyright © 2015 Gonzalo Peña-Castellanos (@goanpeca)
-#
-# Licensed under the terms of the MIT License
-
 """
-Conda Packager Manager Widget
+Conda Packager Manager Widget.
 """
-
-# pylint: disable=R0903
-# pylint: disable=R0911
-# pylint: disable=R0201
 
 from __future__ import with_statement, print_function
-import sys
-import platform
+import json
+import gettext
 import os
 import os.path as osp
-import json
+import platform
 import shutil
+import sys
 
-from spyderlib.qt.QtGui import (QGridLayout, QVBoxLayout, QHBoxLayout, QFont,
-                                QDialogButtonBox, QToolButton, QLineEdit,
-                                QComboBox, QProgressBar, QSpacerItem, QMenu,
-                                QPushButton, QPixmap, QIcon, QCheckBox, QLabel,
-                                QWidget, QSortFilterProxyModel, QTableView,
-                                QAbstractItemView, QDialog, QPalette,
-                                QDesktopServices)
-from spyderlib.qt.QtCore import (QSize, Qt, QAbstractTableModel, QModelIndex,
-                                 QPoint, QUrl, QObject, Signal, QThread,
-                                 QByteArray)
-from spyderlib.qt.QtNetwork import QNetworkRequest, QNetworkAccessManager
-from spyderlib.qt.compat import to_qvariant
+from qtpy.QtCore import (QSize, Qt, QThread)
+from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton,
+                        QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
-from spyderlib.utils import programs
-from spyderlib.utils.qthelpers import get_icon, create_action, add_actions
-from spyderlib.baseconfig import (get_conf_path, get_translation,
-                                  get_image_path, get_module_data_path)
-from spyderlib.py3compat import to_text_string, u, is_unicode
-from spyderlib.py3compat import configparser as cp
-
-import conda_api_q
-
-_ = get_translation("p_condapackages", dirname="spyderplugins")
-
-CONDA_PATH = programs.find_program('conda')
+from ..models import Worker
+from ..utils import conda_api_q, get_conf_path, get_module_data_path
+from ..utils import constants as const
+from ..utils.downloadmanager import DownloadManager
+from ..utils.py3compat import configparser as cp
+from ..widgets import CondaPackagesTable, SearchLineEdit
+from ..widgets.dialogs import CondaPackageActionDialog
 
 
-
-
+_ = gettext.gettext
 
 
 class CondaPackagesWidget(QWidget):
-    """Conda Packages Widget"""
-    VERSION = '1.0.0'
-
+    """Conda Packages Widget."""
     # Location of updated repo.json files from continuum/binstar
-    CONDA_CONF_PATH = get_conf_path('conda')
+    CONDA_CONF_PATH = get_conf_path('repo')
 
-    # Location of continuum/anaconda default repos shipped with spyder
-    DATA_PATH = get_module_data_path('spyderplugins', 'data')
+    # Location of continuum/anaconda default repos shipped with conda-manager
+    DATA_PATH = get_module_data_path()
 
     # file inside DATA_PATH with metadata for conda packages
     DATABASE_FILE = 'packages.ini'
@@ -84,7 +59,8 @@ class CondaPackagesWidget(QWidget):
         self._db_metadata.readfp(open(osp.join(self.DATA_PATH, self._db_file)))
         self._packages_names = None
         self._row_data = None
-        # Hardcoded channels for the moment
+
+        # TODO: Hardcoded channels for the moment
         self._default_channels = [
             ['_free_', 'http://repo.continuum.io/pkgs/free'],
             ['_pro_', 'http://repo.continuum.io/pkgs/pro']
@@ -117,8 +93,9 @@ class CondaPackagesWidget(QWidget):
                         self.textbox_search, self.table]
 
         # setup widgets
-        self.combobox_filter.addItems([k for k in COMBOBOX_VALUES_ORDERED])
-        self.combobox_filter.setCurrentIndex(ALL)
+        self.combobox_filter.addItems([k for k in
+                                       const.COMBOBOX_VALUES_ORDERED])
+        self.combobox_filter.setCurrentIndex(const.ALL)
         self.combobox_filter.setMinimumWidth(120)
 
         self.progress_bar.setVisible(False)
@@ -169,7 +146,7 @@ class CondaPackagesWidget(QWidget):
         else:
             status = _('no packages supported for this architecture!')
             self._update_status(progress=[0, 0], hide=True, status=status)
-            
+
     def _supports_architecture(self):
         """ """
         self._set_repo_name()
@@ -279,8 +256,8 @@ class CondaPackagesWidget(QWidget):
     def _setup_widget(self):
         """ """
         if self._selected_env is None:
-            self._selected_env = ROOT
-            
+            self._selected_env = const.ROOT
+
         self._thread.terminate()
         self._thread = QThread(self)
         self._worker = Worker(self, self._repo_files, self._selected_env,
@@ -290,7 +267,7 @@ class CondaPackagesWidget(QWidget):
         self._worker.sig_ready.connect(self._thread.quit)
         self._worker.moveToThread(self._thread)
 
-        self._thread.started.connect(self._worker._prepare_model)        
+        self._thread.started.connect(self._worker._prepare_model)
         self._thread.start()
 
     def _worker_ready(self):
@@ -367,22 +344,23 @@ class CondaPackagesWidget(QWidget):
             pkgs = dic['pkg']
             dep = dic['dep']
 
-        if action == INSTALL or action == UPGRADE or action == DOWNGRADE:
+        if action == const.INSTALL or action == const.UPGRADE or \
+           action == const.DOWNGRADE:
             status = _('Installing <b>') + dic['pkg'] + '</b>'
             status = status + _(' into <i>') + dic['name'] + '</i>'
             cp.install(name=name, pkgs=[pkgs], dep=dep)
-        elif action == REMOVE:
-            status = (_('Removing <b>') + dic['pkg'] + '</b>' + _(' from <i>')
-                      + dic['name'] + '</i>')
+        elif action == const.REMOVE:
+            status = (_('Removing <b>') + dic['pkg'] + '</b>' +
+                      _(' from <i>') + dic['name'] + '</i>')
             cp.remove(pkgs, name=name)
 
     # --- actions to be implemented in case of environment needs
-        elif action == CREATE:
+        elif action == const.CREATE:
             status = _('Creating environment <b>') + dic['name'] + '</b>'
-        elif action == CLONE:
-            status = (_('Cloning ') + '<i>' + dic['cloned from']
-                      + _('</i> into <b>') + dic['name'] + '</b>')
-        elif action == REMOVE_ENV:
+        elif action == const.CLONE:
+            status = (_('Cloning ') + '<i>' + dic['cloned from'] +
+                      _('</i> into <b>') + dic['name'] + '</b>')
+        elif action == const.REMOVE_ENV:
             status = _('Removing environment <b>') + dic['name'] + '</b>'
 
         self._update_status(hide=True, status=status, progress=[0, 0])
@@ -421,7 +399,7 @@ class CondaPackagesWidget(QWidget):
 
         self._update_status(status=status, progress=[progress, maxval])
 
-    # public api
+    # Public api
     # ----------
     def update_package_index(self):
         """ """
@@ -456,8 +434,6 @@ class CondaPackagesWidget(QWidget):
         # TODO: check if env exists!
         self._selected_env = env
         self._setup_widget()
-    
-
 
 # TODO:  update packages.ini file
 # TODO: Define some automatic tests that can include the following:

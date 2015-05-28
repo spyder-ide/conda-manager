@@ -12,11 +12,15 @@ def read_version():
         lines = f.read().splitlines()
         for l in lines:
             if "__version__" in l:
-                return l.split("=")[1].strip().replace("'", '').replace('"', '')
+                version = l.split("=")[1].strip()
+                version = version.replace("'", '').replace('"', '')
+                return version
 
 
 def readme():
-    return str(open('README.rst').read())
+    with open('README.rst') as f:
+        text = str(f.read())
+    return text
 
 
 setup(
@@ -51,4 +55,3 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Topic :: Software Development :: Widget Sets'])
-

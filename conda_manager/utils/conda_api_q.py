@@ -4,31 +4,34 @@
 # Licensed under the terms of the MIT License
 # (see spyderlib/__init__.py for details)
 
-"""Conda Process based on conda-api and QProcess"""
+"""Conda Process based on conda-api and QProcess."""
 
-from spyderlib.qt.QtGui import QVBoxLayout, QHBoxLayout, QPushButton, QWidget
-from spyderlib.qt.QtCore import QObject, QProcess, QByteArray
-from spyderlib.py3compat import to_text_string
-
-import re
-import os
-import sys
 import json
+import os
+import re
+import sys
 from os.path import basename, isdir, join
+
+from qtpy.QtGui import QVBoxLayout, QHBoxLayout, QPushButton, QWidget
+from qtpy.QtCore import QObject, QProcess, QByteArray
+
+from ..utils.py3compat import to_text_string
 
 __version__ = '1.2.1'
 
-# global
+# Global
 ROOT_PREFIX = None
+
 
 def handle_qbytearray(obj, encoding):
     """ """
     if isinstance(obj, QByteArray):
         obj = obj.data()
-    
+
     return to_text_string(obj, encoding=encoding)
 
-# functions not calling a QProcess, outside of the class
+
+# Functions not calling a QProcess, outside of the class
 # these could also be implemented as static methods...
 def linked(prefix):
     """
@@ -92,7 +95,7 @@ class CondaProcess(QObject):
         """ """
         stdout = self._process.readAllStandardOutput()
         stdout = handle_qbytearray(stdout, CondaProcess.ENCODING)
-        
+
         stderr = self._process.readAllStandardError()
         stderr = handle_qbytearray(stderr, CondaProcess.ENCODING)
 
@@ -104,14 +107,14 @@ class CondaProcess(QObject):
         self.partial = self.output
         self.stdout = self.output
         self.error = stderr
-        
+
 #        print(self.partial)
 #        print(self.error)
 
     def _call_conda_ready(self):
         """function called when QProcess in _call_conda finishes task"""
         function = self._function_called
-        
+
         if self.stdout is None:
             stdout = to_text_string(self._process.readAllStandardOutput(),
                                     encoding=CondaProcess.ENCODING)
@@ -292,7 +295,7 @@ class CondaProcess(QObject):
 
                 output = qprocess.readAllStandardOutput()
                 output = handle_qbytearray(output, CondaProcess.ENCODING)
-                info = json.loads(output)                
+                info = json.loads(output)
                 ROOT_PREFIX = info['root_prefix']
 
     def get_conda_version(self):
@@ -493,7 +496,7 @@ class CondaProcess(QObject):
                             'install into existing environment')
 
         cmd_list = ['install', '--yes', '--json', '--force-pscheck']
-#        cmd_list = ['install', '--yes', '--quiet']        
+#        cmd_list = ['install', '--yes', '--quiet']
         if name:
             cmd_list.extend(['--name', name])
         elif path:
@@ -1055,4 +1058,3 @@ def test():
 
 if __name__ == '__main__':
     test()
-

@@ -13,4 +13,3 @@ def main():
     window = MainWindow()
     window.show()
     app.exec_()
-

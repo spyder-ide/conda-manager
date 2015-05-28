@@ -1,3 +1,25 @@
+# -*- coding: utf-8 -*-
+"""
+
+"""
+
+import gettext
+
+from qtpy.QtCore import Qt, QPoint, QUrl
+from qtpy.QtGui import QDesktopServices, QIcon, QPalette
+from qtpy.QtWidgets import QAbstractItemView, QMenu, QTableView
+
+from ..models.filter import MultiColumnSortFilterProxy
+from ..models.packages import CondaPackagesModel
+from ..utils import get_image_path
+from ..utils import constants as const
+from ..utils.py3compat import to_text_string
+from ..utils.qthelpers import add_actions, create_action
+
+_ = gettext.gettext
+HIDE_COLUMNS = [const.STATUS, const.URL, const.LICENSE, const.REMOVE]
+
+
 class CondaPackagesTable(QTableView):
     """ """
     WIDTH_NAME = 120
@@ -8,7 +30,7 @@ class CondaPackagesTable(QTableView):
         super(CondaPackagesTable, self).__init__(parent)
         self._parent = parent
         self._searchbox = u''
-        self._filterbox = ALL
+        self._filterbox = const.ALL
         self.row_count = None
 
         # To manage icon states
@@ -39,37 +61,39 @@ class CondaPackagesTable(QTableView):
         self._hheader = self.horizontalHeader()
         self._hheader.setResizeMode(self._hheader.Fixed)
         self._hheader.setStyleSheet("""QHeaderView {border: 0px;
-                                              border-radius: 0px;};""")
+                                                    border-radius: 0px;};""")
         self.setPalette(self._palette)
-        self.sortByColumn(NAME, Qt.AscendingOrder)
+        self.sortByColumn(const.NAME, Qt.AscendingOrder)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
 
     def setup_model(self, packages_names, packages_versions, row_data):
         """ """
         self.proxy_model = MultiColumnSortFilterProxy(self)
-        self.setModel(self.proxy_model)
         self.source_model = CondaPackagesModel(self, packages_names,
                                                packages_versions, row_data)
         self.proxy_model.setSourceModel(self.source_model)
-        self.hide_columns()
-        
+        self.setModel(self.proxy_model)
+
         # Custom Proxy Model setup
         self.proxy_model.setDynamicSortFilter(True)
 
         filter_text = \
             (lambda row, text, status: (
-             all([t in row[NAME].lower() for t in
+             all([t in row[const.NAME].lower() for t in
                  to_text_string(text).lower().split()]) or
-             all([t in row[DESCRIPTION].lower() for t in
+             all([t in row[const.DESCRIPTION].lower() for t in
                  to_text_string(text).split()])))
 
-        filter_status = (lambda row, text, status: to_text_string(row[STATUS])
-                         in to_text_string(status))
+        filter_status = (lambda row, text, status:
+                         to_text_string(row[const.STATUS]) in
+                         to_text_string(status))
         self.model().add_filter_function('status-search', filter_status)
         self.model().add_filter_function('text-search', filter_text)
 
         # signals and slots
         self.verticalScrollBar().valueChanged.connect(self.resize_rows)
+
+        self.hide_columns()
 
     def resize_rows(self):
         """ """
@@ -93,30 +117,30 @@ class CondaPackagesTable(QTableView):
         group = self._filterbox
         text = self._searchbox
 
-        if group in [ALL]:
-            group = ''.join([to_text_string(INSTALLED),
-                             to_text_string(UPGRADABLE),
-                             to_text_string(NOT_INSTALLED),
-                             to_text_string(DOWNGRADABLE),
-                             to_text_string(MIXGRADABLE),
-                             to_text_string(NOT_INSTALLABLE)])
-        elif group in [INSTALLED]:
-            group = ''.join([to_text_string(INSTALLED),
-                             to_text_string(UPGRADABLE),
-                             to_text_string(DOWNGRADABLE),
-                             to_text_string(MIXGRADABLE)])
-        elif group in [UPGRADABLE]:
-            group = ''.join([to_text_string(UPGRADABLE),
-                             to_text_string(MIXGRADABLE)])
-        elif group in [DOWNGRADABLE]:
-            group = ''.join([to_text_string(DOWNGRADABLE),
-                             to_text_string(MIXGRADABLE)])
-        elif group in [ALL_INSTALLABLE]:
-            group = ''.join([to_text_string(INSTALLED),
-                             to_text_string(UPGRADABLE),
-                             to_text_string(NOT_INSTALLED),
-                             to_text_string(DOWNGRADABLE),
-                             to_text_string(MIXGRADABLE)])
+        if group in [const.ALL]:
+            group = ''.join([to_text_string(const.INSTALLED),
+                             to_text_string(const.UPGRADABLE),
+                             to_text_string(const.NOT_INSTALLED),
+                             to_text_string(const.DOWNGRADABLE),
+                             to_text_string(const.MIXGRADABLE),
+                             to_text_string(const.NOT_INSTALLABLE)])
+        elif group in [const.INSTALLED]:
+            group = ''.join([to_text_string(const.INSTALLED),
+                             to_text_string(const.UPGRADABLE),
+                             to_text_string(const.DOWNGRADABLE),
+                             to_text_string(const.MIXGRADABLE)])
+        elif group in [const.UPGRADABLE]:
+            group = ''.join([to_text_string(const.UPGRADABLE),
+                             to_text_string(const.MIXGRADABLE)])
+        elif group in [const.DOWNGRADABLE]:
+            group = ''.join([to_text_string(const.DOWNGRADABLE),
+                             to_text_string(const.MIXGRADABLE)])
+        elif group in [const.ALL_INSTALLABLE]:
+            group = ''.join([to_text_string(const.INSTALLED),
+                             to_text_string(const.UPGRADABLE),
+                             to_text_string(const.NOT_INSTALLED),
+                             to_text_string(const.DOWNGRADABLE),
+                             to_text_string(const.MIXGRADABLE)])
         else:
             group = to_text_string(group)
 
@@ -146,7 +170,7 @@ class CondaPackagesTable(QTableView):
 
     def filter_status_changed(self, text):
         """ """
-        for key, val in COMBOBOX_VALUES.iteritems():
+        for key, val in const.COMBOBOX_VALUES.iteritems():
             if str(val) == to_text_string(text):
                 group = val
                 break
@@ -156,13 +180,13 @@ class CondaPackagesTable(QTableView):
     def resizeEvent(self, event):
         """Override Qt method"""
         w = self.width()
-        self.setColumnWidth(NAME, self.WIDTH_NAME)
-        self.setColumnWidth(VERSION, self.WIDTH_VERSION)
+        self.setColumnWidth(const.NAME, self.WIDTH_NAME)
+        self.setColumnWidth(const.VERSION, self.WIDTH_VERSION)
         w_new = w - (self.WIDTH_NAME + self.WIDTH_VERSION +
-                     (len(ACTION_COLUMNS) + 1)*self.WIDTH_ACTIONS)
-        self.setColumnWidth(DESCRIPTION, w_new)
+                     (len(const.ACTION_COLUMNS) + 1)*self.WIDTH_ACTIONS)
+        self.setColumnWidth(const.DESCRIPTION, w_new)
 
-        for col in ACTION_COLUMNS:
+        for col in const.ACTION_COLUMNS:
             self.setColumnWidth(col, self.WIDTH_ACTIONS)
         QTableView.resizeEvent(self, event)
         self.resize_rows()
@@ -202,40 +226,45 @@ class CondaPackagesTable(QTableView):
     def action_pressed(self, index):
         """ """
         column = index.column()
-        
+
         if self.proxy_model is not None:
             model_index = self.proxy_model.mapToSource(index)
             model = self.source_model
-    
+
             self._model_index_clicked = model_index
-            self.valid = False
-    
-            if ((column == INSTALL and model.is_installable(model_index)) or
-               (column == REMOVE and model.is_removable(model_index)) or
-               (column == UPGRADE and model.is_upgradable(model_index)) or
-                    (column == DOWNGRADE and model.is_downgradable(model_index))):
-    
+            self.valid = True
+
+            if column == const.INSTALL and model.is_installable(model_index):
+                model.update_row_icon(model_index.row(), const.INSTALL)
+            elif column == const.INSTALL and model.is_removable(model_index):
+                model.update_row_icon(model_index.row(), const.REMOVE)
+            elif ((column == const.UPGRADE and
+                   model.is_upgradable(model_index)) or
+                  (column == const.DOWNGRADE and
+                   model.is_downgradable(model_index))):
                 model.update_row_icon(model_index.row(), model_index.column())
-                self.valid = True
-                self.column_ = column
             else:
                 self._model_index_clicked = None
                 self.valid = False
 
     def action_released(self):
         """ """
+        model = self.source_model
         model_index = self._model_index_clicked
-        if model_index:
-            self.source_model.update_row_icon(model_index.row(),
-                                              model_index.column())
-            if self.valid:
 
-                name = self.source_model.row(model_index.row())[NAME]
+        if model_index:
+            column = model_index.column()
+
+            if column == const.INSTALL and model.is_removable(model_index):
+                column = const.REMOVE
+            self.source_model.update_row_icon(model_index.row(), column)
+
+            if self.valid:
+                name = self.source_model.row(model_index.row())[const.NAME]
                 versions = self.source_model.get_package_versions(name)
                 version = self.source_model.get_package_version(name)
-                action = self.column_
 
-                self._parent._run_action(name, action, version, versions)
+                self._parent._run_action(name, column, version, versions)
 
     def context_menu_requested(self, event):
         """ Custom context menu"""
@@ -243,7 +272,7 @@ class CondaPackagesTable(QTableView):
         model_index = self.proxy_model.mapToSource(index)
         row = self.source_model.row(model_index.row())
 
-        name, license_ = row[NAME], row[LICENSE]
+        name, license_ = row[const.NAME], row[const.LICENSE]
         pos = QPoint(event.x(), event.y())
         self._menu = QMenu(self)
 
@@ -304,5 +333,3 @@ class CondaPackagesTable(QTableView):
         if url is None:
             return
         QDesktopServices.openUrl(QUrl(url))
-
-

@@ -1,6 +1,19 @@
+# -*- coding: utf-8 -*-
+"""
 
 """
-"""
+
+import gettext
+
+from qtpy.compat import to_qvariant
+from qtpy.QtCore import Qt, QAbstractTableModel, QModelIndex
+from qtpy.QtGui import QFont
+
+from ..utils import conda_api_q
+from ..utils.py3compat import u
+
+_ = gettext.gettext
+
 
 class CondaDependenciesModel(QAbstractTableModel):
     """ """
@@ -92,4 +105,3 @@ class CondaDependenciesModel(QAbstractTableModel):
     def row(self, rownum):
         """ """
         return self._rows[rownum]
-

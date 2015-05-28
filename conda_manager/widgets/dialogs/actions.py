@@ -1,3 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+
+"""
+
+import gettext
+
+from qtpy.QtCore import QSize, Qt
+from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
+                            QDialogButtonBox, QGridLayout, QLabel, QSpacerItem,
+                            QTableView, QWidget)
+
+from ...models.dependencies import CondaDependenciesModel
+from ...utils import conda_api_q, sort_versions
+from ...utils import constants as const
+from ...utils.py3compat import to_text_string
+
+
+_ = gettext.gettext
+
+
 class CondaPackageActionDialog(QDialog):
     """ """
     def __init__(self, parent, env, name, action, version, versions):
@@ -18,8 +39,9 @@ class CondaPackageActionDialog(QDialog):
         self.table_dependencies = None
 
         self.checkbox = QCheckBox(_('Install dependencies (recommended)'))
-        self.bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                Qt.Horizontal, self)
+        self.bbox = QDialogButtonBox(QDialogButtonBox.Ok |
+                                     QDialogButtonBox.Cancel, Qt.Horizontal,
+                                     self)
 
         self.button_ok = self.bbox.button(QDialogButtonBox.Ok)
         self.button_cancel = self.bbox.button(QDialogButtonBox.Cancel)
@@ -30,10 +52,10 @@ class CondaPackageActionDialog(QDialog):
         dialog_size = QSize(300, 90)
 
         # helper variable values
-        action_title = {UPGRADE: _("Upgrade package"),
-                        DOWNGRADE: _("Downgrade package"),
-                        REMOVE: _("Remove package"),
-                        INSTALL: _("Install package")}
+        action_title = {const.UPGRADE: _("Upgrade package"),
+                        const.DOWNGRADE: _("Downgrade package"),
+                        const.REMOVE: _("Remove package"),
+                        const.INSTALL: _("Install package")}
 
         # Versions might have duplicates from different builds
         versions = sort_versions(list(set(versions)), reverse=True)
@@ -42,24 +64,24 @@ class CondaPackageActionDialog(QDialog):
         # astropy 0.4 and the linked list 0.4 but the available versions
         # in the json file do not include 0.4 but 0.4rc1... so...
         # temporal fix is to check if inside list otherwise show full list
-        if action == UPGRADE:
+        if action == const.UPGRADE:
             if version in versions:
                 index = versions.index(version)
                 versions = versions[:index]
             else:
                 versions = versions
-        elif action == DOWNGRADE:
+        elif action == const.DOWNGRADE:
             if version in versions:
                 index = versions.index(version)
                 versions = versions[index+1:]
             else:
                 versions = versions
-        elif action == REMOVE:
+        elif action == const.REMOVE:
             versions = [version]
             self.combobox_version.setEnabled(False)
 
         if len(versions) == 1:
-            if action == REMOVE:
+            if action == const.REMOVE:
                 labeltext = _('Package version to remove:')
             else:
                 labeltext = _('Package version available:')
@@ -75,7 +97,8 @@ class CondaPackageActionDialog(QDialog):
         self.table_dependencies = QWidget(self)
 
         self._layout = QGridLayout()
-        self._layout.addWidget(self.label, 0, 0, Qt.AlignVCenter | Qt.AlignLeft)
+        self._layout.addWidget(self.label, 0, 0, Qt.AlignVCenter |
+                               Qt.AlignLeft)
         self._layout.addWidget(self.widget_version, 0, 1, Qt.AlignVCenter |
                                Qt.AlignRight)
 
@@ -84,7 +107,7 @@ class CondaPackageActionDialog(QDialog):
         row_index = 1
 
         # Create a Table
-        if action in [INSTALL, UPGRADE, DOWNGRADE]:
+        if action in [const.INSTALL, const.UPGRADE, const.DOWNGRADE]:
             table = QTableView(self)
             dialog_size = QSize(dialog_size.width() + 40, 300)
             self.table_dependencies = table
@@ -103,9 +126,10 @@ class CondaPackageActionDialog(QDialog):
             table.horizontalHeader().setStretchLastSection(True)
 
         self._layout.addWidget(self.table_dependencies, row_index + 2, 0, 1, 2,
-                         Qt.AlignHCenter)
+                               Qt.AlignHCenter)
         self._layout.addItem(QSpacerItem(10, 5), row_index + 3, 0)
-        self._layout.addWidget(self.bbox, row_index + 6, 0, 1, 2, Qt.AlignHCenter)
+        self._layout.addWidget(self.bbox, row_index + 6, 0, 1, 2,
+                               Qt.AlignHCenter)
 
         title = "{0}: {1}".format(action_title[action], name)
         self.setLayout(self._layout)

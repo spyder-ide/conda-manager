@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+
+"""
+
+import gettext
+import json
+
+from qtpy.compat import to_qvariant
+from qtpy.QtCore import (QAbstractTableModel, QObject, Qt, Signal,
+                         QModelIndex)
+from qtpy.QtGui import QPalette
+
+from ..utils import conda_api_q, sort_versions, get_icon
+from ..utils import constants as const
+
+_ = gettext.gettext
 
 
 class CondaPackagesModel(QAbstractTableModel):
@@ -33,11 +50,12 @@ class CondaPackagesModel(QAbstractTableModel):
         if not index.isValid():
             return Qt.ItemIsEnabled
         column = index.column()
-        if column in (NAME, DESCRIPTION, VERSION):
+        if column in (const.NAME, const.DESCRIPTION,
+                      const.VERSION):
             return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column in ACTION_COLUMNS:
+        elif column in const.ACTION_COLUMNS:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column == ENDCOL:
+        elif column == const.ENDCOL:
             return Qt.ItemFlags(Qt.NoItemFlags)
         else:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
@@ -59,47 +77,60 @@ class CondaPackagesModel(QAbstractTableModel):
              d] = self._rows[row]
 
         if role == Qt.DisplayRole:
-            if column == NAME:
+            if column == const.NAME:
                 return to_qvariant(name)
-            elif column == VERSION:
+            elif column == const.VERSION:
                 return to_qvariant(version)
-            elif column == STATUS:
+            elif column == const.STATUS:
                 return to_qvariant(status)
-            elif column == DESCRIPTION:
+            elif column == const.DESCRIPTION:
                 return to_qvariant(description)
         elif role == Qt.TextAlignmentRole:
-            if column in [NAME, DESCRIPTION]:
+            if column in [const.NAME, const.DESCRIPTION]:
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
             else:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
-            if column == INSTALL:
-                if status == NOT_INSTALLED:
+            if column == const.INSTALL:
+                if status == const.NOT_INSTALLED:
                     if i:
                         return to_qvariant(self._icons['add.pressed'])
                     else:
                         return to_qvariant(self._icons['add.active'])
+                elif (status == const.INSTALLED or
+                      status == const.UPGRADABLE or
+                      status == const.DOWNGRADABLE or
+                      status == const.MIXGRADABLE):
+                    if r:
+                        return to_qvariant(self._icons['remove.pressed'])
+                    else:
+                        return to_qvariant(self._icons['remove.active'])
                 else:
                     return to_qvariant(self._icons['add.inactive'])
-            elif column == REMOVE:
-                if (status == INSTALLED or status == UPGRADABLE or
-                        status == DOWNGRADABLE or status == MIXGRADABLE):
+
+            elif column == const.REMOVE:
+                if (status == const.INSTALLED or
+                    status == const.UPGRADABLE or
+                    status == const.DOWNGRADABLE or
+                   status == const.MIXGRADABLE):
                     if r:
                         return to_qvariant(self._icons['remove.pressed'])
                     else:
                         return to_qvariant(self._icons['remove.active'])
                 else:
                     return to_qvariant(self._icons['remove.inactive'])
-            elif column == UPGRADE:
-                if status == UPGRADABLE or status == MIXGRADABLE:
+            elif column == const.UPGRADE:
+                if status == const.UPGRADABLE or \
+                  status == const.MIXGRADABLE:
                     if u:
                         return to_qvariant(self._icons['upgrade.pressed'])
                     else:
                         return to_qvariant(self._icons['upgrade.active'])
                 else:
                     return to_qvariant(self._icons['upgrade.inactive'])
-            elif column == DOWNGRADE:
-                if status == DOWNGRADABLE or status == MIXGRADABLE:
+            elif column == const.DOWNGRADE:
+                if status == const.DOWNGRADABLE or \
+                  status == const.MIXGRADABLE:
                     if d:
                         return to_qvariant(self._icons['downgrade.pressed'])
                     else:
@@ -107,29 +138,31 @@ class CondaPackagesModel(QAbstractTableModel):
                 else:
                     return to_qvariant(self._icons['downgrade.inactive'])
         elif role == Qt.ToolTipRole:
-            if column == INSTALL and status == NOT_INSTALLED:
+            if column == const.INSTALL and status == const.NOT_INSTALLED:
                 return to_qvariant(_('Install package'))
-            elif column == REMOVE and (status == INSTALLED or
-                                       status == UPGRADABLE or
-                                       status == DOWNGRADABLE or
-                                       status == MIXGRADABLE):
+            elif column == const.INSTALL and (status == const.INSTALLED or
+                                              status == const.UPGRADABLE or
+                                              status == const.DOWNGRADABLE or
+                                              status == const.MIXGRADABLE):
                 return to_qvariant(_('Remove package'))
-            elif column == UPGRADE and (status == INSTALLED or
-                                        status == UPGRADABLE or
-                                        status == MIXGRADABLE):
+            elif column == const.UPGRADE and (status == const.INSTALLED or
+                                              status == const.UPGRADABLE or
+                                              status == const.MIXGRADABLE):
                 return to_qvariant(_('Upgrade package'))
-            elif column == DOWNGRADE and (status == INSTALLED or
-                                          status == DOWNGRADABLE or
-                                          status == MIXGRADABLE):
+            elif column == const.DOWNGRADE and (status == const.INSTALLED or
+                                                status == const.DOWNGRADABLE or
+                                                status == const.MIXGRADABLE):
                 return to_qvariant(_('Downgrade package'))
         elif role == Qt.ForegroundRole:
             palette = QPalette()
-            if column in [NAME, DESCRIPTION, VERSION]:
-                if status in [INSTALLED, UPGRADABLE, DOWNGRADABLE,
-                              MIXGRADABLE]:
+            if column in [const.NAME, const.DESCRIPTION,
+                          const.VERSION]:
+                if status in [const.INSTALLED, const.UPGRADABLE,
+                              const.DOWNGRADABLE, const.MIXGRADABLE]:
                     color = palette.color(QPalette.WindowText)
                     return to_qvariant(color)
-                elif status in [NOT_INSTALLED, NOT_INSTALLABLE]:
+                elif status in [const.NOT_INSTALLED,
+                                const.NOT_INSTALLABLE]:
                     color = palette.color(QPalette.Mid)
                     return to_qvariant(color)
         return to_qvariant()
@@ -142,31 +175,31 @@ class CondaPackagesModel(QAbstractTableModel):
             return to_qvariant(int(Qt.AlignRight | Qt.AlignVCenter))
         elif role == Qt.ToolTipRole:
             column = section
-            if column == INSTALL:
-                return to_qvariant(_('Install package'))
-            elif column == REMOVE:
+            if column == const.INSTALL:
+                return to_qvariant(_('Install/Remove package'))
+            elif column == const.REMOVE:
                 return to_qvariant(_('Remove package'))
-            elif column == UPGRADE:
+            elif column == const.UPGRADE:
                 return to_qvariant(_('Upgrade package'))
-            elif column == DOWNGRADE:
+            elif column == const.DOWNGRADE:
                 return to_qvariant(_('Downgrade package'))
 
         if orientation == Qt.Horizontal:
-            if section == NAME:
+            if section == const.NAME:
                 return to_qvariant(_("Name"))
-            elif section == VERSION:
+            elif section == const.VERSION:
                 return to_qvariant(_("Version"))
-            elif section == DESCRIPTION:
+            elif section == const.DESCRIPTION:
                 return to_qvariant(_("Description"))
-            elif section == STATUS:
+            elif section == const.STATUS:
                 return to_qvariant(_("Status"))
-            elif section == INSTALL:
-                return to_qvariant(_("I"))
-            elif section == REMOVE:
+            elif section == const.INSTALL:
+                return to_qvariant(_("I/R"))
+            elif section == const.REMOVE:
                 return to_qvariant(_("R"))
-            elif section == UPGRADE:
+            elif section == const.UPGRADE:
                 return to_qvariant(_("U"))
-            elif section == DOWNGRADE:
+            elif section == const.DOWNGRADE:
                 return to_qvariant(_("D"))
             else:
                 return to_qvariant()
@@ -177,7 +210,7 @@ class CondaPackagesModel(QAbstractTableModel):
 
     def columnCount(self, index=QModelIndex()):
         """Override Qt method"""
-        return len(COLUMNS)
+        return len(const.COLUMNS)
 
     def row(self, rownum):
         """ """
@@ -193,7 +226,7 @@ class CondaPackagesModel(QAbstractTableModel):
 
     def update_row_icon(self, row, column):
         """ """
-        if column in ACTION_COLUMNS:
+        if column in const.ACTION_COLUMNS:
             r = self._rows[row]
             actual_state = r[column]
             r[column] = not actual_state
@@ -203,26 +236,29 @@ class CondaPackagesModel(QAbstractTableModel):
     def is_installable(self, model_index):
         """ """
         row = model_index.row()
-        status = self._rows[row][STATUS]
-        return status == NOT_INSTALLED
+        status = self._rows[row][const.STATUS]
+        return status == const.NOT_INSTALLED
 
     def is_removable(self, model_index):
         """ """
         row = model_index.row()
-        status = self._rows[row][STATUS]
-        return status in [UPGRADABLE, DOWNGRADABLE, INSTALLED, MIXGRADABLE]
+        status = self._rows[row][const.STATUS]
+        return status in [const.UPGRADABLE, const.DOWNGRADABLE,
+                          const.INSTALLED, const.MIXGRADABLE]
 
     def is_upgradable(self, model_index):
         """ """
         row = model_index.row()
-        status = self._rows[row][STATUS]
-        return status == UPGRADABLE or status == MIXGRADABLE
+        status = self._rows[row][const.STATUS]
+        return status == const.UPGRADABLE or \
+            status == const.MIXGRADABLE
 
     def is_downgradable(self, model_index):
         """ """
         row = model_index.row()
-        status = self._rows[row][STATUS]
-        return status == DOWNGRADABLE or status == MIXGRADABLE
+        status = self._rows[row][const.STATUS]
+        return status == const.DOWNGRADABLE or \
+            status == const.MIXGRADABLE
 
     def get_package_versions(self, name, versiononly=True):
         """ Gives all the compatible package canonical name
@@ -251,15 +287,15 @@ class CondaPackagesModel(QAbstractTableModel):
         packages = self._packages_names
         if name in packages:
             rownum = packages.index(name)
-            return self.row(rownum)[VERSION]
+            return self.row(rownum)[const.VERSION]
         else:
             return u''
 
 
 class Worker(QObject):
-    """ helper class to preprocess the repodata.json file(s) information into
-    an usefull format for the CondaPackagesModel class without blocking the GUI
-    in case the number of packages or channels grows too large
+    """Helper class to preprocess the repodata.json file(s) information into
+    an usefull format for the CondaPackagesModel class without blocking the UI
+    in case the number of packages or channels grows too large.
     """
     sig_ready = Signal()
     sig_status_updated = Signal(str, bool, list)
@@ -419,13 +455,13 @@ class Worker(QObject):
             vals = self._packages_linked[n]
             canonical_name = vals[-1]
             current_ver = vals[1]
-            
+
             # fix error when package installed from other channels besides
             # the standard ones
             if n in self._packages_versions_number:
                 vers = self._packages_versions_number[n]
                 vers = sort_versions(list(set(vers)), reverse=True)
-    
+
                 self._packages_upgradable[n] = not current_ver == vers[0]
                 self._packages_downgradable[n] = not current_ver == vers[-1]
 
@@ -434,22 +470,22 @@ class Worker(QObject):
                 version = self._packages_linked[name][1]
                 if (self._packages_upgradable[name] and
                         self._packages_downgradable[name]):
-                    status = MIXGRADABLE
+                    status = const.MIXGRADABLE
                 elif self._packages_upgradable[name]:
-                    status = UPGRADABLE
+                    status = const.UPGRADABLE
                 elif self._packages_downgradable[name]:
-                    status = DOWNGRADABLE
+                    status = const.DOWNGRADABLE
                 else:
-                    status = INSTALLED
+                    status = const.INSTALLED
             else:
                 vers = self._packages_versions_number[name]
                 vers = sort_versions(list(set(vers)), reverse=True)
                 version = '-'
 
                 if len(vers) == 0:
-                    status = NOT_INSTALLABLE
+                    status = const.NOT_INSTALLABLE
                 else:
-                    status = NOT_INSTALLED
+                    status = const.NOT_INSTALLED
 
             metadata = self._get_package_metadata(name)
             description = metadata['description']
@@ -471,5 +507,3 @@ class Worker(QObject):
         self.packages_versions = self._packages_versions
 
         self.sig_ready.emit()
-
-

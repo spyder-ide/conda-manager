@@ -6,6 +6,7 @@ Setup script for conda-manager
 
 from setuptools import setup, find_packages
 import os
+import os.path as osp
 import sys
 
 
@@ -52,17 +53,32 @@ def get_data_files():
     return data_files
 
 
+def get_package_data(name, extlist):
+    """Return data files for package *name* with extensions in *extlist*"""
+    flist = []
+    # Workaround to replace os.path.relpath (not available until Python 2.6):
+    offset = len(name) + len(os.pathsep)
+    for dirpath, _dirnames, filenames in os.walk(name):
+        for fname in filenames:
+            if not fname.startswith('.') and osp.splitext(fname)[1] in extlist:
+                flist.append(osp.join(dirpath, fname)[offset:])
+    return flist
+
+
 # Requirements
-requirements = ['qtpy', 'qtawesome', 'requests']
+REQUIREMENTS = ['qtpy', 'qtawesome', 'requests']
+EXTLIST = ['.jpg', '.png', '.json', '.mo', '.ini']
+LIBNAME = 'conda_manager'
 
 
 setup(
     name='conda-manager',
-    namespace_packages=['spyderplugins'],
     version=get_version(),
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
+    package_data={LIBNAME: get_package_data(LIBNAME, EXTLIST)},
+    namespace_packages=['spyderplugins'],
     keywords=["Qt PyQt4 PyQt5 PySide conda conda-api binstar"],
-    install_requires=requirements,
+    install_requires=REQUIREMENTS,
     url='https://github.com/spyder-ide/conda-manager',
     license='MIT',
     author='Gonzalo Peña-Castellanos',

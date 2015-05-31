@@ -45,6 +45,9 @@ Standalone app
 
 Spyder plugin
 -------------
+.. image:: https://github.com/spyder-ide/conda-manager/blob/master/img_src/screenshot-spyder.png
+    :align: center
+    :alt: Conda Package Manager
 
 This project also installs as plugin for `spyder`_ (Scientific PYthon
 Development EnviRonment) to manage conda packages from within the spyder

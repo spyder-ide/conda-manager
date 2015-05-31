@@ -60,10 +60,7 @@ install:
       conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION qt pyside;
     fi
   - source activate test-environment
+script:  
   - python setup.py install
-#before_script:
-#  - cd tests
-#script:  
-#  - python example.py
 
 

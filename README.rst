@@ -36,6 +36,12 @@ downgrade, installation and removal) of `conda`_ packages and environments.
 - `Contributing`_
 - `Changelog`_
 
+Standalone app
+--------------
+.. image:: https://github.com/spyder-ide/conda-manager/blob/master/img_src/screenshot.png
+    :align: center
+    :alt: Conda Package Manager
+
 
 Spyder plugin
 -------------

@@ -160,7 +160,7 @@ class CondaPackagesTable(QTableView):
         if text != '':
             count_text = count_text + _('matching "{0}"').format(text)
 
-        self._parent._update_status(status=count_text, hide=False)
+        self._parent._update_status(status=count_text, hide=False, env=True)
 
     def search_string_changed(self, text):
         """ """

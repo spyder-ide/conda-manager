@@ -292,7 +292,7 @@ class CondaPackagesModel(QAbstractTableModel):
             return u''
 
 
-class Worker(QObject):
+class PackagesWorker(QObject):
     """Helper class to preprocess the repodata.json file(s) information into
     an usefull format for the CondaPackagesModel class without blocking the UI
     in case the number of packages or channels grows too large.

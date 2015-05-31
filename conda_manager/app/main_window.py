@@ -60,6 +60,9 @@ class MainWindow(QMainWindow):
         self.envs_menu = self.menuBar().addMenu(_("&Environments"))
         add_actions(self.envs_menu, self.envs_menu_actions)
 
+        # Channels
+        self.envs_menu = self.menuBar().addMenu(_("&Channels"))
+
         # Tools
         self.preferences_action = create_action(self,
                                                 _("&Preferences"),

@@ -16,7 +16,7 @@ from qtpy.QtCore import (QSize, Qt, QThread)
 from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton,
                         QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
-from ..models import Worker
+from ..models import PackagesWorker
 from ..utils import conda_api_q, get_conf_path, get_module_data_path
 from ..utils import constants as const
 from ..utils.downloadmanager import DownloadManager
@@ -103,7 +103,7 @@ class CondaPackagesWidget(QWidget):
         self.progress_bar.setMaximumHeight(16)
         self.progress_bar.setMaximumWidth(130)
 
-        self.setWindowTitle(_("Conda Packages"))
+        self.setWindowTitle(_("Conda Package Manager"))
         self.setMinimumSize(QSize(480, 300))
 
         # signals and slots
@@ -260,8 +260,8 @@ class CondaPackagesWidget(QWidget):
 
         self._thread.terminate()
         self._thread = QThread(self)
-        self._worker = Worker(self, self._repo_files, self._selected_env,
-                              self._prefix)
+        self._worker = PackagesWorker(self, self._repo_files,
+                                      self._selected_env, self._prefix)
         self._worker.sig_status_updated.connect(self._update_status)
         self._worker.sig_ready.connect(self._worker_ready)
         self._worker.sig_ready.connect(self._thread.quit)
@@ -283,7 +283,7 @@ class CondaPackagesWidget(QWidget):
 
         self._update_status(hide=False)
 
-    def _update_status(self, status=None, hide=True, progress=None):
+    def _update_status(self, status=None, hide=True, progress=None, env=False):
         """Update status bar, progress bar display and widget visibility
 
         status : str
@@ -301,6 +301,9 @@ class CondaPackagesWidget(QWidget):
         if status is not None:
             self._status = status
 
+        if env:
+            self._status = '{0} (<b>{1}</b>)'.format(self._status,
+                                                     self._selected_env)
         self.status_bar.setText(self._status)
 
         if progress is not None:

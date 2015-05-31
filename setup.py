@@ -5,9 +5,16 @@ Setup script for conda-manager
 """
 
 from setuptools import setup, find_packages
+import os
+import sys
 
 
-def read_version():
+# Check for Python 3
+PY3 = sys.version_info[0] == 3
+
+
+def get_version():
+    """ """
     with open("conda_manager/__init__.py") as f:
         lines = f.read().splitlines()
         for l in lines:
@@ -17,17 +24,45 @@ def read_version():
                 return version
 
 
-def readme():
+def get_readme():
+    """ """
     with open('README.rst') as f:
-        text = str(f.read())
-    return text
+        readme = str(f.read())
+    return readme
+
+
+# TODO:
+def get_data_files():
+    """Return data_files in a platform dependent manner"""
+    if sys.platform.startswith('linux'):
+        if PY3:
+            data_files = [('share/applications',
+                           ['scripts/conda-manager3.desktop']),
+                          ('share/pixmaps',
+                           ['img_src/conda-manager3.png'])]
+        else:
+            data_files = [('share/applications',
+                           ['scripts/conda-manager.desktop']),
+                          ('share/pixmaps',
+                           ['img_src/conda-manager.png'])]
+    elif os.name == 'nt':
+        data_files = [('scripts', ['img_src/conda-manager.ico'])]
+    else:
+        data_files = []
+    return data_files
+
+
+# Requirements
+requirements = ['qtpy', 'qtawesome', 'requests']
 
 
 setup(
     name='conda-manager',
-    version=read_version(),
+    namespace_packages=['spyderplugins'],
+    version=get_version(),
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     keywords=["Qt PyQt4 PyQt5 PySide conda conda-api binstar"],
+    install_requires=requirements,
     url='https://github.com/spyder-ide/conda-manager',
     license='MIT',
     author='Gonzalo Peña-Castellanos',
@@ -36,7 +71,7 @@ setup(
     maintainer_email='goanpeca@gmail.com',
     description='A stand alone PyQt/PySide GUI application for managing conda '
                 'packages and environments.',
-    long_description=readme(),
+    long_description=get_readme(),
     entry_points={
         'gui_scripts': [
             'conda-manager = conda_manager.app.main:main'

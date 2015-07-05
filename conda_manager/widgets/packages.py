@@ -251,17 +251,18 @@ class CondaPackagesWidget(QWidget):
             self._error = None
 
         self._setup_widget()
-    # ------------------------------------------------------------------------
 
+    # ------------------------------------------------------------------------
     def _setup_widget(self):
         """ """
         if self._selected_env is None:
             self._selected_env = const.ROOT
 
         self._thread.terminate()
+
         self._thread = QThread(self)
         self._worker = PackagesWorker(self, self._repo_files,
-                                      self._selected_env, self._prefix)
+                                  self._selected_env, self._prefix)
         self._worker.sig_status_updated.connect(self._update_status)
         self._worker.sig_ready.connect(self._worker_ready)
         self._worker.sig_ready.connect(self._thread.quit)
@@ -438,6 +439,16 @@ class CondaPackagesWidget(QWidget):
         self._selected_env = env
         self._setup_widget()
 
+    def disable_widgets(self):
+        """ """
+        for widget in self.widgets:
+            widget.setDisabled(True)
+
+    def enable_widgets(self):
+        """ """
+        for widget in self.widgets:
+            widget.setDisabled(False)
+        
 # TODO:  update packages.ini file
 # TODO: Define some automatic tests that can include the following:
 

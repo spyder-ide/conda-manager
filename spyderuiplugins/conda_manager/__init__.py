@@ -109,7 +109,12 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
 
     def register_plugin(self):
         """Register plugin in Spyder's main window"""
-        self.main.add_dockwidget(self)
+        main = self.main
+        main.add_dockwidget(self)
+
+        if getattr(main.projectexplorer, 'sig_project_closed', False):
+            main.projectexplorer.sig_project_closed.connect(self.project_closed)
+            main.projectexplorer.sig_project_loaded.connect(self.project_loaded)
 
     def refresh_plugin(self):
         """Refresh pylint widget"""
@@ -126,7 +131,27 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     # ------ Public API -------------------------------------------------------
     def set_env(self, env):
         """ """
+        self.set_environment(env, bool(env))
         # TODO:
+
+    # ------ Project explorer API ---------------------------------------------
+    def get_active_project_path(self):
+        """ """
+        pe = self.main.projectexplorer
+        if pe:
+            project = pe.get_active_project()
+            return project.get_root()
+
+    def project_closed(self, project_path):
+        """ """
+        self.set_env(None)
+        self.disable_widgets()
+
+    def project_loaded(self, project_path):
+        """ """
+        
+        self.set_env(None)
+        self.enable_widgets()
 
 # =============================================================================
 # The following statements are required to register this 3rd party plugin:

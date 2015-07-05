@@ -401,7 +401,7 @@ class PackagesWorker(QObject):
             for n in self._packages:
                 self._packages_licenses_all[n] = {}
 
-        pybuild = 'py' + ''.join(pyver.split('.'))[:-1] + '_'  # + pybuild
+        pybuild = 'py' + ''.join(pyver.split('.')[:-1]) + '_'  # + pybuild
         if numpyver is None and numpybuild is None:
             numpybuild = ''
         else:

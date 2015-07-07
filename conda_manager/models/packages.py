@@ -276,7 +276,7 @@ class CondaPackagesModel(QAbstractTableModel):
                 for ve in ver:
                     n, v, b = conda_api_q.split_canonical_name(ve)
                     temp.append(v)
-                return temp
+                return sort_versions(list(set(temp)))
             else:
                 return versions[name]
         else:
@@ -372,7 +372,14 @@ class PackagesWorker(QObject):
         # First do the list of linked packages so in case there is no json
         # We can show at least that
         self._packages_linked = {}
-        canonical_names = sorted(list(cp.linked(self._prefix)))
+        # FIXME: move this logic outside...
+        
+        print('PACKAGES if root', self._prefix)
+        print('PACKAGES if root', self._env)
+        if self._env == 'root':
+            canonical_names = sorted(list(cp.linked(self._prefix)))
+        else:
+            canonical_names = sorted(list(cp.linked(self._env)))
 
         # This has to do with the versions of the selected environment, NOT
         # with the python version running!

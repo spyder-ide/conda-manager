@@ -4,6 +4,7 @@
 """
 
 import gettext
+import os.path as osp
 
 from qtpy.QtCore import QSize, Qt
 from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
@@ -156,7 +157,11 @@ class CondaPackageActionDialog(QDialog):
         """ """
         name = [self._name + '=' + self._version_text]
 
-        self._conda_process.dependencies(name=self._env, pkgs=name,
+        # Temporal fix
+        env_name = self._env
+        if env_name != 'root':
+            env_name = osp.basename(env_name)
+        self._conda_process.dependencies(name=env_name, pkgs=name,
                                          dep=dependencies)
 
     def _changed_checkbox(self, state):

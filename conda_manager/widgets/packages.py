@@ -12,7 +12,7 @@ import platform
 import shutil
 import sys
 
-from qtpy.QtCore import (QSize, Qt, QThread)
+from qtpy.QtCore import (QSize, Qt, QThread, Signal)
 from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton,
                         QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
@@ -39,6 +39,10 @@ class CondaPackagesWidget(QWidget):
     # file inside DATA_PATH with metadata for conda packages
     DATABASE_FILE = 'packages.ini'
 
+    sig_worker_ready = Signal()
+    sig_packages_ready = Signal()
+    sig_environment_created = Signal()
+
     def __init__(self, parent):
         super(CondaPackagesWidget, self).__init__(parent)
         self._parent = parent
@@ -47,7 +51,7 @@ class CondaPackagesWidget(QWidget):
             conda_api_q.CondaProcess(self, self._on_conda_process_ready,
                                      self._on_conda_process_partial)
         self._prefix = conda_api_q.ROOT_PREFIX
-
+        print(self._prefix)
         self._download_manager = DownloadManager(self,
                                                  self._on_download_finished,
                                                  self._on_download_progress,
@@ -59,6 +63,7 @@ class CondaPackagesWidget(QWidget):
         self._db_metadata.readfp(open(osp.join(self.DATA_PATH, self._db_file)))
         self._packages_names = None
         self._row_data = None
+        self._hide_widgets = False
 
         # TODO: Hardcoded channels for the moment
         self._default_channels = [
@@ -250,10 +255,10 @@ class CondaPackagesWidget(QWidget):
                         self._repo_files.remove(repo_file)
             self._error = None
 
-        self._setup_widget()
+        self.setup_packages()
 
     # ------------------------------------------------------------------------
-    def _setup_widget(self):
+    def setup_packages(self):
         """ """
         if self._selected_env is None:
             self._selected_env = const.ROOT
@@ -283,6 +288,8 @@ class CondaPackagesWidget(QWidget):
         self.table.filter_changed()
 
         self._update_status(hide=False)
+        self.sig_worker_ready.emit()
+        self.sig_packages_ready.emit()
 
     def _update_status(self, status=None, hide=True, progress=None, env=False):
         """Update status bar, progress bar display and widget visibility
@@ -302,9 +309,14 @@ class CondaPackagesWidget(QWidget):
         if status is not None:
             self._status = status
 
+        # Temporal fix
+        if self._selected_env is not None and self._selected_env is not 'root':
+            short_env = osp.basename(self._selected_env)
+        else:
+            short_env = 'root'
         if env:
             self._status = '{0} (<b>{1}</b>)'.format(self._status,
-                                                     self._selected_env)
+                                                     short_env)
         self.status_bar.setText(self._status)
 
         if progress is not None:
@@ -336,13 +348,17 @@ class CondaPackagesWidget(QWidget):
             dic['name'] = env
             dic['pkg'] = pkg
             dic['dep'] = not (dep == 0 and state)
-
+            dic['action'] = None 
             self._run_conda_process(action, dic)
 
     def _run_conda_process(self, action, dic):
         """ """
         cp = self._conda_process
         name = dic['name']
+
+        # Temporal fix
+        if name != 'root':
+            name = osp.basename(name)
 
         if 'pkg' in dic and 'dep' in dic:
             pkgs = dic['pkg']
@@ -358,9 +374,10 @@ class CondaPackagesWidget(QWidget):
                       _(' from <i>') + dic['name'] + '</i>')
             cp.remove(pkgs, name=name)
 
-    # --- actions to be implemented in case of environment needs
+        # --- actions to be implemented in case of environment needs
         elif action == const.CREATE:
             status = _('Creating environment <b>') + dic['name'] + '</b>'
+            cp.create(name=name, pkgs=[pkgs])
         elif action == const.CLONE:
             status = (_('Cloning ') + '<i>' + dic['cloned from'] +
                       _('</i> into <b>') + dic['name'] + '</b>')
@@ -368,6 +385,7 @@ class CondaPackagesWidget(QWidget):
             status = _('Removing environment <b>') + dic['name'] + '</b>'
 
         self._update_status(hide=True, status=status, progress=[0, 0])
+        self._temporal_action_dic = dic
 
     def _on_conda_process_ready(self):
         """ """
@@ -379,7 +397,10 @@ class CondaPackagesWidget(QWidget):
         else:
             self._update_status(hide=True)
 
-        self._setup_widget()
+        dic = self._temporal_action_dic
+        if dic['action'] == const.CREATE:
+            self.sig_environment_created.emit()
+        self.setup_packages()
 
     def _on_conda_process_partial(self):
         """ """
@@ -437,18 +458,43 @@ class CondaPackagesWidget(QWidget):
         """Reset environent to reflect this environment in the pacakge model"""
         # TODO: check if env exists!
         self._selected_env = env
-        self._setup_widget()
+        self.setup_packages()
 
-    def disable_widgets(self):
+    def get_active_env(self):
         """ """
-        for widget in self.widgets:
-            widget.setDisabled(True)
+        return self._selected_env
+
+    def get_environments(self, path=None):
+        """Get a list of conda environments."""
+        return self._conda_process.get_envs()
+
+    def get_prefix_envname(self, name):
+        """ """
+        return self._conda_process.get_prefix_envname(name)
+
+    def get_package_versions(self, name):
+        """ """
+        return self.table.source_model.get_package_versions(name)
+
+    def create_environment(self, name, package):
+        """ """
+        # If environment exists already? GUI should take care of this
+        # BUT the api call should simply set that env as the env
+        dic = {}
+        dic['name'] = name
+        dic['pkg'] = package
+        dic['dep'] = True  # Not really needed but for the moment!
+        dic['action'] = const.CREATE  
+        self._run_conda_process(const.CREATE, dic)
 
     def enable_widgets(self):
         """ """
-        for widget in self.widgets:
-            widget.setDisabled(False)
-        
+	self.table.hide_columns()
+
+    def disable_widgets(self):
+        """ """
+	self.table.hide_action_columns()
+
 # TODO:  update packages.ini file
 # TODO: Define some automatic tests that can include the following:
 

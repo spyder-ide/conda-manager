@@ -9,8 +9,9 @@ Conda Package Manager Plugin.
 """
 
 import gettext
+import os.path as osp
 
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, Signal
 from qtpy.QtWidgets import QGridLayout, QGroupBox, QVBoxLayout
 
 from spyderlib.plugins import SpyderPluginMixin, PluginConfigPage
@@ -41,10 +42,14 @@ class CondaPackagesConfigPage(PluginConfigPage):
 
         network_layout = QGridLayout()
         network_layout.addWidget(self.checkbox_proxy, 0, 0)
-        network_layout.addWidget(server, 1, 0)
-        network_layout.addWidget(port, 1, 1)
-        network_layout.addWidget(user, 2, 0)
-        network_layout.addWidget(password, 2, 1)
+        network_layout.addWidget(server.label, 1, 0)
+        network_layout.addWidget(server.textbox, 1, 1)
+        network_layout.addWidget(port.label, 1, 2)
+        network_layout.addWidget(port.textbox, 1, 3)
+        network_layout.addWidget(user.label, 2, 0)
+        network_layout.addWidget(user.textbox, 2, 1)
+        network_layout.addWidget(password.label, 2, 2)
+        network_layout.addWidget(password.textbox, 2, 3)
         network_group.setLayout(network_layout)
 
         vlayout = QVBoxLayout()
@@ -75,9 +80,15 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     CONF_SECTION = 'conda_manager'
     CONFIGWIDGET_CLASS = CondaPackagesConfigPage
 
+    sig_environment_created = Signal()
+
     def __init__(self, parent=None):
         CondaPackagesWidget.__init__(self, parent=parent)
         SpyderPluginMixin.__init__(self, parent)
+
+	self.root_env = 'root'
+        self._env_to_set = self.get_active_env()
+
 
         # Initialize plugin
         self.initialize_plugin()
@@ -113,8 +124,12 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         main.add_dockwidget(self)
 
         if getattr(main.projectexplorer, 'sig_project_closed', False):
-            main.projectexplorer.sig_project_closed.connect(self.project_closed)
-            main.projectexplorer.sig_project_loaded.connect(self.project_loaded)
+            pe = main.projectexplorer
+            pe.condamanager = self
+            pe.sig_project_closed.connect(self.project_closed)
+            pe.sig_project_loaded.connect(self.project_loaded)
+            self.sig_worker_ready.connect(self._after_load)
+            self.sig_environment_created.connect(pe.sig_environment_created)
 
     def refresh_plugin(self):
         """Refresh pylint widget"""
@@ -129,9 +144,16 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         pass
 
     # ------ Public API -------------------------------------------------------
+    def create_env(self, name, package):
+        self.create_environment(name, package)
+        if self.dockwidget.isHidden():
+            self.dockwidget.show()
+        self.dockwidget.raise_()
+
     def set_env(self, env):
         """ """
-        self.set_environment(env, bool(env))
+#        self.sig_packages_ready.disconnect()
+        self.set_environment(env)
         # TODO:
 
     # ------ Project explorer API ---------------------------------------------
@@ -140,18 +162,35 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         pe = self.main.projectexplorer
         if pe:
             project = pe.get_active_project()
-            return project.get_root()
+            if project:
+                return project.get_root()
 
     def project_closed(self, project_path):
         """ """
-        self.set_env(None)
-        self.disable_widgets()
+        self.set_env(self.root_env)
 
     def project_loaded(self, project_path):
         """ """
-        
-        self.set_env(None)
-        self.enable_widgets()
+        name = osp.basename(project_path)
+        env = self.get_prefix_envname(name)
+
+        #self.sig_packages_ready.connect(self.set_env)
+
+        #print('name, envprefix', name, env_prefix)
+        # If None, no matching package was found!
+
+        if env:
+            self._env_to_set = env
+            self.set_env(env)
+
+    def _after_load(self):
+        """ """
+        active_env = self.get_active_env()
+        if active_env == 'root':  # Root
+            self.disable_widgets()
+        else:
+            self.enable_widgets()
+
 
 # =============================================================================
 # The following statements are required to register this 3rd party plugin:

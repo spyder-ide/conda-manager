@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2014 Gonzalo Peña (@goanpeca)
+# Copyright © 2014-2015 Gonzalo Peña (@goanpeca)
 # Licensed under the terms of the MIT License
 # (see spyderlib/__init__.py for details)
 
@@ -15,7 +15,8 @@ from os.path import basename, isdir, join
 from qtpy.QtGui import QVBoxLayout, QHBoxLayout, QPushButton, QWidget
 from qtpy.QtCore import QObject, QProcess, QByteArray
 
-from ..utils.py3compat import to_text_string
+#from ..utils.py3compat import to_text_string
+from conda_manager.utils.py3compat import to_text_string
 
 __version__ = '1.2.1'
 
@@ -65,7 +66,7 @@ class CondaEnvExistsError(CondaError):
 
 
 class CondaProcess(QObject):
-    """conda-api modified to work with QProcess"""
+    """conda-api modified to work with QProcess instead of popen"""
     ENCODING = 'ascii'
 
     def __init__(self, parent, on_finished=None, on_partial=None):
@@ -135,14 +136,14 @@ class CondaProcess(QObject):
             if m is None:
                 raise Exception('output did not match: %r' % stderr)
             self.output = m.group(1)
-        elif function == 'get_envs':
-            info = self.output
-            self.output = info['envs']
-        elif function == 'get_prefix_envname':
-            name = self._name
-            envs = self.output
-            self.output = self._get_prefix_envname_helper(name, envs)
-            self._name = None
+#        elif function == 'get_envs':
+#            info = self.output
+#            self.output = info['envs']
+#        elif function == 'get_prefix_envname':
+#            name = self._name
+#            envs = self.output
+#            self.output = self._get_prefix_envname_helper(name, envs)
+#            self._name = None
         elif function == 'config_path':
             result = self.output
             self.output = result['rc_path']
@@ -178,11 +179,8 @@ class CondaProcess(QObject):
                 return prefix
         return None
 
-    def _call_conda(self, extra_args, abspath=True):
+    def _abspath(self, abspath):
         """ """
-        # call conda with the list of extra arguments, and return the tuple
-        # stdout, stderr
-        global ROOT_PREFIX
         if abspath:
             if sys.platform == 'win32':
                 python = join(ROOT_PREFIX, 'python.exe')
@@ -194,7 +192,25 @@ class CondaProcess(QObject):
             cmd_list = [python, conda]
         else:  # just use whatever conda is on the path
             cmd_list = ['conda']
+        return cmd_list
 
+    def _call_conda(self, extra_args, abspath=True):
+        """ """
+        # call conda with the list of extra arguments, and return the tuple
+        # stdout, stderr
+        global ROOT_PREFIX
+#        if abspath:
+#            if sys.platform == 'win32':
+#                python = join(ROOT_PREFIX, 'python.exe')
+#                conda = join(ROOT_PREFIX,
+#                             'Scripts', 'conda-script.py')
+#            else:
+#                python = join(ROOT_PREFIX, 'bin/python')
+#                conda = join(ROOT_PREFIX, 'bin/conda')
+#            cmd_list = [python, conda]
+#        else:  # just use whatever conda is on the path
+#            cmd_list = ['conda']
+        cmd_list = self._abspath(abspath)
         cmd_list.extend(extra_args)
 
 #        try:
@@ -288,15 +304,19 @@ class CondaProcess(QObject):
             # adapted code
             # ------------
             if ROOT_PREFIX is None:
-                qprocess = QProcess()
-                cmd_list = ['conda', 'info', '--json']
-                qprocess.start(cmd_list[0], cmd_list[1:])
-                qprocess.waitForFinished()
+#                qprocess = QProcess()
+#                cmd_list = ['conda', 'info', '--json']
+#                qprocess.start(cmd_list[0], cmd_list[1:])
+#                qprocess.waitForFinished()
 
-                output = qprocess.readAllStandardOutput()
-                output = handle_qbytearray(output, CondaProcess.ENCODING)
-                info = json.loads(output)
+#                output = qprocess.readAllStandardOutput()
+#                output = handle_qbytearray(output, CondaProcess.ENCODING)
+#                info = json.loads(output)
+#                ROOT_PREFIX = info['root_prefix']
+                info = self.info(abspath=False)
                 ROOT_PREFIX = info['root_prefix']
+
+
 
     def get_conda_version(self):
         """
@@ -328,30 +348,33 @@ class CondaProcess(QObject):
 #        info = self._call_and_parse(['info', '--json'])
 #        return info['envs']
 
+        info = self.info()
+        return info['envs']
+
         # adapted code
         # ------------
-        if self._process.state() == QProcess.NotRunning:
-            self._function_called = 'get_envs'
-            self._call_and_parse(['info', '--json'])
+#        if self._process.state() == QProcess.NotRunning:
+#            self._function_called = 'get_envs'
+#            self._call_and_parse(['info', '--json'])
 
     def get_prefix_envname(self, name):
         """
         Given the name of an environment return its full prefix path, or None
         if it cannot be found.
         """
-#        if name == 'root':
-#            return self.ROOT_PREFIX
-#        for prefix in self.get_envs():
-#            if basename(prefix) == name:
-#                return prefix
-#        return None
+        if name == 'root':
+            return ROOT_PREFIX
+        for prefix in self.get_envs():
+            if basename(prefix) == name:
+                return prefix
+        return None
 
         # adapted code
         # ------------
-        if self._process.state() == QProcess.NotRunning:
-            self._name = name
-            self._function_called = 'get_prefix_envname'
-            self._call_and_parse(['info', '--json'])
+#        if self._process.state() == QProcess.NotRunning:
+#            self._name = name
+#            self._function_called = 'get_prefix_envname'
+#            self._call_and_parse(['info', '--json'])
 
     def info(self, abspath=True):
         """
@@ -361,11 +384,21 @@ class CondaProcess(QObject):
         """
 #        return self._call_and_parse(['info', '--json'], abspath=abspath)
 
+        qprocess = QProcess()
+        cmd_list = self._abspath(abspath)
+        cmd_list.extend(['info', '--json'])
+        qprocess.start(cmd_list[0], cmd_list[1:])
+        qprocess.waitForFinished()
+        output = qprocess.readAllStandardOutput()
+        output = handle_qbytearray(output, CondaProcess.ENCODING)
+        info = json.loads(output)
+        return info
+
         # adapted code
         # ------------
-        if self._process.state() == QProcess.NotRunning:
-            self._function_called = 'info'
-            self._call_and_parse(['info', '--json'], abspath=abspath)
+#        if self._process.state() == QProcess.NotRunning:
+#            self._function_called = 'info'
+#            self._call_and_parse(['info', '--json'], abspath=abspath)
 
     def package_info(self, package, abspath=True):
         """
@@ -933,7 +966,7 @@ class CondaProcess(QObject):
 
     # ---- Additional methods not in conda-api
     def pip(self, name):
-        """ """
+        """Get list of pip installed packages."""
         cmd_list = ['list', '-n', name]
 
         if self._process.state() == QProcess.NotRunning:

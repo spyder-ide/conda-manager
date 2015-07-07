@@ -5,7 +5,7 @@ Main window.
 import gettext
 
 from qtpy.QtCore import QUrl
-from qtpy.QtGui import QDesktopServices
+from qtpy.QtGui import QDesktopServices, QMenu
 from qtpy.QtWidgets import QMainWindow, QMessageBox
 
 from .. import __version__
@@ -55,10 +55,13 @@ class MainWindow(QMainWindow):
                                               triggered=self.clone_env)
         self.remove_env_action = create_action(self, _("&Remove"),
                                                triggered=self.remove_env)
+        self.envs_list_menu = QMenu(_('Environments'))
         self.envs_menu_actions = [self.add_env_action, self.clone_env_action,
-                                  self.remove_env_action]
+                                  self.remove_env_action, None,
+                                  self.envs_list_menu]
         self.envs_menu = self.menuBar().addMenu(_("&Environments"))
         add_actions(self.envs_menu, self.envs_menu_actions)
+        self.update_env_menu()
 
         # Channels
         self.envs_menu = self.menuBar().addMenu(_("&Channels"))
@@ -83,6 +86,28 @@ class MainWindow(QMainWindow):
         add_actions(self.help_menu, self.help_menu_actions)
 
         self.setWindowIcon(get_icon('condapackages.png'))
+
+    def update_env_menu(self):
+        """ """
+        envs_list_actions = []
+        envs = self.get_enviroments()
+        self.envs_list_menu.clear()
+        for env in envs:
+            def trigger(value=False, e=env):
+                return lambda : self.set_environments(e)
+            a = create_action(self, env, triggered=trigger())
+            envs_list_actions.append(a)
+        add_actions(self.envs_list_menu, envs_list_actions)
+
+    def get_enviroments(self, path=None):
+        """ """
+        
+        return ['root'] + self.packages.get_environments()
+
+    def set_environments(self, env):
+        """ """
+#        print(env)
+        self.packages.set_environment(env)
 
     def add_env(self):
         """ """

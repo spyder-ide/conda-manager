@@ -19,7 +19,6 @@ from ..utils.qthelpers import add_actions, create_action
 _ = gettext.gettext
 HIDE_COLUMNS = [const.STATUS, const.URL, const.LICENSE, const.REMOVE]
 
-
 class CondaPackagesTable(QTableView):
     """ """
     WIDTH_NAME = 120
@@ -109,7 +108,16 @@ class CondaPackagesTable(QTableView):
 
     def hide_columns(self):
         """ """
+        for col in const.COLUMNS:
+            self.showColumn(col)
         for col in HIDE_COLUMNS:
+            self.hideColumn(col)
+
+    def hide_action_columns(self):
+        """ """
+        for col in const.COLUMNS:
+            self.showColumn(col)
+        for col in HIDE_COLUMNS + const.ACTION_COLUMNS:
             self.hideColumn(col)
 
     def filter_changed(self):

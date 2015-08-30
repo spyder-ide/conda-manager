@@ -362,22 +362,24 @@ class CondaPackagesWidget(QWidget):
 
         if 'pkg' in dic and 'dep' in dic:
             pkgs = dic['pkg']
+            if not isinstance(pkgs, list):
+                pkgs = [pkgs]
             dep = dic['dep']
 
         if action == const.INSTALL or action == const.UPGRADE or \
            action == const.DOWNGRADE:
             status = _('Installing <b>') + dic['pkg'] + '</b>'
             status = status + _(' into <i>') + dic['name'] + '</i>'
-            cp.install(name=name, pkgs=[pkgs], dep=dep)
+            cp.install(name=name, pkgs=pkgs, dep=dep)
         elif action == const.REMOVE:
-            status = (_('Removing <b>') + dic['pkg'] + '</b>' +
+            status = (_('moving <b>') + dic['pkg'] + '</b>' +
                       _(' from <i>') + dic['name'] + '</i>')
             cp.remove(pkgs, name=name)
 
         # --- actions to be implemented in case of environment needs
         elif action == const.CREATE:
             status = _('Creating environment <b>') + dic['name'] + '</b>'
-            cp.create(name=name, pkgs=[pkgs])
+            cp.create(name=name, pkgs=pkgs)
         elif action == const.CLONE:
             status = (_('Cloning ') + '<i>' + dic['cloned from'] +
                       _('</i> into <b>') + dic['name'] + '</b>')

@@ -76,7 +76,7 @@ setup(
     version=get_version(),
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     package_data={LIBNAME: get_package_data(LIBNAME, EXTLIST)},
-    namespace_packages=['spyderuiplugins'],
+    namespace_packages=['spyplugins'],
     keywords=["Qt PyQt4 PyQt5 PySide conda conda-api binstar"],
     install_requires=REQUIREMENTS,
     url='https://github.com/spyder-ide/conda-manager',

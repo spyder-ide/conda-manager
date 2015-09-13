@@ -16,6 +16,7 @@ from qtpy.QtCore import (QSize, Qt, QThread, Signal)
 from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton,
                         QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
+from ..data.repodata.packageinfo import PACKAGES
 from ..models import PackagesWorker
 from ..utils import conda_api_q, get_conf_path, get_module_data_path
 from ..utils import constants as const
@@ -38,6 +39,7 @@ class CondaPackagesWidget(QWidget):
 
     # file inside DATA_PATH with metadata for conda packages
     DATABASE_FILE = 'packages.ini'
+    DATABASE = PACKAGES
 
     sig_worker_ready = Signal()
     sig_packages_ready = Signal()

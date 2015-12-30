@@ -12,12 +12,17 @@ build:
 requirements:
   build:
     - python
+    - requests
+    - qtpy
+    - qtawesome
   run:
     - python
+    - requests
+    - qtpy
+    - qtawesome
 
 test:
   imports:
-    - qtpy
     - conda_manager
 
   requires:

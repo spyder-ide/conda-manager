@@ -13,16 +13,11 @@ import sys
 # Check for Python 3
 PY3 = sys.version_info[0] == 3
 
+version_ns = {}
+here = os.path.abspath(os.path.dirname(__file__))
 
-def get_version():
-    """ """
-    with open("conda_manager/__init__.py") as f:
-        lines = f.read().splitlines()
-        for l in lines:
-            if "__version__" in l:
-                version = l.split("=")[1].strip()
-                version = version.replace("'", '').replace('"', '')
-                return version
+with open(os.path.join(here, 'conda_manager', '_version.py')) as f:
+    exec(f.read(), {}, version_ns)
 
 
 def get_readme():
@@ -73,7 +68,7 @@ LIBNAME = 'conda_manager'
 
 setup(
     name='conda-manager',
-    version=get_version(),
+    version=version_ns['__version__'],
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
     package_data={LIBNAME: get_package_data(LIBNAME, EXTLIST)},
     namespace_packages=['spyplugins'],

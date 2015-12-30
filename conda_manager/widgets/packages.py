@@ -102,7 +102,6 @@ class CondaPackagesWidget(QWidget):
         # setup widgets
         self.combobox_filter.addItems([k for k in
                                        const.COMBOBOX_VALUES_ORDERED])
-        self.combobox_filter.setCurrentIndex(const.ALL)
         self.combobox_filter.setMinimumWidth(120)
 
         self.progress_bar.setVisible(False)
@@ -146,6 +145,7 @@ class CondaPackagesWidget(QWidget):
         self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h))
 
         self.setLayout(self._layout)
+
         # setup
         if self._supports_architecture():
             self.update_package_index()
@@ -290,6 +290,7 @@ class CondaPackagesWidget(QWidget):
         self.table.filter_changed()
 
         self._update_status(hide=False)
+        self.filter_package(const.INSTALLED)
         self.sig_worker_ready.emit()
         self.sig_packages_ready.emit()
 
@@ -376,7 +377,7 @@ class CondaPackagesWidget(QWidget):
         elif action == const.REMOVE:
             status = (_('moving <b>') + dic['pkg'] + '</b>' +
                       _(' from <i>') + dic['name'] + '</i>')
-            cp.remove(pkgs, name=name)
+            cp.remove(pkgs[0], name=name)
 
         # --- actions to be implemented in case of environment needs
         elif action == const.CREATE:

@@ -222,6 +222,7 @@ class CondaProcess(QObject):
         # adapted code
         # ------------
         self.error, self.output = None, None
+        print(cmd_list[0], cmd_list[1:])
         self._process.start(cmd_list[0], cmd_list[1:])
 
     def _call_and_parse(self, extra_args, abspath=True):

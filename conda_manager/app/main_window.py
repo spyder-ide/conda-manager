@@ -2,17 +2,20 @@
 """
 Main window.
 """
+# Standard library imports
 import gettext
 
+# Third party imports
 from qtpy.QtCore import QUrl
 from qtpy.QtGui import QDesktopServices, QMenu
 from qtpy.QtWidgets import QMainWindow, QMessageBox
 
-from .. import __version__
-from ..utils import get_icon
-from ..utils.py3compat import PY3
-from ..utils.qthelpers import add_actions, create_action
-from ..widgets import CondaPackagesWidget
+# Local imports
+from conda_manager import __version__
+from conda_manager.utils import get_icon
+from conda_manager.utils.py3compat import PY3
+from conda_manager.utils.qthelpers import add_actions, create_action
+from conda_manager.widgets import CondaPackagesWidget
 
 _ = gettext.gettext
 

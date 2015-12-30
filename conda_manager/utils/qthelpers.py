@@ -23,10 +23,7 @@ from qtpy.compat import to_qvariant, from_qvariant
 
 
 # Local import
-from spyderlib.config.base import get_image_path, running_in_mac_app
-from spyderlib.config.gui import get_shortcut
-from spyderlib.utils import programs
-from spyderlib.py3compat import is_text_string, to_text_string
+from .py3compat import is_text_string, to_text_string
 
 # Note: How to redirect a signal from widget *a* to widget *b* ?
 # ----
@@ -37,50 +34,6 @@ from spyderlib.py3compat import is_text_string, to_text_string
 # (self.listwidget is widget *a* and self is widget *b*)
 #    self.connect(self.listwidget, SIGNAL('option_changed'),
 #                 lambda *args: self.emit(SIGNAL('option_changed'), *args))
-
-
-def get_icon(name, default=None, resample=False):
-    """Return image inside a QIcon object
-    default: default image name or icon
-    resample: if True, manually resample icon pixmaps for usual sizes
-    (16, 24, 32, 48, 96, 128, 256). This is recommended for QMainWindow icons 
-    created from SVG images on non-Windows platforms due to a Qt bug (see 
-    Issue 1314)."""
-    if default is None:
-        icon = QIcon(get_image_path(name))
-    elif isinstance(default, QIcon):
-        icon_path = get_image_path(name, default=None)
-        icon = default if icon_path is None else QIcon(icon_path)
-    else:
-        icon = QIcon(get_image_path(name, default))
-    if resample:
-        icon0 = QIcon()
-        for size in (16, 24, 32, 48, 96, 128, 256, 512):
-            icon0.addPixmap(icon.pixmap(size, size))
-        return icon0 
-    else:
-        return icon
-
-
-def get_image_label(name, default="not_found.png"):
-    """Return image inside a QLabel object"""
-    label = QLabel()
-    label.setPixmap(QPixmap(get_image_path(name, default)))
-    return label
-
-
-class MacApplication(QApplication):
-    """Subclass to be able to open external files with our Mac app"""
-    open_external_file = Signal(str)
-    
-    def __init__(self, *args):
-        QApplication.__init__(self, *args)
-
-    def event(self, event):
-        if event.type() == QEvent.FileOpen:
-            fname = str(event.file())
-            self.open_external_file.emit(fname)
-        return QApplication.event(self, event)
 
 
 def qapplication(translate=True):

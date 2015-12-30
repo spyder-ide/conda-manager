@@ -1,11 +1,14 @@
 """
 Application entry point
 """
+# Standard library imports
 import sys
 
+# Third party imports
 from qtpy.QtWidgets import QApplication
 
-from .main_window import MainWindow
+# Local imports
+from conda_manager.app import MainWindow
 
 
 def main():
@@ -13,3 +16,7 @@ def main():
     window = MainWindow()
     window.show()
     app.exec_()
+
+
+if __name__ == '__main__':
+    main()

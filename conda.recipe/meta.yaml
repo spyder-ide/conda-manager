@@ -15,11 +15,13 @@ requirements:
     - requests
     - qtpy
     - spyder
+    - qtawesome
   run:
     - python
     - requests
     - qtpy
     - spyder
+    - qtawesome
 
 test:
   imports:

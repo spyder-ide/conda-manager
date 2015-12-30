@@ -14,12 +14,12 @@ requirements:
     - python
     - requests
     - qtpy
-    - qtawesome
+    - spyder
   run:
     - python
     - requests
     - qtpy
-    - qtawesome
+    - spyder
 
 test:
   imports:

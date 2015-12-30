@@ -451,6 +451,7 @@ class PackagesWorker(QObject):
                 else:
                     tempver_cano.append(ver)
                     tempver_num.append(v)
+
             self._packages_versions[name] = sort_versions(tempver_cano,
                                                           reverse=True)
             self._packages_versions_number[name] = sort_versions(tempver_num,
@@ -469,6 +470,9 @@ class PackagesWorker(QObject):
                 vers = self._packages_versions_number[n]
                 vers = sort_versions(list(set(vers)), reverse=True)
 
+                # If no other version is available just give a dummy version
+                if not vers:
+                    vers = [-1]
                 self._packages_upgradable[n] = not current_ver == vers[0]
                 self._packages_downgradable[n] = not current_ver == vers[-1]
 

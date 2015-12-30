@@ -11,7 +11,7 @@ from qtpy.QtGui import QDesktopServices, QMenu
 from qtpy.QtWidgets import QMainWindow, QMessageBox
 
 # Local imports
-from conda_manager import __version__
+from conda_manager._version import __version__
 from conda_manager.utils import get_icon
 from conda_manager.utils.py3compat import PY3
 from conda_manager.utils.qthelpers import add_actions, create_action
@@ -97,14 +97,13 @@ class MainWindow(QMainWindow):
         self.envs_list_menu.clear()
         for env in envs:
             def trigger(value=False, e=env):
-                return lambda : self.set_environments(e)
+                return lambda: self.set_environments(e)
             a = create_action(self, env, triggered=trigger())
             envs_list_actions.append(a)
         add_actions(self.envs_list_menu, envs_list_actions)
 
     def get_enviroments(self, path=None):
         """ """
-        
         return ['root'] + self.packages.get_environments()
 
     def set_environments(self, env):

@@ -431,19 +431,6 @@ class CondaPackagesWidget(QWidget):
 
     # Public api
     # ----------
-    def update_package_index(self):
-        """ """
-        self._set_channels()
-        self._download_repodata()
-
-    def search_package(self, text):
-        """ """
-        self.table.search_string_changed(text)
-
-    def filter_package(self, value):
-        """ """
-        self.table.filter_status_changed(value)
-
     def get_package_metadata(self, name):
         """ """
         db = self._db_metadata
@@ -458,6 +445,19 @@ class CondaPackagesWidget(QWidget):
                 except (cp.NoSectionError, cp.NoOptionError):
                     pass
         return metadata
+
+    def update_package_index(self):
+        """ """
+        self._set_channels()
+        self._download_repodata()
+
+    def search_package(self, text):
+        """ """
+        self.table.search_string_changed(text)
+
+    def filter_package(self, value):
+        """ """
+        self.table.filter_status_changed(value)
 
     def set_environment(self, env):
         """Reset environent to reflect this environment in the pacakge model"""
@@ -489,16 +489,16 @@ class CondaPackagesWidget(QWidget):
         dic['name'] = name
         dic['pkg'] = package
         dic['dep'] = True  # Not really needed but for the moment!
-        dic['action'] = const.CREATE  
+        dic['action'] = const.CREATE
         self._run_conda_process(const.CREATE, dic)
 
     def enable_widgets(self):
         """ """
-	self.table.hide_columns()
+        self.table.hide_columns()
 
     def disable_widgets(self):
         """ """
-	self.table.hide_action_columns()
+        self.table.hide_action_columns()
 
 # TODO:  update packages.ini file
 # TODO: Define some automatic tests that can include the following:

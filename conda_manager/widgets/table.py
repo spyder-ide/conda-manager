@@ -19,6 +19,7 @@ from ..utils.qthelpers import add_actions, create_action
 _ = gettext.gettext
 HIDE_COLUMNS = [const.STATUS, const.URL, const.LICENSE, const.REMOVE]
 
+
 class CondaPackagesTable(QTableView):
     """ """
     WIDTH_NAME = 120
@@ -163,7 +164,7 @@ class CondaPackagesTable(QTableView):
         elif count == 1:
             count_text = _("1 package available ")
         elif count > 1:
-            count_text = str(count) + _(" packages available ")
+            count_text = to_text_string(count) + _(" packages available ")
 
         if text != '':
             count_text = count_text + _('matching "{0}"').format(text)
@@ -179,7 +180,7 @@ class CondaPackagesTable(QTableView):
     def filter_status_changed(self, text):
         """ """
         for key, val in const.COMBOBOX_VALUES.iteritems():
-            if str(val) == to_text_string(text):
+            if to_text_string(val) == to_text_string(text):
                 group = val
                 break
         self._filterbox = group

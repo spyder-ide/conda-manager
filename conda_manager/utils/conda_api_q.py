@@ -212,6 +212,17 @@ class CondaProcess(QObject):
 #            cmd_list = ['conda']
         cmd_list = self._abspath(abspath)
         cmd_list.extend(extra_args)
+        
+        ## TODO: HACK!
+        print(getattr(self, 'prefix', 'no-prefix!'))
+        if hasattr(self, 'prefix'):
+            try:
+                ind = cmd_list.index('--name')
+                cmd_list.pop(ind)
+                cmd_list.pop(ind)
+                cmd_list.extend(['-p', self.prefix])
+            except Exception as e:
+                print(e)
 
 #        try:
 #            p = Popen(cmd_list, stdout=PIPE, stderr=PIPE)

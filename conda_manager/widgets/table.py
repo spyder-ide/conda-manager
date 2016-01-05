@@ -179,7 +179,11 @@ class CondaPackagesTable(QTableView):
 
     def filter_status_changed(self, text):
         """ """
-        for key, val in const.COMBOBOX_VALUES.iteritems():
+        if hasattr(const.COMBOBOX_VALUES, 'iteritems'):
+            items = const.COMBOBOX_VALUES.iteritems()
+        else:
+            items = const.COMBOBOX_VALUES.items()
+        for key, val in items:
             if to_text_string(val) == to_text_string(text):
                 group = val
                 break

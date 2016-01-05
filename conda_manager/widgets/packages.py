@@ -13,8 +13,8 @@ import shutil
 import sys
 
 from qtpy.QtCore import (QSize, Qt, QThread, Signal)
-from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton,
-                        QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
+from qtpy.QtGui import (QComboBox, QHBoxLayout, QLabel, QPushButton, QDialogButtonBox,
+                        QProgressBar, QSpacerItem, QVBoxLayout, QDialog)
 
 from ..data.repodata.packageinfo import PACKAGES
 from ..models import PackagesWorker
@@ -29,7 +29,7 @@ from ..widgets.dialogs import CondaPackageActionDialog
 _ = gettext.gettext
 
 
-class CondaPackagesWidget(QWidget):
+class CondaPackagesWidget(QDialog):
     """Conda Packages Widget."""
     # Location of updated repo.json files from continuum/binstar
     CONDA_CONF_PATH = get_conf_path('repo')
@@ -45,14 +45,23 @@ class CondaPackagesWidget(QWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
 
-    def __init__(self, parent):
+    def __init__(self, parent, prefix=None):
         super(CondaPackagesWidget, self).__init__(parent)
+
+        self.button_ok = QPushButton(_('Ok'))
+        self.button_ok.clicked.connect(self.accept)
+        self.bbox = QDialogButtonBox(Qt.Horizontal)
+        self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
+        self.button_ok.setDefault(True)
+        self.button_ok.setAutoDefault(True)
+
         self._parent = parent
         self._status = ''  # Statusbar message
         self._conda_process = \
             conda_api_q.CondaProcess(self, self._on_conda_process_ready,
                                      self._on_conda_process_partial)
-        self._prefix = conda_api_q.ROOT_PREFIX
+        conda_api_q.CondaProcess.prefix = prefix
+        self._prefix = prefix or conda_api_q.ROOT_PREFIX
         print(self._prefix)
         self._download_manager = DownloadManager(self,
                                                  self._on_download_finished,
@@ -143,6 +152,7 @@ class CondaPackagesWidget(QWidget):
         self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h))
         self._layout.addLayout(self._bottom_layout)
         self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h))
+        self._layout.addWidget(self.bbox)
 
         self.setLayout(self._layout)
 

@@ -62,7 +62,6 @@ class CondaPackagesWidget(QDialog):
                                      self._on_conda_process_partial)
         conda_api_q.CondaProcess.prefix = prefix
         self._prefix = prefix or conda_api_q.ROOT_PREFIX
-        print(self._prefix)
         self._download_manager = DownloadManager(self,
                                                  self._on_download_finished,
                                                  self._on_download_progress,
@@ -325,8 +324,10 @@ class CondaPackagesWidget(QDialog):
         # Temporal fix
         if self._selected_env is not None and self._selected_env is not 'root':
             short_env = osp.basename(self._selected_env)
-        else:
+        elif self._prefix == conda_api_q.ROOT_PREFIX:
             short_env = 'root'
+        else:
+            short_env = self._prefix
         if env:
             self._status = '{0} (<b>{1}</b>)'.format(self._status,
                                                      short_env)

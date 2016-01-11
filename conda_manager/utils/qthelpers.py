@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2009-2011 Pierre Raybaut
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+# Copyright © 2012 Pierre Raybaut
+#
 # Licensed under the terms of the MIT License
-# (see spyderlib/__init__.py for details)
 
-"""Qt utilities."""
+"""
+Qt utilities.
+"""
 
 # FIXME: Make qtpy dependant
-
 import os
 import os.path as osp
 import re
@@ -15,15 +18,13 @@ import sys
 
 from qtpy.QtGui import (QAction, QStyle, QWidget, QIcon, QApplication,
                         QLabel, QVBoxLayout, QHBoxLayout, QLineEdit,
-                        QKeyEvent, QMenu, QKeySequence, QToolButton,
-                        QPixmap)
-from qtpy.QtCore import (Signal, QObject, Qt, QLocale, QTranslator,
-                         QLibraryInfo, QEvent, Slot)
+                        QKeyEvent, QMenu, QKeySequence, QToolButton)
+from qtpy.QtCore import QObject, Qt, QLocale, QTranslator, QLibraryInfo, Slot
 from qtpy.compat import to_qvariant, from_qvariant
 
 
 # Local import
-from .py3compat import is_text_string, to_text_string
+from conda_manager.utils.py3compat import is_text_string, to_text_string
 
 # Note: How to redirect a signal from widget *a* to widget *b* ?
 # ----
@@ -43,7 +44,7 @@ def qapplication(translate=True):
         SpyderApplication = MacApplication
     else:
         SpyderApplication = QApplication
-    
+
     app = SpyderApplication.instance()
     if app is None:
         # Set Application name for Gnome 3
@@ -71,14 +72,17 @@ def file_uri(fname):
 
 
 QT_TRANSLATOR = None
+
+
 def install_translator(qapp):
     """Install Qt translator to the QApplication instance"""
     global QT_TRANSLATOR
     if QT_TRANSLATOR is None:
         qt_translator = QTranslator()
-        if qt_translator.load("qt_"+QLocale.system().name(),
-                      QLibraryInfo.location(QLibraryInfo.TranslationsPath)):
-            QT_TRANSLATOR = qt_translator # Keep reference alive
+        if qt_translator.load(
+           "qt_"+QLocale.system().name(),
+           QLibraryInfo.location(QLibraryInfo.TranslationsPath)):
+            QT_TRANSLATOR = qt_translator  # Keep reference alive
     if QT_TRANSLATOR is not None:
         qapp.installTranslator(QT_TRANSLATOR)
 
@@ -94,9 +98,9 @@ def _process_mime_path(path, extlist):
         if os.name == 'nt':
             # On Windows platforms, a local path reads: file:///c:/...
             # and a UNC based path reads like: file://server/share
-            if path.startswith(r"file:///"): # this is a local path
-                path=path[8:]
-            else: # this is a unc path
+            if path.startswith(r"file:///"):  # this is a local path
+                path = path[8:]
+            else:  # this is a unc path
                 path = path[5:]
         else:
             path = path[7:]
@@ -130,7 +134,7 @@ def keyevent2tuple(event):
     return (event.type(), event.key(), event.modifiers(), event.text(),
             event.isAutoRepeat(), event.count())
 
-    
+
 def tuple2keyevent(past_event):
     """Convert tuple into a QKeyEvent instance"""
     return QKeyEvent(*past_event)
@@ -270,13 +274,13 @@ def set_item_user_text(item, text):
 
 def create_bookmark_action(parent, url, title, icon=None, shortcut=None):
     """Create bookmark action"""
-    
+
     @Slot()
     def open_url():
         return programs.start_file(url)
-    
-    return create_action( parent, title, shortcut=shortcut, icon=icon,
-                          triggered=open_url)
+
+    return create_action(parent, title, shortcut=shortcut, icon=icon,
+                         triggered=open_url)
 
 
 def create_module_bookmark_actions(parent, bookmarks):
@@ -297,7 +301,7 @@ def create_module_bookmark_actions(parent, bookmarks):
             actions.append(act)
     return actions
 
-        
+
 def create_program_action(parent, text, name, icon=None, nt_name=None):
     """Create action to run a program"""
     if is_text_string(icon):
@@ -309,7 +313,7 @@ def create_program_action(parent, text, name, icon=None, nt_name=None):
         return create_action(parent, text, icon=icon,
                              triggered=lambda: programs.run_program(name))
 
-        
+
 def create_python_script_action(parent, text, icon, package, module, args=[]):
     """Create action to run a GUI based Python script"""
     if is_text_string(icon):
@@ -328,7 +332,7 @@ class DialogManager(QObject):
     def __init__(self):
         QObject.__init__(self)
         self.dialogs = {}
-        
+
     def show(self, dialog):
         """Generic method to show a non-modal dialog and keep reference
         to the Qt C++ object"""
@@ -345,27 +349,27 @@ class DialogManager(QObject):
                               lambda eid=id(dialog): self.dialog_finished(eid))
             dialog.rejected.connect(
                               lambda eid=id(dialog): self.dialog_finished(eid))
-    
+
     def dialog_finished(self, dialog_id):
         """Manage non-modal dialog boxes"""
         return self.dialogs.pop(dialog_id)
-    
+
     def close_all(self):
         """Close all opened dialog boxes"""
         for dlg in list(self.dialogs.values()):
             dlg.reject()
 
-        
+
 def get_std_icon(name, size=None):
     """Get standard platform icon
     Call 'show_std_icons()' for details"""
     if not name.startswith('SP_'):
         name = 'SP_'+name
-    icon = QWidget().style().standardIcon( getattr(QStyle, name) )
+    icon = QWidget().style().standardIcon(getattr(QStyle, name))
     if size is None:
         return icon
     else:
-        return QIcon( icon.pixmap(size, size) )
+        return QIcon(icon.pixmap(size, size))
 
 
 def get_filetype_icon(fname):
@@ -373,7 +377,7 @@ def get_filetype_icon(fname):
     ext = osp.splitext(fname)[1]
     if ext.startswith('.'):
         ext = ext[1:]
-    return get_icon( "%s.png" % ext, get_std_icon('FileIcon') )
+    return get_icon("{0}.png".format(ext), get_std_icon('FileIcon'))
 
 
 class ShowStdIcons(QWidget):
@@ -393,12 +397,12 @@ class ShowStdIcons(QWidget):
                 icon = get_std_icon(child)
                 label = QLabel()
                 label.setPixmap(icon.pixmap(32, 32))
-                icon_layout.addWidget( label )
-                icon_layout.addWidget( QLineEdit(child.replace('SP_', '')) )
+                icon_layout.addWidget(label)
+                icon_layout.addWidget(QLineEdit(child.replace('SP_', '')))
                 col_layout.addLayout(icon_layout)
                 cindex = (cindex+1) % row_nb
                 if cindex == 0:
-                    layout.addLayout(col_layout)                    
+                    layout.addLayout(col_layout)
         self.setLayout(layout)
         self.setWindowTitle('Standard Platform Icons')
         self.setWindowIcon(get_std_icon('TitleBarMenuButton'))

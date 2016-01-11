@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 #
-# Copyright © 2015 Gonzalo Peña-Castellanos (@goanpeca)
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
 #
 # Licensed under the terms of the MIT License
 
@@ -13,7 +14,7 @@ import os.path as osp
 
 # Third party imports
 from qtpy.QtCore import Qt, Signal
-from qtpy.QtWidgets import QGridLayout, QGroupBox, QVBoxLayout
+from qtpy.QtWidgets import QGridLayout, QGroupBox, QMessageBox, QVBoxLayout
 from spyderlib.plugins import SpyderPluginMixin, PluginConfigPage
 from spyderlib.utils import icon_manager as ima
 
@@ -91,7 +92,7 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         SpyderPluginMixin.__init__(self, parent)
 
         self.root_env = 'root'
-        self._env_to_set = self.get_active_env()
+        self._prefix_to_set = self.get_environment_prefix()
 
         # Initialize plugin
         self.initialize_plugin()
@@ -140,8 +141,20 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         pass
 
     def closing_plugin(self, cancelable=False):
-        """Perform actions before parent main window is closed"""
-        return True
+        """Perform actions before parent main window is closed."""
+        if self.busy:
+            answer = QMessageBox.question(
+                self,
+                'Conda Manager',
+                'Conda Manager is still busy.\n\nDo you want to quit?',
+                buttons=QMessageBox.Yes | QMessageBox.No)
+
+            if answer == QMessageBox.Yes:
+                return True
+            else:
+                return False
+        else:
+            return True
 
     def apply_plugin_settings(self, options):
         """Apply configuration file's plugin settings"""
@@ -176,7 +189,7 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     def project_loaded(self, project_path):
         """ """
         name = osp.basename(project_path)
-        env = self.get_prefix_envname(name)
+        
 
         #self.sig_packages_ready.connect(self.set_env)
 
@@ -184,16 +197,16 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         # If None, no matching package was found!
 
         if env:
-            self._env_to_set = env
+            self._prefix_to_set = self.get_environment_prefix()
             self.set_env(env)
 
     def _after_load(self):
         """ """
-        active_env = self.get_active_env()
-        if active_env == 'root':  # Root
-            self.disable_widgets()
-        else:
-            self.enable_widgets()
+        active_prefix = self.get_environment_prefix()
+        #if active_prefix == 'root':  # Root
+        #    self.disable_widgets()
+        #else:
+        #    self.enable_widgets()
 
 
 # =============================================================================

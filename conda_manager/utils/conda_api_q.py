@@ -1,27 +1,78 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2014-2015 Gonzalo Peña (@goanpeca)
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
 # Licensed under the terms of the MIT License
-# (see spyderlib/__init__.py for details)
 
-"""Conda Process based on conda-api and QProcess."""
+"""
+Conda Process based on conda-api and QProcess.
+"""
 
+# Standard library imports
+from os.path import basename, isdir, join
 import json
 import os
+import random
 import re
 import sys
-from os.path import basename, isdir, join
 
-from qtpy.QtGui import QVBoxLayout, QHBoxLayout, QPushButton, QWidget
-from qtpy.QtCore import QObject, QProcess, QByteArray
+# Third party imports
+from qtpy.QtWidgets import (QApplication, QHBoxLayout, QPushButton,
+                            QVBoxLayout, QWidget)
+from qtpy.QtCore import QByteArray, QObject, QProcess, Signal
 
-#from ..utils.py3compat import to_text_string
-from conda_manager.utils.py3compat import to_text_string
 
 __version__ = '1.2.1'
 
-# Global
-ROOT_PREFIX = None
+
+def symlink_ms(source, link_name):
+    """
+    http://stackoverflow.com/questions/6260149/os-symlink-support-in-windows
+    """
+    import ctypes
+    csl = ctypes.windll.kernel32.CreateSymbolicLinkW
+    csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
+    csl.restype = ctypes.c_ubyte
+    flags = 1 if os.path.isdir(source) else 0
+
+    try:
+        if csl(link_name, source.replace('/', '\\'), flags) == 0:
+            raise ctypes.WinError()
+    except:
+        pass
+
+if os.name == "nt":
+    os.symlink = symlink_ms
+
+
+# -----------------------------------------------------------------------------
+# --- Globals
+# -----------------------------------------------------------------------------
+PY2 = sys.version[0] == '2'
+PY3 = sys.version[0] == '3'
+
+
+# -----------------------------------------------------------------------------
+# --- Utils
+# -----------------------------------------------------------------------------
+def to_text_string(obj, encoding=None):
+    """Convert `obj` to (unicode) text string"""
+    if PY2:
+        # Python 2
+        if encoding is None:
+            return unicode(obj)
+        else:
+            return unicode(obj, encoding)
+    else:
+        # Python 3
+        if encoding is None:
+            return str(obj)
+        elif isinstance(obj, str):
+            # In case this function is not used properly, this could happen
+            return obj
+        else:
+            return str(obj, encoding)
 
 
 def handle_qbytearray(obj, encoding):
@@ -32,65 +83,57 @@ def handle_qbytearray(obj, encoding):
     return to_text_string(obj, encoding=encoding)
 
 
-# Functions not calling a QProcess, outside of the class
-# these could also be implemented as static methods...
-def linked(prefix):
-    """
-    Return the (set of canonical names) of linked packages in `prefix`.
-    """
-    if not isdir(prefix):
-        raise Exception('no such directory: %r' % prefix)
-    meta_dir = join(prefix, 'conda-meta')
-    if not isdir(meta_dir):
-        # we might have nothing in linked (and no conda-meta directory)
-        return set()
-    return set(fn[:-5] for fn in os.listdir(meta_dir)
-               if fn.endswith('.json'))
-
-
-def split_canonical_name(cname):
-    """
-    Split a canonical package name into (name, version, build) strings.
-    """
-    return tuple(cname.rsplit('-', 2))
-
-
+# -----------------------------------------------------------------------------
+# --- Errors
+# -----------------------------------------------------------------------------
 class CondaError(Exception):
-    "General Conda error"
+    """General Conda error."""
     pass
 
 
 class CondaEnvExistsError(CondaError):
-    "Conda environment already exists"
+    """Conda environment already exists."""
     pass
 
 
+# -----------------------------------------------------------------------------
+# --- Conda API Qt
+# -----------------------------------------------------------------------------
 class CondaProcess(QObject):
-    """conda-api modified to work with QProcess instead of popen"""
-    ENCODING = 'ascii'
+    """Conda API modified to work with QProcess instead of popen."""
 
-    def __init__(self, parent, on_finished=None, on_partial=None):
+    # Signals
+    sig_finished = Signal(str, object, str)
+    sig_partial = Signal(str, object, str)
+    sig_started = Signal()
+
+    ENCODING = 'ascii'
+    ROOT_PREFIX = None
+
+    def __init__(self, parent):
         QObject.__init__(self, parent)
         self._parent = parent
-        self.output = None
-        self.partial = None
-        self.stdout = None
-        self.error = None
+        self._output = None
+        self._partial = None
+        self._stdout = None
+        self._error = None
         self._parse = False
         self._function_called = ''
         self._name = None
         self._process = QProcess()
-        self._on_finished = on_finished
+        self.set_root_prefix()
 
+        # Signals
         self._process.finished.connect(self._call_conda_ready)
         self._process.readyReadStandardOutput.connect(self._call_conda_partial)
 
-        if on_finished is not None:
-            self._process.finished.connect(on_finished)
-        if on_partial is not None:
-            self._process.readyReadStandardOutput.connect(on_partial)
+    # --- Helpers
+    # -------------------------------------------------------------------------
+    def _is_running(self):
+        return self._process.state() != QProcess.NotRunning
 
-        self.set_root_prefix()
+    def _is_not_running(self):
+        return self._process.state() == QProcess.NotRunning
 
     def _call_conda_partial(self):
         """ """
@@ -101,32 +144,36 @@ class CondaProcess(QObject):
         stderr = handle_qbytearray(stderr, CondaProcess.ENCODING)
 
         if self._parse:
-            self.output = json.loads(stdout)
+            try:
+                self._output = json.loads(stdout)
+            except Exception:
+                # Result is a partial json. Can only be parsed when finished
+                self._output = stdout
         else:
-            self.output = stdout
+            self._output = stdout
 
-        self.partial = self.output
-        self.stdout = self.output
-        self.error = stderr
+        self._partial = self._output
+        self._stdout = self._output
+        self._error = stderr
 
-#        print(self.partial)
-#        print(self.error)
+        self.sig_partial.emit(self._function_called, self._partial,
+                              self._error)
 
     def _call_conda_ready(self):
-        """function called when QProcess in _call_conda finishes task"""
+        """Function called when QProcess in _call_conda finishes task."""
         function = self._function_called
 
-        if self.stdout is None:
+        if self._stdout is None:
             stdout = to_text_string(self._process.readAllStandardOutput(),
                                     encoding=CondaProcess.ENCODING)
         else:
-            stdout = self.stdout
+            stdout = self._stdout
 
-        if self.error is None:
+        if self._error is None:
             stderr = to_text_string(self._process.readAllStandardError(),
                                     encoding=CondaProcess.ENCODING)
         else:
-            stderr = self.error
+            stderr = self._error
 
         if function == 'get_conda_version':
             pat = re.compile(r'conda:?\s+(\d+\.\d\S+|unknown)')
@@ -134,107 +181,73 @@ class CondaProcess(QObject):
             if m is None:
                 m = pat.match(stdout.strip())
             if m is None:
-                raise Exception('output did not match: %r' % stderr)
-            self.output = m.group(1)
-#        elif function == 'get_envs':
-#            info = self.output
-#            self.output = info['envs']
-#        elif function == 'get_prefix_envname':
-#            name = self._name
-#            envs = self.output
-#            self.output = self._get_prefix_envname_helper(name, envs)
-#            self._name = None
+                raise Exception('output did not match: {0}'.format(stderr))
+            self._output = m.group(1)
         elif function == 'config_path':
-            result = self.output
-            self.output = result['rc_path']
+            result = self._output
+            self._output = result['rc_path']
         elif function == 'config_get':
-            result = self.output
-            self.output = result['get']
+            result = self._output
+            self._output = result['get']
         elif (function == 'config_delete' or function == 'config_add' or
-                function == 'config_set' or function == 'config_remove'):
-            result = self.output
-            self.output = result.get('warnings', [])
+              function == 'config_set' or function == 'config_remove'):
+            result = self._output
+            self._output = result.get('warnings', [])
         elif function == 'pip':
             result = []
-            lines = self.output.split('\n')
+            lines = self._output.split('\n')
             for line in lines:
                 if '<pip>' in line:
                     temp = line.split()[:-1] + ['pip']
                     result.append('-'.join(temp))
-            self.output = result
+            self._output = result
 
         if stderr.strip():
-            self.error = stderr
-#            raise Exception('conda %r:\nSTDERR:\n%s\nEND' % (extra_args,
-#                                                             stderr.decode()))
+            self._error = stderr
+
         self._parse = False
 
-    def _get_prefix_envname_helper(self, name, envs):
-        """ """
-        global ROOTPREFIX
-        if name == 'root':
-            return ROOT_PREFIX
-        for prefix in envs:
-            if basename(prefix) == name:
-                return prefix
-        return None
+        self.sig_finished.emit(self._function_called, self._output,
+                               self._error)
 
     def _abspath(self, abspath):
         """ """
         if abspath:
             if sys.platform == 'win32':
-                python = join(ROOT_PREFIX, 'python.exe')
-                conda = join(ROOT_PREFIX,
+                python = join(CondaProcess.ROOT_PREFIX, 'python.exe')
+                conda = join(CondaProcess.ROOT_PREFIX,
                              'Scripts', 'conda-script.py')
             else:
-                python = join(ROOT_PREFIX, 'bin/python')
-                conda = join(ROOT_PREFIX, 'bin/conda')
+                python = join(CondaProcess.ROOT_PREFIX, 'bin/python')
+                conda = join(CondaProcess.ROOT_PREFIX, 'bin/conda')
             cmd_list = [python, conda]
-        else:  # just use whatever conda is on the path
+        else:
+            # Just use whatever conda/pip is on the path
             cmd_list = ['conda']
+
         return cmd_list
 
     def _call_conda(self, extra_args, abspath=True):
         """ """
-        # call conda with the list of extra arguments, and return the tuple
-        # stdout, stderr
-        global ROOT_PREFIX
-#        if abspath:
-#            if sys.platform == 'win32':
-#                python = join(ROOT_PREFIX, 'python.exe')
-#                conda = join(ROOT_PREFIX,
-#                             'Scripts', 'conda-script.py')
-#            else:
-#                python = join(ROOT_PREFIX, 'bin/python')
-#                conda = join(ROOT_PREFIX, 'bin/conda')
-#            cmd_list = [python, conda]
-#        else:  # just use whatever conda is on the path
-#            cmd_list = ['conda']
-        cmd_list = self._abspath(abspath)
-        cmd_list.extend(extra_args)
+        if self._is_not_running():
+            cmd_list = self._abspath(abspath)
+            cmd_list.extend(extra_args)
+            self._error, self._output = None, None
+            self._process.start(cmd_list[0], cmd_list[1:])
+            self.sig_started.emit()
 
-#        try:
-#            p = Popen(cmd_list, stdout=PIPE, stderr=PIPE)
-#        except OSError:
-#            raise Exception("could not invoke %r\n" % args)
-#        return p.communicate()
-
-        # adapted code
-        # ------------
-        self.error, self.output = None, None
-        print(cmd_list[0], cmd_list[1:])
-        self._process.start(cmd_list[0], cmd_list[1:])
+    def _call_pip(self, name=None, prefix=None, extra_args=None):
+        """ """
+        if self._is_not_running():
+            cmd_list = self._pip_cmd(name=name, prefix=prefix)
+            cmd_list.extend(extra_args)
+            self._error, self._output = None, None
+            self._parse = False
+            self._process.start(cmd_list[0], cmd_list[1:])
+            self.sig_started.emit()
 
     def _call_and_parse(self, extra_args, abspath=True):
         """ """
-#        stdout, stderr = _call_conda(extra_args, abspath=abspath)
-#        if stderr.decode().strip():
-#            raise Exception('conda %r:\nSTDERR:\n%s\nEND' % (extra_args,
-#                                                             stderr.decode()))
-#    return json.loads(stdout.decode())
-
-        # adapted code
-        # ------------
         self._parse = True
         self._call_conda(extra_args, abspath=abspath)
 
@@ -262,144 +275,114 @@ class CondaProcess(QObject):
 
         return cmd_list
 
+    # --- Public api
+    # ------------------------------------------------------------------------
+    @staticmethod
+    def linked(prefix, as_spec=False):
+        """
+        Return the (set of canonical names) of linked packages in `prefix`.
+        """
+        if not isdir(prefix):
+            raise Exception('no such directory: {0}'.format(prefix))
+
+        meta_dir = join(prefix, 'conda-meta')
+
+        if not isdir(meta_dir):
+            # We might have nothing in linked (and no conda-meta directory)
+            result = set()
+
+        result = set(fn[:-5] for fn in os.listdir(meta_dir)
+                     if fn.endswith('.json'))
+
+        new_result = []
+        if as_spec:
+            for r in result:
+                n, v, b = CondaProcess.split_canonical_name(r)
+                new_result.append("{0}={1}".format(n, v))
+            result = "\n".join(new_result)
+
+        return result
+
+    @staticmethod
+    def split_canonical_name(cname):
+        """
+        Split a canonical package name into (name, version, build) strings.
+        """
+        result = tuple(cname.rsplit('-', 2))
+        return result
+
     def set_root_prefix(self, prefix=None):
         """
         Set the prefix to the root environment (default is /opt/anaconda).
-        This function should only be called once (right after importing
-        conda_api).
         """
-        global ROOT_PREFIX
-
         if prefix:
-            ROOT_PREFIX = prefix
-        # find *some* conda instance, and then use info() to get 'root_prefix'
+            CondaProcess.ROOT_PREFIX = prefix
         else:
-            pass
-#            i = self.info(abspath=False)
-#            self.ROOT_PREFIX = i['root_prefix']
-            '''
-            plat = 'posix'
-            if sys.platform.lower().startswith('win'):
-                listsep = ';'
-                plat = 'win'
-            else:
-                listsep = ':'
-
-            for p in os.environ['PATH'].split(listsep):
-                if (os.path.exists(os.path.join(p, 'conda')) or
-                    os.path.exists(os.path.join(p, 'conda.exe')) or
-                    os.path.exists(os.path.join(p, 'conda.bat'))):
-
-                    # TEMPORARY:
-                    ROOT_PREFIX = os.path.dirname(p) # root prefix is 1 dir up
-                    i = info()
-                    # REAL:
-                    ROOT_PREFIX = i['root_prefix']
-                    break
-            else: # fall back to standard install location, which may be wrong
-                if plat == 'win':
-                    ROOT_PREFIX = 'C:\Anaconda'
-                else:
-                    ROOT_PREFIX = '/opt/anaconda'
-            '''
-            # adapted code
-            # ------------
-            if ROOT_PREFIX is None:
-#                qprocess = QProcess()
-#                cmd_list = ['conda', 'info', '--json']
-#                qprocess.start(cmd_list[0], cmd_list[1:])
-#                qprocess.waitForFinished()
-
-#                output = qprocess.readAllStandardOutput()
-#                output = handle_qbytearray(output, CondaProcess.ENCODING)
-#                info = json.loads(output)
-#                ROOT_PREFIX = info['root_prefix']
+            # Find conda instance, and then use info() to get 'root_prefix'
+            if CondaProcess.ROOT_PREFIX is None:
                 info = self.info(abspath=False)
-                ROOT_PREFIX = info['root_prefix']
-
-
+                CondaProcess.ROOT_PREFIX = info['root_prefix']
 
     def get_conda_version(self):
         """
-        return the version of conda being used (invoked) as a string
+        Return the version of conda being used (invoked) as a string.
         """
-#        pat = re.compile(r'conda:?\s+(\d+\.\d\S+|unknown)')
-#        stdout, stderr = self._call_conda(['--version'])
-#        # argparse outputs version to stderr in Python < 3.4.
-#        # http://bugs.python.org/issue18920
-#        m = pat.match(stderr.decode().strip())
-#        if m is None:
-#            m = pat.match(stdout.decode().strip())
-#
-#        if m is None:
-#            raise Exception('output did not match: %r' % stderr)
-#        return m.group(1)
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running():
             self._function_called = 'get_conda_version'
             self._call_conda(['--version'])
 
-    def get_envs(self):
+    def get_envs(self, emit=False):
         """
-        Return all of the (named) environment (this does not include the root
-        environment), as a list of absolute path to their prefixes.
+        Return all of the (named) environments (this does not include the root
+        environment), as a list of absolute paths to their prefixes.
         """
-#        info = self._call_and_parse(['info', '--json'])
-#        return info['envs']
+        if self._is_not_running():
+            info = self.info()
+            result = info['envs']
 
-        info = self.info()
-        return info['envs']
+            if emit:
+                self.sig_finished.emit('get_envs', result, "")
 
-        # adapted code
-        # ------------
-#        if self._process.state() == QProcess.NotRunning:
-#            self._function_called = 'get_envs'
-#            self._call_and_parse(['info', '--json'])
+            return result
 
-    def get_prefix_envname(self, name):
+    def get_prefix_envname(self, name, emit=False):
         """
         Given the name of an environment return its full prefix path, or None
         if it cannot be found.
         """
-        if name == 'root':
-            return ROOT_PREFIX
-        for prefix in self.get_envs():
-            if basename(prefix) == name:
-                return prefix
-        return None
+        if self._is_not_running():
+            if name == 'root':
+                prefix = CondaProcess.ROOT_PREFIX
+            for env_prefix in self.get_envs():
+                if basename(env_prefix) == name:
+                    prefix = env_prefix
+                    break
+            if emit:
+                self.sig_finished.emit('get_prefix_envname', prefix, "")
 
-        # adapted code
-        # ------------
-#        if self._process.state() == QProcess.NotRunning:
-#            self._name = name
-#            self._function_called = 'get_prefix_envname'
-#            self._call_and_parse(['info', '--json'])
+            return prefix
 
-    def info(self, abspath=True):
+    def info(self, abspath=True, emit=False):
         """
         Return a dictionary with configuration information.
+
         No guarantee is made about which keys exist.  Therefore this function
         should only be used for testing and debugging.
         """
-#        return self._call_and_parse(['info', '--json'], abspath=abspath)
+        if self._is_not_running():
+            qprocess = QProcess()
+            cmd_list = self._abspath(abspath)
+            cmd_list.extend(['info', '--json'])
+            qprocess.start(cmd_list[0], cmd_list[1:])
+            qprocess.waitForFinished()
+            output = qprocess.readAllStandardOutput()
+            output = handle_qbytearray(output, CondaProcess.ENCODING)
+            info = json.loads(output)
 
-        qprocess = QProcess()
-        cmd_list = self._abspath(abspath)
-        cmd_list.extend(['info', '--json'])
-        qprocess.start(cmd_list[0], cmd_list[1:])
-        qprocess.waitForFinished()
-        output = qprocess.readAllStandardOutput()
-        output = handle_qbytearray(output, CondaProcess.ENCODING)
-        info = json.loads(output)
-        return info
+            if emit:
+                self.sig_finished.emit("info", str(info), "")
 
-        # adapted code
-        # ------------
-#        if self._process.state() == QProcess.NotRunning:
-#            self._function_called = 'info'
-#            self._call_and_parse(['info', '--json'], abspath=abspath)
+            return info
 
     def package_info(self, package, abspath=True):
         """
@@ -416,12 +399,7 @@ class CondaProcess(QObject):
             }]
         }
         """
-#        return self._call_and_parse(['info', package, '--json'],
-#                                    abspath=abspath)
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running():
             self._function_called = 'package_info'
             self._call_and_parse(['info', package, '--json'], abspath=abspath)
 
@@ -454,11 +432,7 @@ class CondaProcess(QObject):
                 ('canonical', 'unknown', 'use_index_cache', 'outdated',
                  'override_channels')))
 
-#        return self._call_and_parse(cmd_list,
-#                                    abspath=kwargs.get('abspath', True))
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running():
             self._function_called = 'search'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -466,92 +440,82 @@ class CondaProcess(QObject):
         """
         Create a "share package" of the environment located in `prefix`,
         and return a dictionary with (at least) the following keys:
-          - 'path': the full path to the created package
+          - 'prefix': the full path to the created package
           - 'warnings': a list of warnings
 
         This file is created in a temp directory, and it is the callers
         responsibility to remove this directory (after the file has been
         handled in some way).
         """
-#        return self._call_and_parse(['share', '--json', '--prefix', prefix])
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'share'
             self._call_and_parse(['share', '--json', '--prefix', prefix])
 
-    def create(self, name=None, path=None, pkgs=None):
+    def create(self, name=None, prefix=None, pkgs=None):
         """
-        Create an environment either by name or path with a specified set of
-        packages
+        Create an environment either by 'name' or 'prefix' with a specified set
+        of packages.
         """
-        if not pkgs or not isinstance(pkgs, (list, tuple)):
+        # TODO: Fix temporal hack
+        if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
                             'install into new environment')
 
-        cmd_list = ['create', '--yes', '--quiet']
+        cmd_list = ['create', '--yes', '--quiet', '--json', '--mkdir']
         if name:
             ref = name
             search = [os.path.join(d, name) for d in self.info()['envs_dirs']]
-            cmd_list = ['create', '--yes', '--quiet', '--name', name]
-        elif path:
-            ref = path
-            search = [path]
-            cmd_list = ['create', '--yes', '--quiet', '--prefix', path]
+            cmd_list.extend(['--name', name])
+        elif prefix:
+            ref = prefix
+            search = [prefix]
+            cmd_list.extend(['--prefix', prefix])
         else:
-            raise TypeError('must specify either an environment name or a path'
-                            ' for new environment')
+            raise TypeError("Must specify either an environment 'name' or a "
+                            "'prefix' for new environment.")
 
         if any(os.path.exists(path) for path in search):
             raise CondaEnvExistsError('Conda environment [%s] already exists'
                                       % ref)
 
-        cmd_list.extend(pkgs)
-#        (out, err) = self._call_conda(cmd_list)
-#        if err.decode().strip():
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               err.decode()))
-#        return out
+        # TODO: Fix temporal hack
+        if isinstance(pkgs, (list, tuple)):
+            cmd_list.extend(pkgs)
+        elif isinstance(pkgs, str):
+            cmd_list.extend(['--file', pkgs])
 
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'create'
             self._call_conda(cmd_list)
 
-    def install(self, name=None, path=None, pkgs=None, dep=True):
+    def install(self, name=None, prefix=None, pkgs=None, dep=True):
         """
-        Install packages into an environment either by name or path with a
-        specified set of packages
-        """
-        if not pkgs or not isinstance(pkgs, (list, tuple)):
+        Install packages into an environment either by 'name' or 'prefix' with
+        a specified set of packages
+        """        
+        # TODO: Fix temporal hack
+        if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
                             'install into existing environment')
 
         cmd_list = ['install', '--yes', '--json', '--force-pscheck']
-#        cmd_list = ['install', '--yes', '--quiet']
         if name:
             cmd_list.extend(['--name', name])
-        elif path:
-            cmd_list.extend(['--prefix', path])
+        elif prefix:
+            cmd_list.extend(['--prefix', prefix])
         else:  # just install into the current environment, whatever that is
             pass
 
-        cmd_list.extend(pkgs)
+        # TODO: Fix temporal hack
+        if isinstance(pkgs, (list, tuple)):
+            cmd_list.extend(pkgs)
+        elif isinstance(pkgs, str):
+            cmd_list.extend(['--file', pkgs])
 
-#        (out, err) = self._call_conda(cmd_list)
-#        if err.decode().strip():
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               err.decode()))
-#        return out
-
-        # adapted code
-        # ------------
         if not dep:
             cmd_list.extend(['--no-deps'])
 
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'install'
             self._call_conda(cmd_list)
 
@@ -574,18 +538,7 @@ class CondaProcess(QObject):
 
         cmd_list.extend(pkgs)
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#
-#        return result
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'update'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -599,20 +552,20 @@ class CondaProcess(QObject):
         }
         """
         cmd_list = ['remove', '--json', '--quiet', '--yes', '--force-pscheck']
-#        cmd_list = ['remove', '--json', '--quiet', '--yes']
 
         if not pkgs and not kwargs.get('all'):
             raise TypeError("Must specify at least one package to remove, \
                             or all=True.")
 
-        if kwargs.get('name') and kwargs.get('path'):
-            raise TypeError('conda remove: At most one of name, path allowed')
+        if kwargs.get('name') and kwargs.get('prefix'):
+            raise TypeError("conda remove: At most one of 'name', 'prefix' "
+                            "allowed")
 
         if kwargs.get('name'):
             cmd_list.extend(['--name', kwargs.pop('name')])
 
-        if kwargs.get('path'):
-            cmd_list.extend(['--prefix', kwargs.pop('path')])
+        if kwargs.get('prefix'):
+            cmd_list.extend(['--prefix', kwargs.pop('prefix')])
 
         cmd_list.extend(
             self._setup_install_commands_from_kwargs(
@@ -622,51 +575,36 @@ class CondaProcess(QObject):
 
         cmd_list.extend(pkgs)
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#
-#        return result
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'remove'
             self._call_and_parse(cmd_list,
                                  abspath=kwargs.get('abspath', True))
 
-    def remove_environment(self, name=None, path=None, **kwargs):
+    def remove_environment(self, name=None, prefix=None, **kwargs):
         """
         Remove an environment entirely.
 
         See ``remove``.
         """
-#        return self.remove(name=name, path=path, all=True, **kwargs)
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'remove_environment'
-            self.remove(name=name, path=path, all=True, **kwargs)
+            self.remove(name=name, prefix=prefix, all=True, **kwargs)
 
-    def clone_environment(self, clone, name=None, path=None, **kwargs):
+    def clone_environment(self, clone, name=None, prefix=None, **kwargs):
         """
-        Clone the environment ``clone`` into ``name`` or ``path``.
+        Clone the environment ``clone`` into ``name`` or ``prefix``.
         """
         cmd_list = ['create', '--json', '--quiet']
 
-        if (name and path) or not (name or path):
-            raise TypeError("conda clone_environment: exactly one of name or \
-                            path required")
+        if (name and prefix) or not (name or prefix):
+            raise TypeError("conda clone_environment: exactly one of 'name' "
+                            "or 'prefix' required.")
 
         if name:
             cmd_list.extend(['--name', name])
 
-        if path:
-            cmd_list.extend(['--prefix', path])
+        if prefix:
+            cmd_list.extend(['--prefix', prefix])
 
         cmd_list.extend(['--clone', clone])
 
@@ -677,79 +615,9 @@ class CondaProcess(QObject):
                  'no_pin', 'force', 'all', 'channel', 'override_channels',
                  'no_default_packages')))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#
-#        return result
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running():
             self._function_called = 'clone_environment'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
-
-#    def process(self, name=None, path=None, cmd=None, args=None, stdin=None,
-#                stdout=None, stderr=None, timeout=None):
-#        """
-#        Create a Popen process for cmd using the specified args but in the
-#        conda environment specified by name or path.
-#
-#        The returned object will need to be invoked with p.communicate() or
-#        similar.
-#
-#        :param name: name of conda environment
-#        :param path: path to conda environment (if no name specified)
-#        :param cmd:  command to invoke
-#        :param args: argument
-#        :param stdin: stdin
-#        :param stdout: stdout
-#        :param stderr: stderr
-#        :return: Popen object
-#        """
-#
-#        if bool(name) == bool(path):
-#            raise TypeError('exactly one of name or path must be specified')
-#
-#        if not cmd:
-#            raise TypeError('cmd to execute must be specified')
-#
-#        if not args:
-#            args = []
-#
-#        if name:
-#            path = self.get_prefix_envname(name)
-#
-#        plat = 'posix'
-#        if sys.platform.lower().startswith('win'):
-#            listsep = ';'
-#            plat = 'win'
-#        else:
-#            listsep = ':'
-#
-#        conda_env = dict(os.environ)
-#
-#        if plat == 'posix':
-#            conda_env['PATH'] = path + os.path.sep + 'bin' + listsep + \
-#                conda_env['PATH']
-#        else: # win
-#            conda_env['PATH'] = path + os.path.sep + 'Scripts' + listsep + \
-#                conda_env['PATH']
-#
-#        conda_env['PATH'] = path + listsep + conda_env['PATH']
-#
-#        cmd_list = [cmd]
-#        cmd_list.extend(args)
-#
-#        try:
-#            p = Popen(cmd_list, env=conda_env, stdin=stdin, stdout=stdout,
-#                      stderr=stderr)
-#        except OSError:
-#            raise Exception("could not invoke %r\n" % cmd_list)
-#        return p
 
     def clone(self, path, prefix):
         """
@@ -764,10 +632,6 @@ class CondaProcess(QObject):
         of this function).
         The return object is a list of warnings.
         """
-#        return self._call_and_parse(['clone', '--json', '--prefix', prefix,
-#                                     path])
-        # adapted code
-        # ------------
         if self._process.state() == QProcess.NotRunning:
             self._function_called = 'clone'
             self._call_and_parse(['clone', '--json', '--prefix', prefix, path])
@@ -790,17 +654,7 @@ class CondaProcess(QObject):
         cmd_list = ['config', '--get']
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result['rc_path']
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_path'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -815,17 +669,7 @@ class CondaProcess(QObject):
         cmd_list.extend(keys)
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result['get']
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_get'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -838,17 +682,7 @@ class CondaProcess(QObject):
         cmd_list = ['config', '--set', key, str(value)]
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result.get('warnings', [])
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_set'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -861,17 +695,7 @@ class CondaProcess(QObject):
         cmd_list = ['config', '--add', key, value]
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result.get('warnings', [])
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_add'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -884,17 +708,7 @@ class CondaProcess(QObject):
         cmd_list = ['config', '--remove', key, value]
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result.get('warnings', [])
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_remove'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -907,17 +721,7 @@ class CondaProcess(QObject):
         cmd_list = ['config', '--remove-key', key]
         cmd_list.extend(self._setup_config_from_kwargs(kwargs))
 
-#        result = self._call_and_parse(cmd_list,
-#                                      abspath=kwargs.get('abspath', True))
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result.get('warnings', [])
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'config_delete'
             self._call_and_parse(cmd_list, abspath=kwargs.get('abspath', True))
 
@@ -930,54 +734,16 @@ class CondaProcess(QObject):
         """
         cmd_list = ['run', '--json', command]
 
-#        result = self._call_and_parse(cmd_list, abspath=abspath)
-#
-#        if 'error' in result:
-#            raise CondaError('conda %s: %s' % (" ".join(cmd_list),
-#                                               result['error']))
-#        return result
-
-        # adapted code
-        # ------------
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'run'
             self._call_and_parse(cmd_list, abspath=abspath)
 
-#    def test():
-#        """
-#        Self-test function, which prints useful debug information.
-#        This function returns None on success, and will crash the interpreter
-#        on failure.
-#        """
-#        print('sys.version: %r' % sys.version)
-#        print('sys.prefix : %r' % sys.prefix)
-#        print('conda_api.__version__: %r' % __version__)
-#        print('conda_api.ROOT_PREFIX: %r' % ROOT_PREFIX)
-#        if isdir(ROOT_PREFIX):
-#            conda_version = get_conda_version()
-#            print('conda version: %r' % conda_version)
-#            print('conda info:')
-#            d = info()
-#            for kv in d.items():
-#                print('\t%s=%r' % kv)
-#            assert d['conda_version'] == conda_version
-#        else:
-#            print('Warning: no such directory: %r' % ROOT_PREFIX)
-#        print('OK')
-
-    # ---- Additional methods not in conda-api
-    def pip(self, name):
-        """Get list of pip installed packages."""
-        cmd_list = ['list', '-n', name]
-
-        if self._process.state() == QProcess.NotRunning:
-            self._function_called = 'pip'
-            self._call_conda(cmd_list)
-
-    def dependencies(self, name=None, path=None, pkgs=None, dep=True):
+    # --- Additional methods not in conda-api
+    # ------------------------------------------------------------------------
+    def dependencies(self, name=None, prefix=None, pkgs=None, dep=True):
         """
-        Install packages into an environment either by name or path with a
-        specified set of packages
+        Get dependenciy list for packages to be installed into an environment
+        defined either by 'name' or 'prefix'.
         """
         if not pkgs or not isinstance(pkgs, (list, tuple)):
             raise TypeError('must specify a list of one or more packages to '
@@ -991,16 +757,178 @@ class CondaProcess(QObject):
 
         if name:
             cmd_list.extend(['--name', name])
-        elif path:
-            cmd_list.extend(['--prefix', path])
-        else:  # just install into the current environment, whatever that is
+        elif prefix:
+            cmd_list.extend(['--prefix', prefix])
+        else:
             pass
 
         cmd_list.extend(pkgs)
 
-        if self._process.state() == QProcess.NotRunning:
+        if self._is_not_running:
             self._function_called = 'install_dry'
             self._call_and_parse(cmd_list)
+
+    def environment_exists(self, name=None, prefix=None, abspath=True,
+                           emit=False):
+        """
+        Check if an environment exists by 'name' or by 'prefix'. If query is
+        by 'name' only the default conda environments directory is searched.
+        """
+        if name and prefix:
+            raise TypeError("Exactly one of 'name' or 'prefix' is required.")
+
+        qprocess = QProcess()
+        cmd_list = self._abspath(abspath)
+        cmd_list.extend(['list', '--json'])
+
+        if name:
+            cmd_list.extend(['--name', name])
+        else:
+            cmd_list.extend(['--prefix', prefix])
+
+        qprocess.start(cmd_list[0], cmd_list[1:])
+        qprocess.waitForFinished()
+        output = qprocess.readAllStandardOutput()
+        output = handle_qbytearray(output, CondaProcess.ENCODING)
+        info = json.loads(output)
+
+        if emit:
+            self.sig_finished.emit("info", unicode(info), "")
+
+        return 'error' not in info
+
+    def export(self, filename, name=None, prefix=None, emit=False):
+        """
+        Export environment by 'prefix' or 'name' as yaml 'filename'.
+        """
+        if name and prefix:
+            raise TypeError("Exactly one of 'name' or 'prefix' is required.")
+
+        if self._is_not_running:
+            if name:
+                temporal_envname = name
+
+            if prefix:
+                temporal_envname = 'tempenv' + int(random.random()*10000000)
+                envs_dir = self.info()['envs_dirs'][0]
+                os.symlink(prefix, os.sep.join([envs_dir, temporal_envname]))
+
+            cmd = self._abspath(True)
+            cmd.extend(['env', 'export', '--name', temporal_envname, '--file',
+                        os.path.abspath(filename)])
+            qprocess = QProcess()
+            qprocess.start(cmd[0], cmd[1:])
+            qprocess.waitForFinished()
+
+            if prefix:
+                os.unlink(os.sep.join([envs_dir, temporal_envname]))
+
+    def update_environment(self, filename, name=None, prefix=None, emit=False):
+        """
+        Set environment at 'prefix' or 'name' to match 'filename' spec as yaml.
+        """
+        if name and prefix:
+            raise TypeError("Exactly one of 'name' or 'prefix' is required.")
+
+        if self._is_not_running:
+            if name:
+                temporal_envname = name
+
+            if prefix:
+                temporal_envname = 'tempenv' + int(random.random()*10000000)
+                envs_dir = self.info()['envs_dirs'][0]
+                os.symlink(prefix, os.sep.join([envs_dir, temporal_envname]))
+
+            cmd = self._abspath(True)
+            cmd.extend(['env', 'update', '--name', temporal_envname, '--file',
+                        os.path.abspath(filename)])
+            qprocess = QProcess()
+            qprocess.start(cmd[0], cmd[1:])
+            qprocess.waitForFinished()
+
+            if prefix:
+                os.unlink(os.sep.join([envs_dir, 'tempenv']))
+
+    @property
+    def error(self):
+        return self._error
+
+    @property
+    def output(self):
+        return self._output
+
+    # --- Pip commands
+    # -------------------------------------------------------------------------
+    def _pip_cmd(self, name=None, prefix=None):
+        """
+        Get pip location based on environment `name` or `prefix`.
+        """
+        if (name and prefix) or not (name or prefix):
+            raise TypeError("conda pip: exactly one of 'name' ""or 'prefix' "
+                            "required.")
+
+        if name and self.environment_exists(name=name):
+            prefix = self.get_prefix_envname(name)
+
+        if sys.platform == 'win32':
+            python = join(prefix, 'python.exe')  # FIXME:
+            pip = join(prefix, 'pip.exe')    # FIXME:
+        else:
+            python = join(prefix, 'bin/python')
+            pip = join(prefix, 'bin/pip')
+
+        cmd_list = [python, pip]
+
+        return cmd_list
+
+    def pip_list(self, name=None, prefix=None, abspath=True, emit=False):
+        """
+        Get list of pip installed packages.
+        """
+        if (name and prefix) or not (name or prefix):
+            raise TypeError("conda pip: exactly one of 'name' ""or 'prefix' "
+                            "required.")
+
+        if self._is_not_running:
+            cmd_list = self._abspath(abspath)
+            if name:
+                cmd_list.extend(['list', '--name', name])
+            if prefix:
+                cmd_list.extend(['list', '--prefix', prefix])
+
+            qprocess = QProcess()
+            qprocess.start(cmd_list[0], cmd_list[1:])
+            qprocess.waitForFinished()
+            output = qprocess.readAllStandardOutput()
+            output = handle_qbytearray(output, CondaProcess.ENCODING)
+
+            result = []
+            lines = output.split('\n')
+
+            for line in lines:
+                if '<pip>' in line:
+                    temp = line.split()[:-1] + ['pip']
+                    result.append('-'.join(temp))
+
+            if emit:
+                self.sig_finished.emit("pip", str(result), "")
+
+        return result
+
+    def pip_remove(self, name=None, prefix=None, pkgs=None):
+        """
+        Remove a pip pacakge in given environment by 'name' or 'prefix'.
+        """
+        if isinstance(pkgs, list) or isinstance(pkgs, tuple):
+            pkg = ' '.join(pkgs)
+        else:
+            pkg = pkgs
+
+        extra_args = ['uninstall', '--yes', pkg]
+
+        if self._is_not_running():
+            self._function_called = 'pip_remove'
+            self._call_pip(name=name, prefix=prefix, extra_args=extra_args)
 
 
 class TestWidget(QWidget):
@@ -1009,26 +937,24 @@ class TestWidget(QWidget):
         QWidget.__init__(self, parent)
 
         self._parent = parent
-        self.cp = CondaProcess(self, self.on_finished)
+        self.cp = CondaProcess(self)
 
-        # widgets
+        # Widgets
         self.button_get_conda_version = QPushButton('get_conda_version')
         self.button_info = QPushButton('info')
         self.button_get_envs = QPushButton('get envs')
         self.button_install = QPushButton('install')
         self.button_package_info = QPushButton('package info')
-
         self.button_linked = QPushButton('linked')
-
         self.button_pip = QPushButton('pip')
+        self.button_pip_remove = QPushButton('pip-remove')
 
-        self.widgets_queue = [self.button_get_conda_version, self.button_info,
-                              self.button_get_envs, self.button_install,
-                              self.button_package_info, self.button_pip]
+        self.widgets = [self.button_get_conda_version, self.button_info,
+                        self.button_get_envs, self.button_install,
+                        self.button_package_info, self.button_linked,
+                        self.button_pip]
 
-        self.widgets = [self.button_linked]
-
-        # layout setup
+        # Layout setup
         layout_top = QHBoxLayout()
         layout_top.addWidget(self.button_get_conda_version)
         layout_top.addWidget(self.button_get_envs)
@@ -1041,6 +967,7 @@ class TestWidget(QWidget):
 
         layout_bottom = QHBoxLayout()
         layout_bottom.addWidget(self.button_pip)
+        layout_bottom.addWidget(self.button_pip_remove)
 
         layout = QVBoxLayout()
         layout.addLayout(layout_top)
@@ -1049,7 +976,11 @@ class TestWidget(QWidget):
 
         self.setLayout(layout)
 
-        # signals
+        # Signals
+        self.cp.sig_started.connect(self.disable_widgets)
+        self.cp.sig_finished.connect(self.on_finished)
+        self.cp.sig_finished.connect(self.enable_widgets)
+
         self.button_get_conda_version.clicked.connect(
             self.cp.get_conda_version)
         self.button_get_envs.clicked.connect(self.cp.get_envs)
@@ -1058,33 +989,32 @@ class TestWidget(QWidget):
         self.button_package_info.clicked.connect(
             lambda: self.cp.package_info('spyder'))
         self.button_linked.clicked.connect(
-            lambda: linked(ROOT_PREFIX))
-        self.button_pip.clicked.connect(lambda: self.cp.pip('root'))
+            lambda: self.cp.linked(self.cp.ROOT_PREFIX))
+        self.button_pip.clicked.connect(lambda: self.cp.pip(name='root'))
+        self.button_pip_remove.clicked.connect(
+            lambda: self.cp.pip_remove(name='root', pkgs=['grequests']))
 
-        for widget in self.widgets_queue:
-            widget.clicked.connect(lambda: self._set_gui_disabled(True))
-
-    def _set_gui_disabled(self, value):
+    def disable_widgets(self):
         """ """
-        for widget in self.widgets + self.widgets_queue:
-            widget.setDisabled(value)
+        for widget in self.widgets:
+            widget.setDisabled(True)
 
-    def on_finished(self):
+    def enable_widgets(self):
         """ """
-        self._set_gui_disabled(False)
-        output = self.cp.output
-        error = self.cp.error
-        function_called = self.cp._function_called
+        for widget in self.widgets:
+            widget.setEnabled(True)
+
+    def on_finished(self, func, output, error):
+        """ """
         print('stdout:\t' + str(output))
         print('stderr:\t' + str(error))
-        print('function:\t' + str(function_called))
+        print('function:\t' + str(func))
         print('')
 
 
 def test():
     """Run conda packages widget test"""
-    from spyderlib.utils.qthelpers import qapplication
-    app = qapplication()
+    app = QApplication([])
     widget = TestWidget(None)
     widget.show()
     sys.exit(app.exec_())

@@ -1,12 +1,20 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
+
 """
 MultiColumnSortFilterProxy Implements a QSortFilterProxyModel that allows for
 custom filtering on several columns.
 """
 
+# Third party imports
 from qtpy.QtCore import QSortFilterProxyModel
 
-from ..utils import constants
+# Local imports
+from conda_manager.utils import constants
 
 
 class MultiColumnSortFilterProxy(QSortFilterProxyModel):

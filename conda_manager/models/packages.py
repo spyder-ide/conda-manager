@@ -1,18 +1,26 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
+"""
 
+# Standard library imports
 import gettext
 import json
 
+# Third party imports
 from qtpy.compat import to_qvariant
 from qtpy.QtCore import (QAbstractTableModel, QObject, Qt, Signal,
-                         QModelIndex)
+                         QModelIndex, QSize)
 from qtpy.QtGui import QPalette
 
-from ..utils import conda_api_q, sort_versions, get_icon
-from ..utils import constants as const
+# Local imports
+from conda_manager.utils import conda_api_q, get_icon, sort_versions
+from conda_manager.utils import constants as const
 
 _ = gettext.gettext
 
@@ -38,7 +46,10 @@ class CondaPackagesModel(QAbstractTableModel):
             'add.pressed': get_icon('conda_add_pressed.png'),
             'remove.active': get_icon('conda_remove_active.png'),
             'remove.inactive': get_icon('conda_remove_inactive.png'),
-            'remove.pressed': get_icon('conda_remove_pressed.png')}
+            'remove.pressed': get_icon('conda_remove_pressed.png'),
+            'python': get_icon('python.png'),
+            'anaconda': get_icon('anaconda.png'),
+            }
 
     def _update_cell(self, row, column):
         start = self.index(row, column)
@@ -49,8 +60,9 @@ class CondaPackagesModel(QAbstractTableModel):
         """Override Qt method"""
         if not index.isValid():
             return Qt.ItemIsEnabled
+
         column = index.column()
-        if column in (const.NAME, const.DESCRIPTION,
+        if column in (const.PACKAGE_TYPE, const.NAME, const.DESCRIPTION,
                       const.VERSION):
             return Qt.ItemFlags(Qt.ItemIsEnabled)
         elif column in const.ACTION_COLUMNS:
@@ -70,13 +82,13 @@ class CondaPackagesModel(QAbstractTableModel):
 
         # Carefull here with the order, this has to be adjusted manually
         if self._rows[row] == row:
-            [name, description, version, status, url, license_, i, r, u, d] =\
-                [u'', u'', '-', -1, u'', u'', False, False, False, False]
+            [type_, name, description, version, status, url, license_, i, r, u, d] = [0, u'', u'', '-', -1, u'', u'', False, False, False, False]
         else:
-            [name, description, version, status, url, license_, i, r, u,
-             d] = self._rows[row]
+            [type_, name, description, version, status, url, license_, i, r, u, d] = self._rows[row]
 
         if role == Qt.DisplayRole:
+            if column == const.PACKAGE_TYPE:
+                return to_qvariant(type_)
             if column == const.NAME:
                 return to_qvariant(name)
             elif column == const.VERSION:
@@ -91,7 +103,12 @@ class CondaPackagesModel(QAbstractTableModel):
             else:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
-            if column == const.INSTALL:
+            if column == const.PACKAGE_TYPE:
+                if type_ == const.CONDA:
+                    return to_qvariant(self._icons['anaconda'])
+                else:
+                    return to_qvariant(self._icons['python'])
+            elif column == const.INSTALL:
                 if status == const.NOT_INSTALLED:
                     if i:
                         return to_qvariant(self._icons['add.pressed'])
@@ -165,6 +182,11 @@ class CondaPackagesModel(QAbstractTableModel):
                                 const.NOT_INSTALLABLE]:
                     color = palette.color(QPalette.Mid)
                     return to_qvariant(color)
+
+        elif role == Qt.SizeHintRole:
+            if column in [const.ACTION_COLUMNS] + [const.PACKAGE_TYPE]:
+                return to_qvariant(QSize(24, 24))
+
         return to_qvariant()
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
@@ -175,7 +197,9 @@ class CondaPackagesModel(QAbstractTableModel):
             return to_qvariant(int(Qt.AlignRight | Qt.AlignVCenter))
         elif role == Qt.ToolTipRole:
             column = section
-            if column == const.INSTALL:
+            if column == const.PACKAGE_TYPE:
+                return to_qvariant(_('Package type: Conda, Pip'))
+            elif column == const.INSTALL:
                 return to_qvariant(_('Install/Remove package'))
             elif column == const.REMOVE:
                 return to_qvariant(_('Remove package'))
@@ -185,6 +209,8 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(_('Downgrade package'))
 
         if orientation == Qt.Horizontal:
+            if section == const.PACKAGE_TYPE:
+                return to_qvariant(_("T"))
             if section == const.NAME:
                 return to_qvariant(_("Name"))
             elif section == const.VERSION:
@@ -261,12 +287,13 @@ class CondaPackagesModel(QAbstractTableModel):
             status == const.MIXGRADABLE
 
     def get_package_versions(self, name, versiononly=True):
-        """ Gives all the compatible package canonical name
+        """
+        Gives all the compatible package canonical name
 
-            name : str
-                name of the package
-            versiononly : bool
-                if True, returns version number only, otherwise canonical name
+        name : str
+            name of the package
+        versiononly : bool
+            if `True`, returns version number only, otherwise canonical name
         """
         versions = self._packages_versions
         if name in versions:
@@ -274,7 +301,7 @@ class CondaPackagesModel(QAbstractTableModel):
                 ver = versions[name]
                 temp = []
                 for ve in ver:
-                    n, v, b = conda_api_q.split_canonical_name(ve)
+                    n, v, b = conda_api_q.CondaProcess.split_canonical_name(ve)
                     temp.append(v)
                 return sort_versions(list(set(temp)))
             else:
@@ -293,31 +320,47 @@ class CondaPackagesModel(QAbstractTableModel):
 
 
 class PackagesWorker(QObject):
-    """Helper class to preprocess the repodata.json file(s) information into
+    """
+    Helper class to preprocess the repodata.json file(s) information into
     an usefull format for the CondaPackagesModel class without blocking the UI
     in case the number of packages or channels grows too large.
     """
     sig_ready = Signal()
     sig_status_updated = Signal(str, bool, list)
 
-    def __init__(self, parent, repo_files, env, prefix):
+    def __init__(self, parent, repo_files, prefix, root_prefix, pip_packages):
         QObject.__init__(self)
         self._parent = parent
         self._repo_files = repo_files
-        self._env = env
         self._prefix = prefix
+        self._root_prefix = root_prefix
+        self._pip_packages_names = {}
+
+        for p in pip_packages:
+            n, v, b = conda_api_q.CondaProcess.split_canonical_name(p)
+            local = ''
+            if '(' in n:
+                name = n.split('-(')
+                n = name[0]
+                local = name[-1].replace(')', '')
+            self._pip_packages_names[n] = {}
+            self._pip_packages_names[n]['version'] = v
+            self._pip_packages_names[n]['local'] = local
+            self._pip_packages_names[n]['build'] = b
 
         self.packages_names = None
         self.row_data = None
         self.packages_versions = None
+        self._packages = None
 
-        # define helper function locally
+        # Define helper function locally
         self._get_package_metadata = parent.get_package_metadata
 
     def _prepare_model(self):
         """ """
-        self._load_packages()
-        self._setup_data()
+        if self._repo_files:
+            self._load_packages()
+            self._setup_data()
 
     def _load_packages(self):
         """ """
@@ -338,13 +381,17 @@ class PackagesWorker(QObject):
                 for key in packages:
                     val = packages[key]
                     name = val['name'].lower()
-                    grouped_usable_packages[name] = list()
+                    if name not in grouped_usable_packages:
+                        grouped_usable_packages[name] = []
 
         for packages in packages_all:
             for key in packages:
                 val = packages[key]
                 name = val['name'].lower()
                 grouped_usable_packages[name].append([key, val])
+
+        for name in self._pip_packages_names:
+            grouped_usable_packages[name] = []
 
         self._packages = grouped_usable_packages
 
@@ -361,7 +408,7 @@ class PackagesWorker(QObject):
         self._packages_downgradable = {}
         self._packages_installable = {}
         self._packages_licenses_all = {}
-        self._conda_api = conda_api_q
+        self._conda_api = conda_api_q.CondaProcess
 
         cp = self._conda_api
         # TODO: Do we want to exclude some packages? If we plan to continue
@@ -372,14 +419,9 @@ class PackagesWorker(QObject):
         # First do the list of linked packages so in case there is no json
         # We can show at least that
         self._packages_linked = {}
-        # FIXME: move this logic outside...
-        
-        print('PACKAGES if root', self._prefix)
-        print('PACKAGES if root', self._env)
-        if self._env == 'root':
-            canonical_names = sorted(list(cp.linked(self._prefix)))
-        else:
-            canonical_names = sorted(list(cp.linked(self._env)))
+
+        # FIXME: move this logic outside...?
+        canonical_names = sorted(list(cp.linked(self._prefix)))
 
         # This has to do with the versions of the selected environment, NOT
         # with the python version running!
@@ -510,7 +552,14 @@ class PackagesWorker(QObject):
             else:
                 license_ = u''
 
-            self._rows[row] = [name, description, version, status, url,
+            # TODO: Temporal fix to include pip packages
+            if name in self._pip_packages_names:
+                type_ = const.PIP
+                status = const.INSTALLED
+                version = self._pip_packages_names[name]['version']
+            else:
+                type_ = const.CONDA
+            self._rows[row] = [type_, name, description, version, status, url,
                                license_, False, False, False, False]
 
         self.row_data = self._rows

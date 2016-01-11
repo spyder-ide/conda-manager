@@ -1,7 +1,14 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
+
 """
 Main window.
 """
+
 # Standard library imports
 import gettext
 
@@ -106,10 +113,9 @@ class MainWindow(QMainWindow):
         """ """
         return ['root'] + self.packages.get_environments()
 
-    def set_environments(self, env):
+    def set_environments(self, prefix):
         """ """
-#        print(env)
-        self.packages.set_environment(env)
+        self.packages.set_environment(prefix=prefix)
 
     def add_env(self):
         """ """
@@ -183,3 +189,20 @@ class MainWindow(QMainWindow):
             <a href="http://code.google.com/p/pythonxy/">Python(x,y)</a>
             also contribute to this plan.</p>
             """.format(**var))
+
+    def closeEvent(self, event):
+        """ """
+        if self.packages.busy:
+            answer = QMessageBox.question(
+                self,
+                'Quit Conda Manager?',
+                'Conda is still busy.\n\nDo you want to quit?',
+                buttons=QMessageBox.Yes | QMessageBox.No)
+
+            if answer == QMessageBox.Yes:
+                QMainWindow.closeEvent(self, event)
+                # Do some cleanup?
+            else:
+                event.ignore()
+        else:
+            QMainWindow.closeEvent(self, event)

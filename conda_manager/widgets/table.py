@@ -1,27 +1,47 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
+"""
 
+# Standard library imports
+from __future__ import (division, print_function, unicode_literals,
+                        with_statement)
 import gettext
 
-from qtpy.QtCore import Qt, QPoint, QUrl
-from qtpy.QtGui import QDesktopServices, QIcon, QPalette
-from qtpy.QtWidgets import QAbstractItemView, QMenu, QTableView
+# Third party imports
+from qtpy.QtCore import Qt, QPoint, QSize, QUrl
+from qtpy.QtGui import QDesktopServices, QIcon, QPalette, QItemDelegate
+from qtpy.QtWidgets import QAbstractItemView, QMenu, QMessageBox, QTableView
 
-from ..models.filter import MultiColumnSortFilterProxy
-from ..models.packages import CondaPackagesModel
-from ..utils import get_image_path
-from ..utils import constants as const
-from ..utils.py3compat import to_text_string
-from ..utils.qthelpers import add_actions, create_action
+# Local imports
+from conda_manager.models.filter import MultiColumnSortFilterProxy
+from conda_manager.models.packages import CondaPackagesModel
+from conda_manager.utils import get_image_path
+from conda_manager.utils import constants as const
+from conda_manager.utils.py3compat import to_text_string
+from conda_manager.utils.qthelpers import add_actions, create_action
 
 _ = gettext.gettext
 HIDE_COLUMNS = [const.STATUS, const.URL, const.LICENSE, const.REMOVE]
 
 
+class CustomDelegate(QItemDelegate):
+    def sizeHint(self, style, model_index):
+        column = model_index.column()
+        if column in [const.PACKAGE_TYPE] + const.ACTION_COLUMNS:
+            return QSize(24, 24)
+        else:
+            return QItemDelegate.sizeHint(self, style, model_index)
+
+
 class CondaPackagesTable(QTableView):
     """ """
+    WIDTH_TYPE = 24
     WIDTH_NAME = 120
     WIDTH_ACTIONS = 24
     WIDTH_VERSION = 70
@@ -31,6 +51,7 @@ class CondaPackagesTable(QTableView):
         self._parent = parent
         self._searchbox = u''
         self._filterbox = const.ALL
+        self._delegate = CustomDelegate(self)
         self.row_count = None
 
         # To manage icon states
@@ -50,7 +71,9 @@ class CondaPackagesTable(QTableView):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.verticalHeader().hide()
+        self.setSortingEnabled(True)
         self.setAlternatingRowColors(True)
+        self.setItemDelegate(self._delegate)
         self.setShowGrid(False)
         self.setWordWrap(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -65,6 +88,7 @@ class CondaPackagesTable(QTableView):
         self.setPalette(self._palette)
         self.sortByColumn(const.NAME, Qt.AscendingOrder)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.hide_columns()
 
     def setup_model(self, packages_names, packages_versions, row_data):
         """ """
@@ -90,10 +114,12 @@ class CondaPackagesTable(QTableView):
         self.model().add_filter_function('status-search', filter_status)
         self.model().add_filter_function('text-search', filter_text)
 
-        # signals and slots
+        # Signals and slots
         self.verticalScrollBar().valueChanged.connect(self.resize_rows)
 
         self.hide_columns()
+#        self.resizeRowsToContents()
+        self.resize_rows()
 
     def resize_rows(self):
         """ """
@@ -157,7 +183,7 @@ class CondaPackagesTable(QTableView):
             self.proxy_model.set_filter(text, group)
             self.resize_rows()
 
-        # update label count
+        # Update label count
         count = self.verticalHeader().count()
         if count == 0:
             count_text = _("0 packages available ")
@@ -179,7 +205,11 @@ class CondaPackagesTable(QTableView):
 
     def filter_status_changed(self, text):
         """ """
-        for key, val in const.COMBOBOX_VALUES.iteritems():
+        if text not in const.PACKAGE_STATUS:
+            text = const.PACKAGE_STATUS[text]
+
+        for key in const.COMBOBOX_VALUES:
+            val = const.COMBOBOX_VALUES[key]
             if to_text_string(val) == to_text_string(text):
                 group = val
                 break
@@ -189,9 +219,10 @@ class CondaPackagesTable(QTableView):
     def resizeEvent(self, event):
         """Override Qt method"""
         w = self.width()
+        self.setColumnWidth(const.PACKAGE_TYPE, self.WIDTH_TYPE)
         self.setColumnWidth(const.NAME, self.WIDTH_NAME)
         self.setColumnWidth(const.VERSION, self.WIDTH_VERSION)
-        w_new = w - (self.WIDTH_NAME + self.WIDTH_VERSION +
+        w_new = w - (self.WIDTH_TYPE + self.WIDTH_NAME + self.WIDTH_VERSION +
                      (len(const.ACTION_COLUMNS) + 1)*self.WIDTH_ACTIONS)
         self.setColumnWidth(const.DESCRIPTION, w_new)
 
@@ -269,71 +300,92 @@ class CondaPackagesTable(QTableView):
             self.source_model.update_row_icon(model_index.row(), column)
 
             if self.valid:
-                name = self.source_model.row(model_index.row())[const.NAME]
+                row_data = self.source_model.row(model_index.row())
+                type_ = row_data[const.PACKAGE_TYPE]
+                name = row_data[const.NAME]
                 versions = self.source_model.get_package_versions(name)
                 version = self.source_model.get_package_version(name)
 
-                self._parent._run_action(name, column, version, versions)
+                if type_ == const.CONDA:
+                    self._parent._run_action(name, column, version, versions)
+                elif type_ == const.PIP:
+                    QMessageBox.information(self, "Remove pip package: "
+                                            "{0}".format(name),
+                                            "This functionality is not yet "
+                                            "available.")
+                else:
+                    pass
 
     def context_menu_requested(self, event):
-        """ Custom context menu"""
+        """Custom context menu."""
         index = self.current_index
         model_index = self.proxy_model.mapToSource(index)
         row = self.source_model.row(model_index.row())
+        column = model_index.column()
 
-        name, license_ = row[const.NAME], row[const.LICENSE]
-        pos = QPoint(event.x(), event.y())
-        self._menu = QMenu(self)
-
-        metadata = self._parent.get_package_metadata(name)
-        pypi = metadata['pypi']
-        home = metadata['home']
-        dev = metadata['dev']
-        docs = metadata['docs']
-
-        q_pypi = QIcon(get_image_path('python.png'))
-        q_home = QIcon(get_image_path('home.png'))
-        q_docs = QIcon(get_image_path('conda_docs.png'))
-
-        if 'git' in dev:
-            q_dev = QIcon(get_image_path('conda_github.png'))
-        elif 'bitbucket' in dev:
-            q_dev = QIcon(get_image_path('conda_bitbucket.png'))
+        if column in [const.INSTALL, const.UPGRADE, const.DOWNGRADE]:
+            return
+        elif column in [const.VERSION]:
+            name = self.source_model.row(model_index.row())[const.NAME]
+            versions = self.source_model.get_package_versions(name)
+            actions = []
+            for version in reversed(versions):
+                actions.append(create_action(self, version,
+                                             icon=QIcon()))
         else:
-            q_dev = QIcon()
+            name, license_ = row[const.NAME], row[const.LICENSE]
 
-        if 'mit' in license_.lower():
-            lic = 'http://opensource.org/licenses/MIT'
-        elif 'bsd' == license_.lower():
-            lic = 'http://opensource.org/licenses/BSD-3-Clause'
-        else:
-            lic = None
+            metadata = self._parent.get_package_metadata(name)
+            pypi = metadata['pypi']
+            home = metadata['home']
+            dev = metadata['dev']
+            docs = metadata['docs']
 
-        actions = []
+            q_pypi = QIcon(get_image_path('python.png'))
+            q_home = QIcon(get_image_path('home.png'))
+            q_docs = QIcon(get_image_path('conda_docs.png'))
 
-        if license_ != '':
-            actions.append(create_action(self, _('License: ' + license_),
-                                         icon=QIcon(), triggered=lambda:
-                                         self.open_url(lic)))
-            actions.append(None)
+            if 'git' in dev:
+                q_dev = QIcon(get_image_path('conda_github.png'))
+            elif 'bitbucket' in dev:
+                q_dev = QIcon(get_image_path('conda_bitbucket.png'))
+            else:
+                q_dev = QIcon()
 
-        if pypi != '':
-            actions.append(create_action(self, _('Python Package Index'),
-                                         icon=q_pypi, triggered=lambda:
-                                         self.open_url(pypi)))
-        if home != '':
-            actions.append(create_action(self, _('Homepage'),
-                                         icon=q_home, triggered=lambda:
-                                         self.open_url(home)))
-        if docs != '':
-            actions.append(create_action(self, _('Documentation'),
-                                         icon=q_docs, triggered=lambda:
-                                         self.open_url(docs)))
-        if dev != '':
-            actions.append(create_action(self, _('Development'),
-                                         icon=q_dev, triggered=lambda:
-                                         self.open_url(dev)))
-        if len(actions):
+            if 'mit' in license_.lower():
+                lic = 'http://opensource.org/licenses/MIT'
+            elif 'bsd' == license_.lower():
+                lic = 'http://opensource.org/licenses/BSD-3-Clause'
+            else:
+                lic = None
+
+            actions = []
+
+            if license_ != '':
+                actions.append(create_action(self, _('License: ' + license_),
+                                             icon=QIcon(), triggered=lambda:
+                                             self.open_url(lic)))
+                actions.append(None)
+
+            if pypi != '':
+                actions.append(create_action(self, _('Python Package Index'),
+                                             icon=q_pypi, triggered=lambda:
+                                             self.open_url(pypi)))
+            if home != '':
+                actions.append(create_action(self, _('Homepage'),
+                                             icon=q_home, triggered=lambda:
+                                             self.open_url(home)))
+            if docs != '':
+                actions.append(create_action(self, _('Documentation'),
+                                             icon=q_docs, triggered=lambda:
+                                             self.open_url(docs)))
+            if dev != '':
+                actions.append(create_action(self, _('Development'),
+                                             icon=q_dev, triggered=lambda:
+                                             self.open_url(dev)))
+        if len(actions) > 1:
+            self._menu = QMenu(self)
+            pos = QPoint(event.x(), event.y())
             add_actions(self._menu, actions)
             self._menu.popup(self.viewport().mapToGlobal(pos))
 

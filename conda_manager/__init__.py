@@ -1,6 +1,14 @@
-# -*- coding: utf-8 -*-
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
+
 """
 
 """
-from . import app, data, models, utils, widgets
-from .widgets import CondaPackagesWidget
+
+# Local imports
+from conda_manager import app, data, models, utils, widgets  # analysis:ignore
+from conda_manager.widgets import CondaPackagesWidget        # analysis:ignore

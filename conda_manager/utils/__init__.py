@@ -1,17 +1,26 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
 
+"""
+
+# Standard library imports
 import os
 import os.path as osp
 
+# Third party imports
 from qtpy.QtGui import QIcon
 
-from ..data.images import IMG_PATH
-from ..data.repodata import REPODATA_PATH
-from ..utils import encoding
-from ..utils.py3compat import is_unicode, u
+# Local imports
+from conda_manager.data.images import IMG_PATH
+from conda_manager.data.repodata import REPODATA_PATH
+from conda_manager.utils import encoding
+from conda_manager.utils.py3compat import is_unicode, u
 
 
 def get_image_path(filename):
@@ -57,7 +66,7 @@ def get_home_dir():
 
 
 def get_conf_path(filename=None):
-    """Return absolute path for configuration file with specified filename"""
+    """Return absolute path for configuration file with specified filename."""
     conf_dir = osp.join(get_home_dir(), '.condamanager')
 
     if not osp.isdir(conf_dir):

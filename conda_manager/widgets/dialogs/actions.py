@@ -1,20 +1,30 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
 
+"""
+
+# Standard library imports
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals, with_statement)
 import gettext
-import os.path as osp
 
+# Third party imports
 from qtpy.QtCore import QSize, Qt
 from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
                             QDialogButtonBox, QGridLayout, QLabel, QSpacerItem,
                             QTableView, QWidget)
 
-from ...models.dependencies import CondaDependenciesModel
-from ...utils import conda_api_q, sort_versions
-from ...utils import constants as const
-from ...utils.py3compat import to_text_string
+# Local imports
+from conda_manager.models.dependencies import CondaDependenciesModel
+from conda_manager.utils import conda_api_q, sort_versions
+from conda_manager.utils import constants as const
+from conda_manager.utils.py3compat import to_text_string
 
 
 _ = gettext.gettext
@@ -22,17 +32,16 @@ _ = gettext.gettext
 
 class CondaPackageActionDialog(QDialog):
     """ """
-    def __init__(self, parent, env, name, action, version, versions):
+    def __init__(self, parent, prefix, name, action, version, versions):
         super(CondaPackageActionDialog, self).__init__(parent)
         self._parent = parent
-        self._env = env
+        self._prefix = prefix
         self._version_text = None
         self._name = name
         self._dependencies_dic = {}
-        self._conda_process = \
-            conda_api_q.CondaProcess(self, self._on_process_finished)
+        self._conda_process = conda_api_q.CondaProcess(self)
 
-        # widgets
+        # Widgets
         self.label = QLabel(self)
         self.combobox_version = QComboBox()
         self.label_version = QLabel(self)
@@ -52,7 +61,7 @@ class CondaPackageActionDialog(QDialog):
 
         dialog_size = QSize(300, 90)
 
-        # helper variable values
+        # Helper variable values
         action_title = {const.UPGRADE: _("Upgrade package"),
                         const.DOWNGRADE: _("Downgrade package"),
                         const.REMOVE: _("Remove package"),
@@ -139,12 +148,13 @@ class CondaPackageActionDialog(QDialog):
         self.setWindowTitle(title)
         self.setModal(True)
 
-        # signals and slots
+        # Signals and slots
         self.bbox.accepted.connect(self.accept)
         self.bbox.rejected.connect(self.close)
         self.combobox_version.currentIndexChanged.connect(
             self._changed_version)
         self.checkbox.stateChanged.connect(self._changed_checkbox)
+        self._conda_process.sig_finished.connect(self._on_process_finished)
 
     def _changed_version(self, version, dependencies=True):
         """ """
@@ -155,13 +165,11 @@ class CondaPackageActionDialog(QDialog):
 
     def _get_dependencies(self, dependencies=True):
         """ """
-        name = [self._name + '=' + self._version_text]
+        package_name = [self._name + '=' + self._version_text]
 
         # Temporal fix
-        env_name = self._env
-        if env_name != 'root':
-            env_name = osp.basename(env_name)
-        self._conda_process.dependencies(name=env_name, pkgs=name,
+        self._conda_process.dependencies(prefix=self._prefix,
+                                         pkgs=package_name,
                                          dep=dependencies)
 
     def _changed_checkbox(self, state):

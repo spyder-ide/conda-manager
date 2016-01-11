@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright © 2012-2013 Pierre Raybaut
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+# Copyright © 2012 Pierre Raybaut
+#
 # Licensed under the terms of the MIT License
-# (see spyderlib/__init__.py for details)
 
 """
 spyderlib.py3compat
@@ -16,11 +18,12 @@ This module should be fully compatible with:
     * Python 3
 """
 
+# Standard library imports
 from __future__ import print_function
-
-import sys
 import os
+import sys
 
+# Constants
 PY2 = sys.version[0] == '2'
 PY3 = sys.version[0] == '3'
 
@@ -64,18 +67,18 @@ if PY2:
     import repr as reprlib
 else:
     # Python 3
-    import builtins
-    import configparser
+    import builtins                         # analysis:ignore
+    import configparser                     # analysis:ignore
     try:
-        import winreg
+        import winreg                       # analysis:ignore
     except ImportError:
         pass
-    from sys import maxsize
-    import io
-    import pickle
-    from collections import MutableMapping
-    import _thread
-    import reprlib
+    from sys import maxsize                 # analysis:ignore
+    import io                               # analysis:ignore
+    import pickle                           # analysis:ignore
+    from collections import MutableMapping  # analysis:ignore
+    import _thread                          # analysis:ignore
+    import reprlib                          # analysis:ignore
 
 
 # =============================================================================
@@ -249,7 +252,7 @@ else:
     def cmp(a, b):
         return (a > b) - (a < b)
     str_lower = str.lower
-    from itertools import zip_longest
+    from itertools import zip_longest  # analysis:ignore
 
 
 def qbytearray_to_str(qba):

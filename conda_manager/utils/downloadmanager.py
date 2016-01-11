@@ -1,15 +1,24 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
 
+"""
+
+# Standard library imports
 import os
 import os.path as osp
 
+# Third party imports
 from qtpy.QtCore import QByteArray, QObject, QUrl
 from qtpy.QtNetwork import QNetworkAccessManager, QNetworkRequest
 
-from ..utils.py3compat import to_text_string
+# Local imports
+from conda_manager.utils.py3compat import to_text_string
 
 
 # TODO: Change to use requests library instead of Qt ....

@@ -1,18 +1,32 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
 
-from qtpy.QtCore import (Qt, QSize)
-from qtpy.QtGui import (QIcon, QPixmap)
-from qtpy.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QToolButton)
+"""
 
-from ..utils import get_image_path
+# Standard library imports
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals, with_statement)
+import sys
+
+# Third party imports
+from qtpy.QtCore import Qt, QSize
+from qtpy.QtGui import QIcon, QPixmap
+from qtpy.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLineEdit,
+                            QToolButton)
+
+# Local imports
+from conda_manager.utils import get_image_path
 
 
 class SearchLineEdit(QLineEdit):
     """Line edit search widget with icon and remove all button"""
-    def __init__(self, parent, icon=True):
+    def __init__(self, parent=None, icon=True):
         super(SearchLineEdit, self).__init__(parent)
         self.setTextMargins(1, 0, 20, 0)
 
@@ -21,8 +35,8 @@ class SearchLineEdit(QLineEdit):
             self._label = QLabel(self)
             self._pixmap_icon = QPixmap(get_image_path('conda_search.png'))
             self._label.setPixmap(self._pixmap_icon)
-            self._label.setStyleSheet('''border: 0px; padding-bottom: 2px;
-                                      padding-left: 1px;''')
+            self._label.setStyleSheet('''border: 0px; padding-bottom: 0px;
+                                      padding-left: 2px;''')
 
         self._pixmap = QPixmap(get_image_path('conda_del.png'))
         self.button_clear = QToolButton(self)
@@ -31,7 +45,7 @@ class SearchLineEdit(QLineEdit):
         self.button_clear.setCursor(Qt.ArrowCursor)
         self.button_clear.setStyleSheet("""QToolButton
             {background: transparent;
-            padding: 0px; border: none; margin:0px; }""")
+            padding-right: 2px; border: none; margin:0px; }""")
         self.button_clear.setVisible(False)
 
         # Layout
@@ -52,9 +66,18 @@ class SearchLineEdit(QLineEdit):
         else:
             self.button_clear.setVisible(True)
 
+    def sizeHint(self):
+        return QSize(200, self._pixmap_icon.height())
+
     # Public api
     # ----------
     def clear_text(self):
         """ """
         self.setText('')
         self.setFocus()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    w = SearchLineEdit()
+    w.show()
+    sys.exit(app.exec_())

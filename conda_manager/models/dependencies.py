@@ -1,15 +1,24 @@
-# -*- coding: utf-8 -*-
-"""
+# -*- coding:utf-8 -*-
+#
+# Copyright © 2015 The Spyder Development Team
+# Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
 
 """
 
+"""
+
+# Standard library imports
 import gettext
 
+# Third party imports
 from qtpy.compat import to_qvariant
 from qtpy.QtCore import Qt, QAbstractTableModel, QModelIndex
 from qtpy.QtGui import QFont
 
-from ..utils import conda_api_q
+# Local imports
+from conda_manager.utils import conda_api_q
 
 _ = gettext.gettext
 
@@ -60,14 +69,14 @@ class CondaDependenciesModel(QAbstractTableModel):
             if sections[section]:
                 for item in sections[section]:
                     i = item.split(' ')[0]
-                    name, version, build = conda_api_q.split_canonical_name(i)
+                    name, version, build = conda_api_q.CondaProcess.split_canonical_name(i)
                     packages[name] = {}
 
         for section in sections:
             pkgs = sections[section]
             for item in pkgs:
                 i = item.split(' ')[0]
-                name, version, build = conda_api_q.split_canonical_name(i)
+                name, version, build = conda_api_q.CondaProcess.split_canonical_name(i)
                 packages[name][section] = version
         return packages
 

@@ -23,9 +23,9 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import (QSize, Qt, QThread, Signal)
-from qtpy.QtGui import (QComboBox, QDialogButtonBox, QDialog, QHBoxLayout,
-                        QLabel, QMessageBox, QPushButton, QProgressBar,
-                        QSpacerItem, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog, QHBoxLayout,
+                            QLabel, QMessageBox, QPushButton, QProgressBar,
+                            QSpacerItem, QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.models import PackagesWorker

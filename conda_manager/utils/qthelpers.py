@@ -16,9 +16,10 @@ import os.path as osp
 import re
 import sys
 
-from qtpy.QtGui import (QAction, QStyle, QWidget, QIcon, QApplication,
-                        QLabel, QVBoxLayout, QHBoxLayout, QLineEdit,
-                        QKeyEvent, QMenu, QKeySequence, QToolButton)
+from qtpy.QtGui import QIcon, QKeyEvent, QKeySequence
+from qtpy.QtWidgets import (QAction, QStyle, QWidget, QApplication, QLabel,
+                            QVBoxLayout, QHBoxLayout, QLineEdit, QMenu,
+                            QToolButton)
 from qtpy.QtCore import QObject, Qt, QLocale, QTranslator, QLibraryInfo, Slot
 from qtpy.compat import to_qvariant, from_qvariant
 

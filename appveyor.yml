@@ -1,0 +1,23 @@
+# https://ci.appveyor.com/project/goanpeca/conda-manager
+
+environment:
+  matrix:
+    - PYTHON:         "C:\\Python27_64"
+      PYTHON_VERSION: "2.7"
+      PYTHON_ARCH:    "64"
+      USE_QT_API:     "PyQt4"
+
+    - PYTHON:         "C:\\Python35_64"
+      PYTHON_VERSION: "3.5"
+      PYTHON_ARCH:    "64"
+      USE_QT_API:     "PyQt4"
+
+install:
+  - powershell .\\ci\\appveyor\\install.ps1
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PYTHON%\\Library\\bin;%PATH%"
+  - "SET TEST_CI=True"
+
+build: false
+
+test_script:
+  - python conda-manager.py

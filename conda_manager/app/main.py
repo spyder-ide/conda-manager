@@ -18,7 +18,7 @@ from conda_manager.app import MainWindow
 
 
 def main():
-    app = qapplication(sys.argv, test_time=15)
+    app = qapplication(sys.argv, test_time=45)
     window = MainWindow()
     window.show()
     app.exec_()

@@ -10,9 +10,9 @@
 Qt utilities.
 """
 
-from qtpy.QtWidgets import QAction, QApplication, QMenu, QToolButton
-from qtpy.QtCore import Qt, QLocale, QTranslator, QLibraryInfo
 from qtpy.compat import to_qvariant
+from qtpy.QtCore import Qt, QLocale, QTranslator, QLibraryInfo
+from qtpy.QtWidgets import QAction, QApplication, QMenu, QToolButton
 
 
 def qapplication(translate=True):

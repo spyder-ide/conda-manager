@@ -10,66 +10,21 @@
 Qt utilities.
 """
 
-# FIXME: Make qtpy dependant
-import os
-import os.path as osp
-import re
-import sys
-
-from qtpy.QtGui import QIcon, QKeyEvent, QKeySequence
-from qtpy.QtWidgets import (QAction, QStyle, QWidget, QApplication, QLabel,
-                            QVBoxLayout, QHBoxLayout, QLineEdit, QMenu,
-                            QToolButton)
-from qtpy.QtCore import QObject, Qt, QLocale, QTranslator, QLibraryInfo, Slot
-from qtpy.compat import to_qvariant, from_qvariant
-
-
-# Local import
-from conda_manager.utils.py3compat import is_text_string, to_text_string
-
-# Note: How to redirect a signal from widget *a* to widget *b* ?
-# ----
-# It has to be done manually:
-#  * typing 'SIGNAL("clicked()")' works
-#  * typing 'signalstr = "clicked()"; SIGNAL(signalstr)' won't work
-# Here is an example of how to do it:
-# (self.listwidget is widget *a* and self is widget *b*)
-#    self.connect(self.listwidget, SIGNAL('option_changed'),
-#                 lambda *args: self.emit(SIGNAL('option_changed'), *args))
+from qtpy.QtWidgets import QAction, QApplication, QMenu, QToolButton
+from qtpy.QtCore import Qt, QLocale, QTranslator, QLibraryInfo
+from qtpy.compat import to_qvariant
 
 
 def qapplication(translate=True):
     """Return QApplication instance
     Creates it if it doesn't already exist"""
-    if running_in_mac_app():
-        SpyderApplication = MacApplication
-    else:
-        SpyderApplication = QApplication
-
-    app = SpyderApplication.instance()
+    app = QApplication.instance()
     if app is None:
-        # Set Application name for Gnome 3
-        # https://groups.google.com/forum/#!topic/pyside/24qxvwfrRDs
-        app = SpyderApplication(['Spyder'])
-
-        # Set application name for KDE (See issue 2207)
-        app.setApplicationName('Spyder')
+        app = QApplication(['Conda-Manager'])
+        app.setApplicationName('Conda-Manager')
     if translate:
         install_translator(app)
     return app
-
-
-def file_uri(fname):
-    """Select the right file uri scheme according to the operating system"""
-    if os.name == 'nt':
-        # Local file
-        if re.search(r'^[a-zA-Z]:', fname):
-            return 'file:///' + fname
-        # UNC based path
-        else:
-            return 'file://' + fname
-    else:
-        return 'file://' + fname
 
 
 QT_TRANSLATOR = None
@@ -86,98 +41,6 @@ def install_translator(qapp):
             QT_TRANSLATOR = qt_translator  # Keep reference alive
     if QT_TRANSLATOR is not None:
         qapp.installTranslator(QT_TRANSLATOR)
-
-
-def keybinding(attr):
-    """Return keybinding"""
-    ks = getattr(QKeySequence, attr)
-    return from_qvariant(QKeySequence.keyBindings(ks)[0], str)
-
-
-def _process_mime_path(path, extlist):
-    if path.startswith(r"file://"):
-        if os.name == 'nt':
-            # On Windows platforms, a local path reads: file:///c:/...
-            # and a UNC based path reads like: file://server/share
-            if path.startswith(r"file:///"):  # this is a local path
-                path = path[8:]
-            else:  # this is a unc path
-                path = path[5:]
-        else:
-            path = path[7:]
-    if osp.exists(path):
-        if extlist is None or osp.splitext(path)[1] in extlist:
-            return path
-
-
-def mimedata2url(source, extlist=None):
-    """
-    Extract url list from MIME data
-    extlist: for example ('.py', '.pyw')
-    """
-    pathlist = []
-    if source.hasUrls():
-        for url in source.urls():
-            path = _process_mime_path(to_text_string(url.toString()), extlist)
-            if path is not None:
-                pathlist.append(path)
-    elif source.hasText():
-        for rawpath in to_text_string(source.text()).splitlines():
-            path = _process_mime_path(rawpath, extlist)
-            if path is not None:
-                pathlist.append(path)
-    if pathlist:
-        return pathlist
-
-
-def keyevent2tuple(event):
-    """Convert QKeyEvent instance into a tuple"""
-    return (event.type(), event.key(), event.modifiers(), event.text(),
-            event.isAutoRepeat(), event.count())
-
-
-def tuple2keyevent(past_event):
-    """Convert tuple into a QKeyEvent instance"""
-    return QKeyEvent(*past_event)
-
-
-def restore_keyevent(event):
-    if isinstance(event, tuple):
-        _, key, modifiers, text, _, _ = event
-        event = tuple2keyevent(event)
-    else:
-        text = event.text()
-        modifiers = event.modifiers()
-        key = event.key()
-    ctrl = modifiers & Qt.ControlModifier
-    shift = modifiers & Qt.ShiftModifier
-    return event, text, key, ctrl, shift
-
-
-def create_toolbutton(parent, text=None, shortcut=None, icon=None, tip=None,
-                      toggled=None, triggered=None,
-                      autoraise=True, text_beside_icon=False):
-    """Create a QToolButton"""
-    button = QToolButton(parent)
-    if text is not None:
-        button.setText(text)
-    if icon is not None:
-        if is_text_string(icon):
-            icon = get_icon(icon)
-        button.setIcon(icon)
-    if text is not None or tip is not None:
-        button.setToolTip(text if tip is None else tip)
-    if text_beside_icon:
-        button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-    button.setAutoRaise(autoraise)
-    if triggered is not None:
-        button.clicked.connect(triggered)
-    if toggled is not None:
-        button.toggled.connect(toggled)
-        button.setCheckable(True)
-    if shortcut is not None:
-        button.setShortcut(shortcut)
-    return button
 
 
 def action2button(action, autoraise=True, text_beside_icon=False, parent=None):
@@ -211,8 +74,6 @@ def create_action(parent, text, shortcut=None, icon=None, tip=None,
         action.toggled.connect(toggled)
         action.setCheckable(True)
     if icon is not None:
-        if is_text_string(icon):
-            icon = get_icon(icon)
         action.setIcon(icon)
     if shortcut is not None:
         action.setShortcut(shortcut)
@@ -228,12 +89,6 @@ def create_action(parent, text, shortcut=None, icon=None, tip=None,
     #  since the context thing doesn't work quite well with these widgets)
     action.setShortcutContext(context)
     return action
-
-
-def add_shortcut_to_tooltip(action, context, name):
-    """Add the shortcut associated with a given action to its tooltip"""
-    action.setToolTip(action.toolTip() + ' (%s)' %
-                      get_shortcut(context=context, name=name))
 
 
 def add_actions(target, actions, insert_before=None):
@@ -261,163 +116,3 @@ def add_actions(target, actions, insert_before=None):
             else:
                 target.insertAction(insert_before, action)
         previous_action = action
-
-
-def get_item_user_text(item):
-    """Get QTreeWidgetItem user role string"""
-    return from_qvariant(item.data(0, Qt.UserRole), to_text_string)
-
-
-def set_item_user_text(item, text):
-    """Set QTreeWidgetItem user role string"""
-    item.setData(0, Qt.UserRole, to_qvariant(text))
-
-
-def create_bookmark_action(parent, url, title, icon=None, shortcut=None):
-    """Create bookmark action"""
-
-    @Slot()
-    def open_url():
-        return programs.start_file(url)
-
-    return create_action(parent, title, shortcut=shortcut, icon=icon,
-                         triggered=open_url)
-
-
-def create_module_bookmark_actions(parent, bookmarks):
-    """
-    Create bookmark actions depending on module installation:
-    bookmarks = ((module_name, url, title), ...)
-    """
-    actions = []
-    for key, url, title in bookmarks:
-        # Create actions for scientific distros only if Spyder is installed
-        # under them
-        create_act = True
-        if key == 'xy' or key == 'winpython':
-            if not programs.is_module_installed(key):
-                create_act = False
-        if create_act:
-            act = create_bookmark_action(parent, url, title)
-            actions.append(act)
-    return actions
-
-
-def create_program_action(parent, text, name, icon=None, nt_name=None):
-    """Create action to run a program"""
-    if is_text_string(icon):
-        icon = get_icon(icon)
-    if os.name == 'nt' and nt_name is not None:
-        name = nt_name
-    path = programs.find_program(name)
-    if path is not None:
-        return create_action(parent, text, icon=icon,
-                             triggered=lambda: programs.run_program(name))
-
-
-def create_python_script_action(parent, text, icon, package, module, args=[]):
-    """Create action to run a GUI based Python script"""
-    if is_text_string(icon):
-        icon = get_icon(icon)
-    if programs.python_script_exists(package, module):
-        return create_action(parent, text, icon=icon,
-                             triggered=lambda:
-                             programs.run_python_script(package, module, args))
-
-
-class DialogManager(QObject):
-    """
-    Object that keep references to non-modal dialog boxes for another QObject,
-    typically a QMainWindow or any kind of QWidget
-    """
-    def __init__(self):
-        QObject.__init__(self)
-        self.dialogs = {}
-
-    def show(self, dialog):
-        """Generic method to show a non-modal dialog and keep reference
-        to the Qt C++ object"""
-        for dlg in list(self.dialogs.values()):
-            if to_text_string(dlg.windowTitle()) \
-               == to_text_string(dialog.windowTitle()):
-                dlg.show()
-                dlg.raise_()
-                break
-        else:
-            dialog.show()
-            self.dialogs[id(dialog)] = dialog
-            dialog.accepted.connect(
-                              lambda eid=id(dialog): self.dialog_finished(eid))
-            dialog.rejected.connect(
-                              lambda eid=id(dialog): self.dialog_finished(eid))
-
-    def dialog_finished(self, dialog_id):
-        """Manage non-modal dialog boxes"""
-        return self.dialogs.pop(dialog_id)
-
-    def close_all(self):
-        """Close all opened dialog boxes"""
-        for dlg in list(self.dialogs.values()):
-            dlg.reject()
-
-
-def get_std_icon(name, size=None):
-    """Get standard platform icon
-    Call 'show_std_icons()' for details"""
-    if not name.startswith('SP_'):
-        name = 'SP_'+name
-    icon = QWidget().style().standardIcon(getattr(QStyle, name))
-    if size is None:
-        return icon
-    else:
-        return QIcon(icon.pixmap(size, size))
-
-
-def get_filetype_icon(fname):
-    """Return file type icon"""
-    ext = osp.splitext(fname)[1]
-    if ext.startswith('.'):
-        ext = ext[1:]
-    return get_icon("{0}.png".format(ext), get_std_icon('FileIcon'))
-
-
-class ShowStdIcons(QWidget):
-    """
-    Dialog showing standard icons
-    """
-    def __init__(self, parent):
-        QWidget.__init__(self, parent)
-        layout = QHBoxLayout()
-        row_nb = 14
-        cindex = 0
-        for child in dir(QStyle):
-            if child.startswith('SP_'):
-                if cindex == 0:
-                    col_layout = QVBoxLayout()
-                icon_layout = QHBoxLayout()
-                icon = get_std_icon(child)
-                label = QLabel()
-                label.setPixmap(icon.pixmap(32, 32))
-                icon_layout.addWidget(label)
-                icon_layout.addWidget(QLineEdit(child.replace('SP_', '')))
-                col_layout.addLayout(icon_layout)
-                cindex = (cindex+1) % row_nb
-                if cindex == 0:
-                    layout.addLayout(col_layout)
-        self.setLayout(layout)
-        self.setWindowTitle('Standard Platform Icons')
-        self.setWindowIcon(get_std_icon('TitleBarMenuButton'))
-
-
-def show_std_icons():
-    """
-    Show all standard Icons
-    """
-    app = qapplication()
-    dialog = ShowStdIcons(None)
-    dialog.show()
-    sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    show_std_icons()

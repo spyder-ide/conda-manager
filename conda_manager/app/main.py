@@ -12,15 +12,13 @@ Application entry point.
 # Standard library imports
 import sys
 
-# Third party imports
-from qtpy.QtWidgets import QApplication
-
 # Local imports
+from conda_manager.utils.qthelpers import qapplication
 from conda_manager.app import MainWindow
 
 
 def main():
-    app = QApplication(sys.argv)
+    app = qapplication(sys.argv, test_time=15)
     window = MainWindow()
     window.show()
     app.exec_()

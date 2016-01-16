@@ -10,12 +10,14 @@
 Qt utilities.
 """
 
+import os
+
 from qtpy.compat import to_qvariant
-from qtpy.QtCore import Qt, QLocale, QTranslator, QLibraryInfo
+from qtpy.QtCore import Qt, QLocale, QTranslator, QLibraryInfo, QTimer
 from qtpy.QtWidgets import QAction, QApplication, QMenu, QToolButton
 
 
-def qapplication(translate=True):
+def qapplication(translate=True, test_time=3):
     """Return QApplication instance
     Creates it if it doesn't already exist"""
     app = QApplication.instance()
@@ -24,6 +26,12 @@ def qapplication(translate=True):
         app.setApplicationName('Conda-Manager')
     if translate:
         install_translator(app)
+
+    test_travis = os.environ.get('TEST_CI', None)
+    if test_travis is not None:
+        timer_shutdown = QTimer(app)
+        timer_shutdown.timeout.connect(app.quit)
+        timer_shutdown.start(test_time*1000)
     return app
 
 

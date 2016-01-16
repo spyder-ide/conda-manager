@@ -56,15 +56,16 @@ install:
   - conda info -a
 
   # Test environments for different Qt bindings
+  - conda config --add channels spyder-ide;
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION qtpy qtawesome requests;
   - if [[ "$USE_QT_API" == "PyQt5" ]]; then
-      conda config --add channels spyder-ide;
-      conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION qt5 pyqt5;
+      conda install -q -n test-environment qt5 pyqt5;
     elif [[ "$USE_QT_API" == "PyQt4" ]]; then
-      conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION qt pyqt;
+      conda install -q -n test-environment qt pyqt;
     elif [[ "$USE_QT_API" == "PySide" ]]; then
-      conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION qt pyside;
+      conda install -q -n test-environment qt pyside;
     fi
   - source activate test-environment
-  - python setup.py install
-script:  
+  - python setup.py install --single-version-externally-managed --root=/
+script:
   - python conda-manager.py

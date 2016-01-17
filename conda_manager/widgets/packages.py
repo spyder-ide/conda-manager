@@ -599,7 +599,7 @@ class CondaPackagesDialog(QDialog, CondaPackagesWidget):
 
 def test_widget():
     """Run conda packages widget test"""
-    from spyderlib.utils.qthelpers import qapplication
+    from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
     widget = CondaPackagesWidget(None)
     widget.show()
@@ -608,7 +608,7 @@ def test_widget():
 
 def test_dialog():
     """Run conda packages widget test"""
-    from spyderlib.utils.qthelpers import qapplication
+    from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
     dialog = CondaPackagesDialog(name='root')
     dialog.exec_()

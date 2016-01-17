@@ -12,15 +12,11 @@ build:
 requirements:
   build:
     - python
-    - requests
-    - qtpy
-    - spyder
-    - qtawesome
+    - setuptools
   run:
     - python
     - requests
     - qtpy
-    - spyder
     - qtawesome
 
 test:

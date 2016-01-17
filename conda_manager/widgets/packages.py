@@ -379,6 +379,7 @@ class CondaPackagesWidget(QWidget):
         """ """
         cp = self._conda_process
         prefix = self._prefix
+        print(action, dic)
 
         if prefix == self._root_prefix:
             name = 'root'

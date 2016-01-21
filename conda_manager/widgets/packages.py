@@ -189,12 +189,12 @@ class CondaPackagesWidget(QWidget):
         machine = platform.machine()
         fname = [None, None]
 
-        if 'win' in system:
-            fname[0] = 'win'
+        if 'osx' in system or 'darwin' in system:
+            fname[0] = 'osx'
         elif 'lin' in system:
             fname[0] = 'linux'
-        elif 'osx' in system or 'darwin' in system:  # TODO: is this correct?
-            fname[0] = 'osx'
+        elif 'win' in system or 'nt' in system:
+            fname[0] = 'win'
         else:
             return None
 
@@ -379,6 +379,7 @@ class CondaPackagesWidget(QWidget):
         """ """
         cp = self._conda_process
         prefix = self._prefix
+        print(action, dic)
 
         if prefix == self._root_prefix:
             name = 'root'

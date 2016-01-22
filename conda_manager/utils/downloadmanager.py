@@ -213,7 +213,7 @@ class RequestsWorker(QObject):
 
             if not os.path.isdir(os.path.dirname(path)):
                 os.makedirs(os.path.dirname(path))
-            with open(path, 'w') as f:
+            with open(path, 'wb') as f:
                 f.write(raw)
 
             path = path.replace('.bz2', '')
@@ -221,7 +221,7 @@ class RequestsWorker(QObject):
         else:
             data = stream.getvalue()
 
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             f.write(data)
 
         self._free = True

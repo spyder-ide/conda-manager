@@ -88,7 +88,14 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     sig_environment_created = Signal()
 
     def __init__(self, parent=None):
-        CondaPackagesWidget.__init__(self, parent=parent)
+        channels = self.get_option('channels', ['anaconda', 'spyder-ide'])
+        active_channels = self.get_option('active_channels',
+                                          ['anaconda', 'spyder-ide'])
+        CondaPackagesWidget.__init__(self,
+                                     parent=parent,
+                                     channels=channels,
+                                     active_channels=active_channels,
+                                     )
         SpyderPluginMixin.__init__(self, parent)
 
         self.root_env = 'root'
@@ -136,6 +143,8 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
             self.sig_worker_ready.connect(self._after_load)
             self.sig_environment_created.connect(pe.sig_environment_created)
 
+        self.sig_channels_updated.connect(self._save_channel_settings)
+
     def refresh_plugin(self):
         """Refresh pylint widget"""
         pass
@@ -159,6 +168,12 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     def apply_plugin_settings(self, options):
         """Apply configuration file's plugin settings"""
         pass
+
+    # --- Private API ---
+    # ----
+    def _save_channel_settings(self, channels, active_channels):
+        self.set_option('active_channels', active_channels)
+        self.set_option('channels', channels)
 
     # ------ Public API -------------------------------------------------------
     def create_env(self, name, package):

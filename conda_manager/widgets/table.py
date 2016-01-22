@@ -30,13 +30,14 @@ from conda_manager.utils.py3compat import to_text_string
 from conda_manager.utils.qthelpers import add_actions, create_action
 
 _ = gettext.gettext
-HIDE_COLUMNS = [const.STATUS, const.URL, const.LICENSE, const.REMOVE]
+HIDE_COLUMNS = [const.COL_STATUS, const.COL_URL, const.COL_LICENSE,
+                const.COL_REMOVE]
 
 
 class CustomDelegate(QItemDelegate):
     def sizeHint(self, style, model_index):
         column = model_index.column()
-        if column in [const.PACKAGE_TYPE] + const.ACTION_COLUMNS:
+        if column in [const.COL_PACKAGE_TYPE] + const.ACTION_COLUMNS:
             return QSize(24, 24)
         else:
             return QItemDelegate.sizeHint(self, style, model_index)
@@ -70,8 +71,8 @@ class CondaPackagesTable(QTableView):
         self.source_model = None
         self.proxy_model = None
 
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
+#        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+#        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
@@ -80,7 +81,6 @@ class CondaPackagesTable(QTableView):
         self.setShowGrid(False)
         self.setWordWrap(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
         self._palette = QPalette()
 
         # Header setup
@@ -92,17 +92,22 @@ class CondaPackagesTable(QTableView):
         else:
             self._hheader.setResizeMode(self._hheader.Fixed)
         self._hheader.setStyleSheet("""QHeaderView {border: 0px;
-                                                    border-radius: 0px;};""")
+                                                    border-radius: 0px;};
+                                                    """)
         self.setPalette(self._palette)
-        self.sortByColumn(const.NAME, Qt.AscendingOrder)
+        self.sortByColumn(const.COL_NAME, Qt.AscendingOrder)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()
 
-    def setup_model(self, packages_names, packages_versions, row_data):
+    def setup_model(self, packages_names, packages_versions, packages_sizes,
+                    row_data):
         """ """
+        self._packages_sizes = packages_sizes
         self.proxy_model = MultiColumnSortFilterProxy(self)
         self.source_model = CondaPackagesModel(self, packages_names,
-                                               packages_versions, row_data)
+                                               packages_versions,
+                                               packages_sizes,
+                                               row_data)
         self.proxy_model.setSourceModel(self.source_model)
         self.setModel(self.proxy_model)
 
@@ -111,13 +116,13 @@ class CondaPackagesTable(QTableView):
 
         filter_text = \
             (lambda row, text, status: (
-             all([t in row[const.NAME].lower() for t in
+             all([t in row[const.COL_NAME].lower() for t in
                  to_text_string(text).lower().split()]) or
-             all([t in row[const.DESCRIPTION].lower() for t in
+             all([t in row[const.COL_DESCRIPTION].lower() for t in
                  to_text_string(text).split()])))
 
         filter_status = (lambda row, text, status:
-                         to_text_string(row[const.STATUS]) in
+                         to_text_string(row[const.COL_STATUS]) in
                          to_text_string(status))
         self.model().add_filter_function('status-search', filter_status)
         self.model().add_filter_function('text-search', filter_text)
@@ -227,12 +232,14 @@ class CondaPackagesTable(QTableView):
     def resizeEvent(self, event):
         """Override Qt method"""
         w = self.width()
-        self.setColumnWidth(const.PACKAGE_TYPE, self.WIDTH_TYPE)
-        self.setColumnWidth(const.NAME, self.WIDTH_NAME)
-        self.setColumnWidth(const.VERSION, self.WIDTH_VERSION)
-        w_new = w - (self.WIDTH_TYPE + self.WIDTH_NAME + self.WIDTH_VERSION +
+        width_start = 20
+        self.setColumnWidth(const.COL_START, width_start)
+        self.setColumnWidth(const.COL_PACKAGE_TYPE, self.WIDTH_TYPE)
+        self.setColumnWidth(const.COL_NAME, self.WIDTH_NAME)
+        self.setColumnWidth(const.COL_VERSION, self.WIDTH_VERSION)
+        w_new = w - (width_start + self.WIDTH_TYPE + self.WIDTH_NAME + self.WIDTH_VERSION +
                      (len(const.ACTION_COLUMNS) + 1)*self.WIDTH_ACTIONS)
-        self.setColumnWidth(const.DESCRIPTION, w_new)
+        self.setColumnWidth(const.COL_DESCRIPTION, w_new)
 
         for col in const.ACTION_COLUMNS:
             self.setColumnWidth(col, self.WIDTH_ACTIONS)
@@ -282,13 +289,13 @@ class CondaPackagesTable(QTableView):
             self._model_index_clicked = model_index
             self.valid = True
 
-            if column == const.INSTALL and model.is_installable(model_index):
-                model.update_row_icon(model_index.row(), const.INSTALL)
-            elif column == const.INSTALL and model.is_removable(model_index):
-                model.update_row_icon(model_index.row(), const.REMOVE)
-            elif ((column == const.UPGRADE and
+            if column == const.COL_INSTALL and model.is_installable(model_index):
+                model.update_row_icon(model_index.row(), const.COL_INSTALL)
+            elif column == const.COL_INSTALL and model.is_removable(model_index):
+                model.update_row_icon(model_index.row(), const.COL_REMOVE)
+            elif ((column == const.COL_UPGRADE and
                    model.is_upgradable(model_index)) or
-                  (column == const.DOWNGRADE and
+                  (column == const.COL_DOWNGRADE and
                    model.is_downgradable(model_index))):
                 model.update_row_icon(model_index.row(), model_index.column())
             else:
@@ -300,27 +307,33 @@ class CondaPackagesTable(QTableView):
         model = self.source_model
         model_index = self._model_index_clicked
 
+        actions = {const.COL_INSTALL: const.ACTION_INSTALL,
+                   const.COL_REMOVE: const.ACTION_REMOVE,
+                   const.COL_UPGRADE: const.ACTION_UPGRADE,
+                   const.COL_DOWNGRADE: const.ACTION_DOWNGRADE,
+                   }
+
         if model_index:
             column = model_index.column()
 
-            if column == const.INSTALL and model.is_removable(model_index):
-                column = const.REMOVE
+            if column == const.COL_INSTALL and model.is_removable(model_index):
+                column = const.COL_REMOVE
             self.source_model.update_row_icon(model_index.row(), column)
 
             if self.valid:
                 row_data = self.source_model.row(model_index.row())
-                type_ = row_data[const.PACKAGE_TYPE]
-                name = row_data[const.NAME]
+                type_ = row_data[const.COL_PACKAGE_TYPE]
+                name = row_data[const.COL_NAME]
                 versions = self.source_model.get_package_versions(name)
                 version = self.source_model.get_package_version(name)
 
-                if type_ == const.CONDA:
-                    self._parent._run_action(name, column, version, versions)
-                elif type_ == const.PIP:
-                    QMessageBox.information(self, "Remove pip package: "
-                                            "{0}".format(name),
-                                            "This functionality is not yet "
-                                            "available.")
+                action = actions.get(column, None)
+
+                if type_ == const.CONDA_PACKAGE:
+                    self._parent._run_action(name, action, version, versions,
+                                             self._packages_sizes)
+                elif type_ == const.PIP_PACKAGE:
+                    self._parent._run_pip_action(name, action)
                 else:
                     pass
 
@@ -331,17 +344,17 @@ class CondaPackagesTable(QTableView):
         row = self.source_model.row(model_index.row())
         column = model_index.column()
 
-        if column in [const.INSTALL, const.UPGRADE, const.DOWNGRADE]:
+        if column in const.ACTION_COLUMNS:
             return
-        elif column in [const.VERSION]:
-            name = self.source_model.row(model_index.row())[const.NAME]
+        elif column in [const.COL_VERSION]:
+            name = self.source_model.row(model_index.row())[const.COL_NAME]
             versions = self.source_model.get_package_versions(name)
             actions = []
             for version in reversed(versions):
                 actions.append(create_action(self, version,
                                              icon=QIcon()))
         else:
-            name, license_ = row[const.NAME], row[const.LICENSE]
+            name, license_ = row[const.COL_NAME], row[const.COL_LICENSE]
 
             metadata = self._parent.get_package_metadata(name)
             pypi = metadata['pypi']

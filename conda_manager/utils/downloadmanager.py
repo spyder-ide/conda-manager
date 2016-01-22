@@ -10,146 +10,259 @@
 """
 
 # Standard library imports
+import bz2
+import io
+import multiprocessing
 import os
-import os.path as osp
+import sys
 
 # Third party imports
-from qtpy.QtCore import QByteArray, QObject, QUrl
-from qtpy.QtNetwork import QNetworkAccessManager, QNetworkRequest
-
-# Local imports
-from conda_manager.utils.py3compat import to_text_string
+from qtpy.QtCore import Signal, QObject, QThread, QTimer
+from qtpy.QtGui import QApplication, QPushButton, QVBoxLayout, QWidget
+import requests
 
 
-# TODO: Change to use requests library instead of Qt ....
-
-class DownloadManager(QObject):
-    """Synchronous download manager.
-
-    http://qt-project.org/doc/qt-4.8/network-downloadmanager-downloadmanager-cpp.html
-    as inspiration.
+def human_bytes(n):
     """
-    def __init__(self, parent, on_finished_func, on_progress_func, save_path):
-        super(DownloadManager, self).__init__(parent)
+    Return the number of bytes n in more human readable form.
+    """
+    if n < 1024:
+        return '%d B' % n
+    k = n/1024
+    if k < 1024:
+        return '%d KB' % round(k)
+    m = k/1024
+    if m < 1024:
+        return '%.1f MB' % m
+    g = m/1024
+    return '%.2f GB' % g
+
+
+# --- Async worker
+# -----------------------------------------------------------------------------
+def aget(item):
+    """
+    """
+    path = item['path']
+    url = item['url']
+    request = requests.get(url, stream=True)
+    content_length = int(request.headers.get('content-length', -1))
+    con = aget.total_queue.get()
+    aget.total_queue.put(content_length + con)
+    aget.count.put(0)
+    stream = io.BytesIO()
+
+    for i, chunk in enumerate(request.iter_content(chunk_size=1024)):
+        if chunk:
+            prog = aget.queue.get()
+            progress = len(chunk) + prog
+            aget.queue.put(progress)
+            stream.write(chunk)
+
+    if not os.path.isdir(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+
+    with open(path, 'wb') as f:
+        f.write(stream.getvalue())
+
+
+def pool_init(queue, total_queue, count):
+    """
+    """
+    # see http://stackoverflow.com/a/3843313/852994
+    aget.queue = queue
+    aget.total_queue = total_queue
+    aget.count = count
+
+
+class AsyncRequestsWorker(QObject):
+    """
+    Asynchronous download worker using requests.
+    """
+    sig_finished = Signal()
+    sig_partial = Signal(object, object)
+
+    def __init__(self, parent, queue, save_path):
+        QObject.__init__(self)
         self._parent = parent
+        self._queue = queue
+        self._save_path = save_path
+        self._url = None             # current url in process
+        self._filename = None        # current filename in process
+        self._error = None           # error number
+        self._free = True            # lock process flag
+        self._partial_queue = multiprocessing.Queue()
+        self._partial_queue.put(0)
+        self._total_queue = multiprocessing.Queue()
+        self._total_queue.put(0)
+        self._count = multiprocessing.Queue()
+        cpu = multiprocessing.cpu_count()
+        self._pool = multiprocessing.Pool(processes=cpu,
+                                          initializer=pool_init,
+                                          initargs=(self._partial_queue,
+                                                    self._total_queue,
+                                                    self._count))
+        self._timer = QTimer()
+        self._timer.timeout.connect(self._get_queue_messages)
+        self._timer.start(100)
+        self._total = 0
+        self._partial = 0
 
-        self._on_finished_func = on_finished_func
-        self._on_progress_func = on_progress_func
+    def _get_queue_messages(self):
+        self._partial = self._partial_queue.get()
+        self._total = self._total_queue.get()
 
-        self._manager = QNetworkAccessManager(self)
-        self._request = None
-        self._reply = None
-        self._queue = None         # [['filename', 'uri'], ...]
-        self._url = None           # current url in process
-        self._filename = None      # current filename in process
-        self._save_path = None     # current defined save path
-        self._error = None         # error number
-        self._free = True          # lock process flag
+        self.sig_partial.emit(self._partial, self._total)
 
-        self.set_save_path(save_path)
+        self._partial_queue.put(self._partial)
+        self._total_queue.put(self._total)
 
-    def _start_next_download(self):
+        if (self._partial == self._total and
+                self._total_queue.qsize() == len(self._queue)):
+            self._timer.stop()
+            self.sig_finished.emit()
+
+    def start(self):
+        items = []
+        for q in self._queue:
+            dic = {'path': os.path.join(self._save_path, q[0]),
+                   'url': q[1],
+                   }
+            items.append(dic)
+        self._pool.map(aget, items)
+
+
+# --- Sync worker
+# -----------------------------------------------------------------------------
+class RequestsWorker(QObject):
+    """
+    Synchronous download worker using requests.
+    """
+    sig_finished = Signal()
+    sig_partial = Signal(object, object)
+
+    def __init__(self, parent, queue, save_path):
+        QObject.__init__(self)
+        self._parent = parent
+        self._queue = queue
+        self._save_path = save_path
+        self._url = None             # current url in process
+        self._filename = None        # current filename in process
+        self._error = None           # error number
+        self._free = True            # lock process flag
+
+    def start(self, i=None):
         """ """
         if self._free:
-            if len(self._queue) != 0:
+            if self._queue and len(self._queue) != 0:
                 self._free = False
                 self._filename, self._url = self._queue.pop(0)
-                full_path = osp.join(self._save_path, self._filename)
+                full_path = os.path.join(self._save_path, self._filename)
 
-                if osp.isfile(full_path):
-                    # compare file versions by getting headers first
-                    self._get(header_only=True)
+                if os.path.isfile(full_path):
+                    # Compare file versions by getting headers first
+                    self._get_headers(full_path)
                 else:
-                    # file does not exists, first download
-                    self._get()
-                # print(full_path)
+                    # File does not exists, first download
+                    self._get(full_path)
             else:
-                self._on_finished_func()
+                self.sig_finished.emit()
+        else:
+            self.start()
 
-    def _get(self, header_only=False):
-        """Download file specified by uri"""
-        self._request = QNetworkRequest(QUrl(self._url))
+    def _get_headers(self, path):
+        """
+        Download file header specified by uri.
+        """
+        self._free = False
         self._reply = None
         self._error = None
+        fullpath = os.path.join(self._save_path, self._filename)
 
-        if header_only:
-            self._reply = self._manager.head(self._request)
-            self._reply.finished.connect(self._on_downloaded_headers)
+        request = requests.get(self._url, stream=True)
+        header_filesize = int(request.headers.get('Content-Length', -1))
+        local_filesize = int(os.path.getsize(fullpath))
+
+        if local_filesize != header_filesize:
+            self._get(path, request=request)
         else:
-            self._reply = self._manager.get(self._request)
-            self._reply.finished.connect(self._on_downloaded)
+            self.sig_partial.emit(100, 100)
+            self._free = True
+            self.start()
 
-        self._reply.downloadProgress.connect(self._on_progress)
+    def _get(self, path, request=None):
+        """
+        Download file specified by uri.
+        """
+        self._free = False
+        if request is None:
+            request = requests.get(self._url, stream=True)
 
-    def _on_downloaded_headers(self):
-        """On header from uri downloaded"""
-        # handle error for headers...
-        error_code = self._reply.error()
-        if error_code > 0:
-            self._on_errors(error_code)
-            return None
+        content_length = int(request.headers.get('Content-Length', -1))
+        stream = io.BytesIO()
+        for i, chunk in enumerate(request.iter_content(chunk_size=1024)):
+            if chunk:
+                progress = i*1024 + len(chunk)
+                if content_length == -1:
+                    progress = -1
+                self.sig_partial.emit(progress, content_length)
+                stream.write(chunk)
 
-        fullpath = osp.join(self._save_path, self._filename)
-        headers = {}
-        data = self._reply.rawHeaderPairs()
+        if path.endswith('.bz2'):
+            raw = stream.getvalue()
 
-        for d in data:
-            if isinstance(d[0], QByteArray):
-                d = [d[0].data(), d[1].data()]
-            key = to_text_string(d[0], encoding='ascii')
-            value = to_text_string(d[1], encoding='ascii')
-            headers[key.lower()] = value
+            if not os.path.isdir(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            with open(path, 'w') as f:
+                f.write(raw)
 
-        if len(headers) != 0:
-            header_filesize = int(headers['content-length'])
-            local_filesize = int(osp.getsize(fullpath))
+            path = path.replace('.bz2', '')
+            data = bz2.decompress(raw)
+        else:
+            data = stream.getvalue()
 
-            if header_filesize == local_filesize:
-                self._free = True
-                self._start_next_download()
-            else:
-                self._get()
-
-    def _on_downloaded(self):
-        """On file downloaded"""
-        # check if errors
-        error_code = self._reply.error()
-        if error_code > 0:
-            self._on_errors(error_code)
-            return None
-
-        # process data if no errors
-        data = self._reply.readAll()
-
-        self._save_file(data)
-
-    def _on_errors(self, e):
-        """On download errors"""
-        self._free = True  # otherwise update button cannot work!
-        self._error = e
-        self._on_finished_func()
-
-    def _on_progress(self, downloaded_size, total_size):
-        """On Partial progress"""
-        self._on_progress_func([downloaded_size, total_size])
-
-    def _save_file(self, data):
-        """ """
-        if not osp.isdir(self._save_path):
-            os.mkdir(self._save_path)
-
-        fullpath = osp.join(self._save_path, self._filename)
-
-        if isinstance(data, QByteArray):
-            data = data.data()
-
-        with open(fullpath, 'wb') as f:
+        with open(path, 'w') as f:
             f.write(data)
 
         self._free = True
-        self._start_next_download()
+        self.start()
 
-    # public api
+
+class RequestsDownloadManager(QObject):
+    """Synchronous download manager using requests.
+
+    Note: there is a QNetworkManager, but ssl seemed to be absent on some
+    Qt versions, so the requests download manager is prefered.
+    """
+    sig_partial = Signal(object, object)
+    sig_finished = Signal()
+
+    def __init__(self, parent, save_path, async=False):
+        super(RequestsDownloadManager, self).__init__(parent)
+        self._parent = parent
+        self._queue = []           # [['filename', 'uri'], ...]
+        self._save_path = save_path  # current defined save path
+        self._worker = None          # requests worker
+        self._thread = QThread(self)
+        self._async = async
+
+    def _setup(self):
+        self._thread.terminate()
+        self._thread = QThread(self)
+
+        if self._async:
+            self._worker = AsyncRequestsWorker(self, self._queue,
+                                               self._save_path)
+        else:
+            self._worker = RequestsWorker(self, self._queue, self._save_path)
+
+        self._worker.sig_partial.connect(self.sig_partial)
+        self._worker.sig_finished.connect(self.sig_finished)
+        self._worker.sig_finished.connect(self._thread.quit)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.start)
+
+    # Public api
     # ----------
     def set_save_path(self, path):
         """ """
@@ -158,15 +271,55 @@ class DownloadManager(QObject):
     def set_queue(self, queue):
         """[['filename', 'uri'], ['filename', 'uri'], ...]"""
         self._queue = queue
+        self._setup()
 
     def get_errors(self):
         """ """
-        return self._error
+        return None
+#        return self._worker._error
 
     def start_download(self):
         """ """
-        self._start_next_download()
+        self._thread.start()
 
     def stop_download(self):
         """ """
-        pass
+        self._thread.terminate()
+
+
+class TestWidget(QWidget):
+    def __init__(self):
+        super(TestWidget, self).__init__()
+        self.rdm = RequestsDownloadManager(None, '/home/goanpeca/Desktop/')
+        self.button = QPushButton('Download')
+        layout = QVBoxLayout()
+        layout.addWidget(self.button)
+        self.setLayout(layout)
+        self.button.clicked.connect(self.download)
+        self.button.clicked.connect(lambda: self.button.setEnabled(False))
+        self.rdm.sig_finished.connect(lambda: self.button.setEnabled(True))
+
+    def download(self):
+        queue = [
+            ['anaconda.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ['asmeurer.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ['boob.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ['boob1.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ['boob2.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ['boob3.json.bz2',
+             'https://conda.anaconda.org/anaconda/linux-64/repodata.json.bz2'],
+            ]
+        self.rdm.set_queue(queue)
+        self.rdm.start_download()
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    w = TestWidget()
+    w.show()
+    sys.exit(app.exec_())

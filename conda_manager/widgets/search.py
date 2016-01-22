@@ -76,6 +76,7 @@ class SearchLineEdit(QLineEdit):
         self.setText('')
         self.setFocus()
 
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     w = SearchLineEdit()

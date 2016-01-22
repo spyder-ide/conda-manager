@@ -10,3 +10,4 @@
 
 # Local imports
 from .actions import CondaPackageActionDialog  # analysis:ignore
+from .channels import ChannelsDialog           # analysis:ignore

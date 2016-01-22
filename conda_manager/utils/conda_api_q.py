@@ -51,6 +51,7 @@ if os.name == "nt":
 # -----------------------------------------------------------------------------
 PY2 = sys.version[0] == '2'
 PY3 = sys.version[0] == '3'
+DEBUG = False
 
 
 # -----------------------------------------------------------------------------
@@ -103,8 +104,8 @@ class CondaProcess(QObject):
     """Conda API modified to work with QProcess instead of popen."""
 
     # Signals
-    sig_finished = Signal(str, object, str)
-    sig_partial = Signal(str, object, str)
+    sig_finished = Signal(str, object, str)  # function_name, output, error
+    sig_partial = Signal(str, object, str)   # function_name, partial, error
     sig_started = Signal()
 
     ENCODING = 'ascii'
@@ -142,6 +143,9 @@ class CondaProcess(QObject):
 
         stderr = self._process.readAllStandardError()
         stderr = handle_qbytearray(stderr, CondaProcess.ENCODING)
+
+        if self._partial is not None:
+            stdout = self._partial + stdout
 
         if self._parse:
             try:
@@ -193,7 +197,7 @@ class CondaProcess(QObject):
               function == 'config_set' or function == 'config_remove'):
             result = self._output
             self._output = result.get('warnings', [])
-        elif function == 'pip':
+        elif function == 'pip_list':
             result = []
             lines = self._output.split('\n')
             for line in lines:
@@ -206,9 +210,11 @@ class CondaProcess(QObject):
             self._error = stderr
 
         self._parse = False
-
         self.sig_finished.emit(self._function_called, self._output,
                                self._error)
+
+        if DEBUG:
+            print(self._function_called, self._output, self._error)
 
     def _abspath(self, abspath):
         """ """
@@ -232,16 +238,19 @@ class CondaProcess(QObject):
         if self._is_not_running():
             cmd_list = self._abspath(abspath)
             cmd_list.extend(extra_args)
-            self._error, self._output = None, None
+            self._error, self._output, self._partial = None, None, None
             self._process.start(cmd_list[0], cmd_list[1:])
             self.sig_started.emit()
+
+            if DEBUG:
+                print(cmd_list)
 
     def _call_pip(self, name=None, prefix=None, extra_args=None):
         """ """
         if self._is_not_running():
             cmd_list = self._pip_cmd(name=name, prefix=prefix)
             cmd_list.extend(extra_args)
-            self._error, self._output = None, None
+            self._error, self._output, self._partial = None, None, None
             self._parse = False
             self._process.start(cmd_list[0], cmd_list[1:])
             self.sig_started.emit()
@@ -451,10 +460,10 @@ class CondaProcess(QObject):
             self._function_called = 'share'
             self._call_and_parse(['share', '--json', '--prefix', prefix])
 
-    def create(self, name=None, prefix=None, pkgs=None):
+    def create(self, name=None, prefix=None, pkgs=None, channels=None):
         """
         Create an environment either by 'name' or 'prefix' with a specified set
-        of packages.
+        of packages and 'channels'.
         """
         # TODO: Fix temporal hack
         if not pkgs or not isinstance(pkgs, (list, tuple, str)):
@@ -484,27 +493,45 @@ class CondaProcess(QObject):
         elif isinstance(pkgs, str):
             cmd_list.extend(['--file', pkgs])
 
+        # TODO: Check if correct
+        if channels:
+            cmd_list.extend(['--override-channels'])
+
+            for channel in channels:
+                cmd_list.extend(['--channel'])
+                cmd_list.extend([channel])
+
         if self._is_not_running:
             self._function_called = 'create'
             self._call_conda(cmd_list)
 
-    def install(self, name=None, prefix=None, pkgs=None, dep=True):
+    def install(self, name=None, prefix=None, pkgs=None, dep=True,
+                channels=None):
         """
         Install packages into an environment either by 'name' or 'prefix' with
-        a specified set of packages
-        """        
+        a specified set of packages and channels.
+        """
         # TODO: Fix temporal hack
         if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
                             'install into existing environment')
 
         cmd_list = ['install', '--yes', '--json', '--force-pscheck']
+
         if name:
             cmd_list.extend(['--name', name])
         elif prefix:
             cmd_list.extend(['--prefix', prefix])
         else:  # just install into the current environment, whatever that is
             pass
+
+        # TODO: Check if correct
+        if channels:
+            cmd_list.extend(['--override-channels'])
+
+            for channel in channels:
+                cmd_list.extend(['--channel'])
+                cmd_list.extend([channel])
 
         # TODO: Fix temporal hack
         if isinstance(pkgs, (list, tuple)):
@@ -740,7 +767,8 @@ class CondaProcess(QObject):
 
     # --- Additional methods not in conda-api
     # ------------------------------------------------------------------------
-    def dependencies(self, name=None, prefix=None, pkgs=None, dep=True):
+    def dependencies(self, name=None, prefix=None, pkgs=None, channels=None,
+                     dep=True):
         """
         Get dependenciy list for packages to be installed into an environment
         defined either by 'name' or 'prefix'.
@@ -749,7 +777,7 @@ class CondaProcess(QObject):
             raise TypeError('must specify a list of one or more packages to '
                             'install into existing environment')
 
-        cmd_list = ['install', '--dry-run', '--json']
+#        cmd_list = ['install', '--dry-run', '--json']
         cmd_list = ['install', '--dry-run', '--json', '--force-pscheck']
 
         if not dep:
@@ -763,6 +791,14 @@ class CondaProcess(QObject):
             pass
 
         cmd_list.extend(pkgs)
+
+        # TODO: Check if correct
+        if channels:
+            cmd_list.extend(['--override-channels'])
+
+            for channel in channels:
+                cmd_list.extend(['--channel'])
+                cmd_list.extend([channel])
 
         if self._is_not_running:
             self._function_called = 'install_dry'
@@ -881,7 +917,7 @@ class CondaProcess(QObject):
 
         return cmd_list
 
-    def pip_list(self, name=None, prefix=None, abspath=True, emit=False):
+    def pip_list(self, name=None, prefix=None, abspath=True):
         """
         Get list of pip installed packages.
         """
@@ -890,34 +926,17 @@ class CondaProcess(QObject):
                             "required.")
 
         if self._is_not_running:
-            cmd_list = self._abspath(abspath)
             if name:
-                cmd_list.extend(['list', '--name', name])
+                cmd_list = ['list', '--name', name]
             if prefix:
-                cmd_list.extend(['list', '--prefix', prefix])
+                cmd_list = ['list', '--prefix', prefix]
 
-            qprocess = QProcess()
-            qprocess.start(cmd_list[0], cmd_list[1:])
-            qprocess.waitForFinished()
-            output = qprocess.readAllStandardOutput()
-            output = handle_qbytearray(output, CondaProcess.ENCODING)
-
-            result = []
-            lines = output.split('\n')
-
-            for line in lines:
-                if '<pip>' in line:
-                    temp = line.split()[:-1] + ['pip']
-                    result.append('-'.join(temp))
-
-            if emit:
-                self.sig_finished.emit("pip", str(result), "")
-
-        return result
+            self._function_called = 'pip_list'
+            self._call_and_parse(cmd_list, abspath=abspath)
 
     def pip_remove(self, name=None, prefix=None, pkgs=None):
         """
-        Remove a pip pacakge in given environment by 'name' or 'prefix'.
+        Remove a pip pacakge in given environment by `name` or `prefix`.
         """
         if isinstance(pkgs, list) or isinstance(pkgs, tuple):
             pkg = ' '.join(pkgs)

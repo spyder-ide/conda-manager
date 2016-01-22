@@ -18,7 +18,7 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import Signal, QObject, QThread, QTimer
-from qtpy.QtGui import QApplication, QPushButton, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget
 import requests
 
 

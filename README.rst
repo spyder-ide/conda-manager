@@ -1,18 +1,18 @@
-.. image:: https://pypip.in/version/conda-manager/badge.svg
+|license| |pypi version| |pypi download| |pypi versions| |Build status|
+
+.. |license| image:: https://img.shields.io/pypi/l/conda-manager.svg
+   :target: LICENSE.txt
+   :alt: License
+.. |pypi version| image:: https://img.shields.io/pypi/v/conda-manager.svg
    :target: https://pypi.python.org/pypi/conda-manager/
    :alt: Latest PyPI version
-
-.. image:: https://pypip.in/download/conda-manager/badge.svg
-   :target: https://pypi.python.org/pypi/conda-manager/
+.. |pypi download| image:: https://img.shields.io/pypi/dm/conda-manager.svg
+   :target: https://pypi.python.org/pypi/conda-manager
    :alt: Number of PyPI downloads
-
-.. image:: https://pypip.in/py_versions/conda-manager/badge.svg
-   :target: https://pypi.python.org/pypi/conda-manager/
-   :alt: Supported python version
-   
-.. image:: https://pypip.in/license/conda-manager/badge.svg
-
-.. image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
+.. |pypi versions| image:: https://img.shields.io/pypi/pyversions/conda-manager.svg
+   :target: https://pypi.python.org/pypi/conda-manager
+   :alt: Supported Python version
+.. |Build status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager
    :alt: Travis-CI build status
 

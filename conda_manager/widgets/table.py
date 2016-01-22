@@ -8,15 +8,18 @@
 """
 """
 
-# Standard library imports
 from __future__ import (division, print_function, unicode_literals,
                         with_statement)
+
+# Standard library imports
+import os
 import gettext
 
 # Third party imports
 from qtpy.QtCore import Qt, QPoint, QSize, QUrl
-from qtpy.QtGui import QDesktopServices, QIcon, QPalette, QItemDelegate
-from qtpy.QtWidgets import QAbstractItemView, QMenu, QMessageBox, QTableView
+from qtpy.QtGui import QDesktopServices, QIcon, QPalette
+from qtpy.QtWidgets import (QAbstractItemView, QItemDelegate, QMenu,
+                            QMessageBox, QTableView)
 
 # Local imports
 from conda_manager.models.filter import MultiColumnSortFilterProxy
@@ -82,7 +85,12 @@ class CondaPackagesTable(QTableView):
 
         # Header setup
         self._hheader = self.horizontalHeader()
-        self._hheader.setResizeMode(self._hheader.Fixed)
+        # TODO: Change this to use a qtpy constant once a new version
+        # of qtpy is released
+        if os.environ['QT_API'] == 'pyqt5':
+            self._hheader.setSectionResizeMode(self._hheader.Fixed)
+        else:
+            self._hheader.setResizeMode(self._hheader.Fixed)
         self._hheader.setStyleSheet("""QHeaderView {border: 0px;
                                                     border-radius: 0px;};
                                                     """)

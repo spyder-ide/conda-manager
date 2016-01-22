@@ -14,8 +14,8 @@ import gettext
 
 # Third party imports
 from qtpy.QtCore import QUrl
-from qtpy.QtGui import QDesktopServices, QMenu
-from qtpy.QtWidgets import QMainWindow, QMessageBox
+from qtpy.QtGui import QDesktopServices
+from qtpy.QtWidgets import QMainWindow, QMenu, QMessageBox
 
 # Local imports
 from conda_manager._version import __version__

@@ -221,6 +221,9 @@ class RequestsWorker(QObject):
         else:
             data = stream.getvalue()
 
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
         with open(path, 'wb') as f:
             f.write(data)
 

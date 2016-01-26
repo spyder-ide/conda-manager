@@ -249,6 +249,10 @@ class RequestsDownloadManager(QObject):
         self._thread = QThread(self)
         self._async = async
 
+        # Make dir if not existing
+        if not os.path.isdir(save_path):
+            os.makedirs(save_path)
+
     def _setup(self):
         self._thread.terminate()
         self._thread = QThread(self)

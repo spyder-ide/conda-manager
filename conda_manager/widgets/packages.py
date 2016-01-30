@@ -83,7 +83,9 @@ class CondaPackagesWidget(QWidget):
         self._prefix = None
         self._temporal_action_dic = {}
         self._download_manager = RequestsDownloadManager(self,
-                                                         self.CONDA_CONF_PATH)
+                                                         self.CONDA_CONF_PATH,
+                                                         async=False,
+                                                         check_size=False)
         self._thread = QThread(self)
         self._worker = None
         self._db_metadata = cp.ConfigParser()
@@ -203,12 +205,12 @@ class CondaPackagesWidget(QWidget):
         self.setTabOrder(self.button_channels, self.button_update)
         self.setTabOrder(self.button_update, self.textbox_search)
         self.setTabOrder(self.textbox_search, self.table)
-        self.setTabOrder(self.table, self.button_ok)
 
         # Setup
         self.set_environment(name=name, prefix=prefix, update=False)
+
         if self._supports_architecture():
-            self.update_package_index()
+            self.update_package_index(check_size=False)
         else:
             status = _('no packages supported for this architecture!')
             self._update_status(progress=[0, 0], hide=True, status=status)
@@ -338,6 +340,7 @@ class CondaPackagesWidget(QWidget):
         """ """
         self._pip_packages = []
         self._pip_process.pip_list(prefix=self._prefix)
+        self._download_manager.set_check_size(False)
 
     def _post_setup(self):
         self._set_channels()
@@ -624,8 +627,9 @@ class CondaPackagesWidget(QWidget):
                     pass
         return metadata
 
-    def update_package_index(self):
+    def update_package_index(self, other=None, check_size=True):
         """ """
+        self._download_manager.set_check_size(check_size)
         self._set_channels()
         self._download_repodata()
 

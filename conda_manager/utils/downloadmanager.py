@@ -141,7 +141,7 @@ class RequestsWorker(QObject):
     sig_finished = Signal()
     sig_partial = Signal(object, object)
 
-    def __init__(self, parent, queue, save_path):
+    def __init__(self, parent, queue, save_path, check_size):
         QObject.__init__(self)
         self._parent = parent
         self._queue = queue
@@ -150,6 +150,7 @@ class RequestsWorker(QObject):
         self._filename = None        # current filename in process
         self._error = None           # error number
         self._free = True            # lock process flag
+        self._check_size = check_size
 
     def start(self, i=None):
         """ """
@@ -159,9 +160,13 @@ class RequestsWorker(QObject):
                 self._filename, self._url = self._queue.pop(0)
                 full_path = os.path.join(self._save_path, self._filename)
 
-                if os.path.isfile(full_path):
+                if os.path.isfile(full_path) and self._check_size:
                     # Compare file versions by getting headers first
                     self._get_headers(full_path)
+                elif os.path.isfile(full_path) and not self._check_size:
+                    # If a file matches the name dont download anything
+                    self._free = True
+                    self.start()
                 else:
                     # File does not exists, first download
                     self._get(full_path)
@@ -240,7 +245,7 @@ class RequestsDownloadManager(QObject):
     sig_partial = Signal(object, object)
     sig_finished = Signal()
 
-    def __init__(self, parent, save_path, async=False):
+    def __init__(self, parent, save_path, async=False, check_size=True):
         super(RequestsDownloadManager, self).__init__(parent)
         self._parent = parent
         self._queue = []           # [['filename', 'uri'], ...]
@@ -248,6 +253,7 @@ class RequestsDownloadManager(QObject):
         self._worker = None          # requests worker
         self._thread = QThread(self)
         self._async = async
+        self._check_size = check_size
 
         # Make dir if not existing
         if not os.path.isdir(save_path):
@@ -261,7 +267,10 @@ class RequestsDownloadManager(QObject):
             self._worker = AsyncRequestsWorker(self, self._queue,
                                                self._save_path)
         else:
-            self._worker = RequestsWorker(self, self._queue, self._save_path)
+            self._worker = RequestsWorker(self,
+                                          self._queue,
+                                          self._save_path,
+                                          self._check_size)
 
         self._worker.sig_partial.connect(self.sig_partial)
         self._worker.sig_finished.connect(self.sig_finished)
@@ -271,6 +280,10 @@ class RequestsDownloadManager(QObject):
 
     # Public api
     # ----------
+    def set_check_size(self, value):
+        """ """
+        self._check_size = value
+
     def set_save_path(self, path):
         """ """
         self._save_path = path
@@ -297,7 +310,8 @@ class RequestsDownloadManager(QObject):
 class TestWidget(QWidget):
     def __init__(self):
         super(TestWidget, self).__init__()
-        self.rdm = RequestsDownloadManager(None, '/home/goanpeca/Desktop/')
+        self.rdm = RequestsDownloadManager(None, '/home/goanpeca/Desktop/',
+                                           async=False, check_size=False)
         self.button = QPushButton('Download')
         layout = QVBoxLayout()
         layout.addWidget(self.button)

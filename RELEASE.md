@@ -37,4 +37,4 @@ git push --tags
 
 * Upload to Spyder channel
 
-`conda upload ***.tar.bz2 -u spyder-ide`
+`anaconda upload conda-manager-***.tar.bz2 -u spyder-ide`

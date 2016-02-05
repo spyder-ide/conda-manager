@@ -2,13 +2,13 @@
 
 * Install `twine`. Needed to  upload to PyPi in safe manner.
 
-```python
+```bash
 pip install twine
 ```
 
 * Update `_version.py` (set release version, remove 'dev')
 
-```python
+```bash
 git add .
 git commit -m 'comment'
 python setup.py sdist
@@ -18,14 +18,23 @@ git tag -a vX.X.X -m 'comment'
 
 * Update `_version.py` (add 'dev' and increment minor)
 
-```python
+```bash
 git add .
 git commit -m 'comment'
 git push
 git push --tags
 ```
-# To release a new version of **conda-manager** on PyPI:
 
-`conda build conda.recipe/ -c spyder-ide`
+# To release a new version of **conda-manager** for Anaconda:
 
-`conda upload ***.tar.bz -u spyder-ide`
+* For a stable release
+
+`conda build conda.recipe`
+
+* For a pre-release
+
+`PRERELEASE=True conda build conda.recipe`
+
+* Upload to Spyder channel
+
+`anaconda upload conda-manager-***.tar.bz2 -u spyder-ide`

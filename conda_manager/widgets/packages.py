@@ -65,7 +65,8 @@ class CondaPackagesWidget(QWidget):
                  prefix=None,
                  channels=(),
                  active_channels=(),
-                 conda_url='https://conda.anaconda.org'):
+                 conda_url='https://conda.anaconda.org',
+                 setup=True):
 
         super(CondaPackagesWidget, self).__init__(parent)
 
@@ -95,6 +96,7 @@ class CondaPackagesWidget(QWidget):
         self._row_data = None
         self._hide_widgets = False
         self._first_run = True
+        self.busy = False
 
         if channels:
             self._channels = channels
@@ -207,13 +209,14 @@ class CondaPackagesWidget(QWidget):
         self.setTabOrder(self.textbox_search, self.table)
 
         # Setup
-        self.set_environment(name=name, prefix=prefix, update=False)
+        if setup:
+            self.set_environment(name=name, prefix=prefix, update=False)
 
-        if self._supports_architecture():
-            self.update_package_index(check_size=False)
-        else:
-            status = _('no packages supported for this architecture!')
-            self._update_status(progress=[0, 0], hide=True, status=status)
+            if self._supports_architecture():
+                self.update_package_index(check_size=False)
+            else:
+                status = _('no packages supported for this architecture!')
+                self._update_status(progress=[0, 0], hide=True, status=status)
 
     def _supports_architecture(self):
         """ """
@@ -646,10 +649,11 @@ class CondaPackagesWidget(QWidget):
         if name and prefix:
             raise Exception('#TODO:')
 
-        if name and self._conda_process.environment_exists(name=name):
-            self._prefix = self.get_prefix_envname(name)
-        elif prefix and self._conda_process.environment_exists(prefix=prefix):
+        if prefix and self._conda_process.environment_exists(prefix=prefix):
             self._prefix = prefix
+            print('Conda manager', prefix)
+        elif name and self._conda_process.environment_exists(name=name):
+            self._prefix = self.get_prefix_envname(name)
         else:
             self._prefix = self._root_prefix
 

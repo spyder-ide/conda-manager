@@ -405,8 +405,8 @@ class CondaPackagesWidget(QWidget):
 
         if self._prefix == self._root_prefix:
             short_env = 'root'
-        elif self._conda_process.environment_exists(prefix=self._prefix):
-            short_env = osp.basename(self._prefix)
+#        elif self._conda_process.environment_exists(prefix=self._prefix):
+#            short_env = osp.basename(self._prefix)
         else:
             short_env = self._prefix
 
@@ -646,12 +646,11 @@ class CondaPackagesWidget(QWidget):
 
     def set_environment(self, name=None, prefix=None, update=True):
         """ """
-        if name and prefix:
-            raise Exception('#TODO:')
+#        if name and prefix:
+#            raise Exception('#TODO:')
 
         if prefix and self._conda_process.environment_exists(prefix=prefix):
             self._prefix = prefix
-            print('Conda manager', prefix)
         elif name and self._conda_process.environment_exists(name=name):
             self._prefix = self.get_prefix_envname(name)
         else:

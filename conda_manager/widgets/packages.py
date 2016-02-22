@@ -349,6 +349,7 @@ class CondaPackagesWidget(QWidget):
         self._set_channels()
         self._thread.terminate()
         self._thread = QThread(self)
+
         self._worker = PackagesWorker(self, self._repo_files,
                                       self._prefix, self._root_prefix,
                                       self._pip_packages)
@@ -596,14 +597,15 @@ class CondaPackagesWidget(QWidget):
         self.dlg.move(x, y)
         self.dlg.button_add.setFocus()
 
-    def update_channels(self, channels=None, active_channels=None):
+    def update_channels(self, channels=None, active_channels=None, ui=True):
         """
         Update the current channels and active channels.
 
         Note: Assumes that channels and active channels are valid.
         """
-        self.button_channels.toggle()
-        self.button_channels.setDisabled(False)
+        if ui:
+            self.button_channels.toggle()
+            self.button_channels.setDisabled(False)
 
         if sorted(self._active_channels) != sorted(active_channels) or \
                 sorted(self._channels) != sorted(channels):

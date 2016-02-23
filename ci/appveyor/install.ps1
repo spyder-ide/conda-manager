@@ -93,7 +93,7 @@ function UpdateConda ($python_home) {
 function main () {
     InstallMiniconda $env:PYTHON_VERSION $env:PYTHON_ARCH $env:PYTHON
     UpdateConda $env:PYTHON
-    InstallCondaPackages $env:PYTHON "pyqt qtpy qtawesome requests pyyaml"
+    InstallCondaPackages $env:PYTHON "pyqt qtpy qtawesome requests pyyaml anaconda-client"
 }
 
 

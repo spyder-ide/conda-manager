@@ -175,9 +175,9 @@ class _ClientAPI(QObject):
             name, version, b = tuple(canonical_name.rsplit('-', 2))
             pip_packages[name] = {'version': version}
 
-        packages_names = sorted(list(set(linked_packages.keys() +
-                                         pip_packages.keys() +
-                                         packages.keys())))
+        packages_names = sorted(list(set(list(linked_packages.keys()) +
+                                         list(pip_packages.keys()) +
+                                         list(packages.keys()))))
 
         for name in packages_names:
             packagedata = packages.get(name, None)

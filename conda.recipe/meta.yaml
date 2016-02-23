@@ -27,9 +27,11 @@ test:
 
   requires:
     - anaconda-client
-    - pyqt
+    - python
     - pyyaml
+    - qtawesome
     - qtpy
+    - requests
 
 about:
   home: https://github.com/spyder-ide/conda-manager

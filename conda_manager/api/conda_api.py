@@ -334,8 +334,9 @@ class _CondaAPI(QObject):
         Return all of the (named) environment (this does not include the root
         environment), as a list of absolute path to their prefixes.
         """
-        return self._call_and_parse(['info', '--json'],
-                                    callback=lambda o, e: o['envs'])
+#        return self._call_and_parse(['info', '--json'],
+#                                    callback=lambda o, e: o['envs'])
+        return os.listdir(os.sep.join([self.ROOT_PREFIX, 'envs']))
 
     def get_prefix_envname(self, name):
         """

@@ -52,6 +52,7 @@ class _AnacondaAPI(QObject):
         self.pip_remove = self._conda_api.pip_remove
         self.linked = self._conda_api.linked
         self.environment_exists = self._conda_api.environment_exists
+        self.get_envs = self._conda_api.get_envs
 
         # These methods return a worker
         self.download_async = self._download_api.download

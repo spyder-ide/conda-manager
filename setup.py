@@ -61,7 +61,7 @@ def get_package_data(name, extlist):
 
 
 # Requirements
-REQUIREMENTS = ['qtpy', 'qtawesome', 'requests', 'pyyaml']
+REQUIREMENTS = ['qtpy', 'qtawesome', 'requests', 'pyyaml', 'anaconda-client']
 EXTLIST = ['.jpg', '.png', '.json', '.mo', '.ini']
 LIBNAME = 'conda_manager'
 

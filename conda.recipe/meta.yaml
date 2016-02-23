@@ -15,17 +15,20 @@ requirements:
     - python
     - setuptools
   run:
+    - anaconda-client
     - python
-    - requests
-    - qtpy
-    - qtawesome
     - pyyaml
+    - qtawesome
+    - qtpy
+    - requests
 test:
   imports:
     - conda_manager
 
   requires:
+    - anaconda-client
     - pyqt
+    - pyyaml
     - qtpy
 
 about:

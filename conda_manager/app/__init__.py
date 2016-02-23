@@ -9,5 +9,4 @@
 This package contains the code for the standalone application.
 """
 
-from .main_window import MainWindow  # analysis:ignore
 from .main import main               # analysis:ignore

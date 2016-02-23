@@ -29,7 +29,8 @@ from conda_manager.api import AnacondaAPI
 from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.py3compat import configparser as cp
-from conda_manager.widgets import CondaPackagesTable, SearchLineEdit
+from conda_manager.widgets.search import SearchLineEdit
+from conda_manager.widgets.table import CondaPackagesTable
 from conda_manager.widgets.dialogs import (ChannelsDialog,
                                            CondaPackageActionDialog)
 
@@ -87,6 +88,7 @@ class CondaPackagesWidget(QWidget):
         self.busy = False
         self.data_directory = data_directory
         self.conda_url = conda_url
+        self.name = name
         self.prefix = prefix
         self.root_prefix = self.api.ROOT_PREFIX
         self.message = ''
@@ -182,7 +184,9 @@ class CondaPackagesWidget(QWidget):
 
         # Setup
         self._load_bundled_metadata()
+
         if setup:
+            self.set_environment(name=name, prefix=prefix)
             self.setup()
 
     # --- Helpers/Callbacks
@@ -408,10 +412,10 @@ class CondaPackagesWidget(QWidget):
 
         if self.prefix == self.root_prefix:
             short_env = 'root'
-#        elif self._conda_process.environment_exists(prefix=self._prefix):
-#            short_env = osp.basename(self._prefix)
+#        elif self.api.environment_exists(prefix=self.prefix):
+#            short_env = osp.basename(self.prefix)
         else:
-            short_env = self._prefix
+            short_env = self.prefix
 
         if env:
             self.message = '{0} (<b>{1}</b>)'.format(
@@ -487,12 +491,12 @@ class CondaPackagesWidget(QWidget):
 #        if name and prefix:
 #            raise Exception('#TODO:')
 
-        if prefix and self._conda_process.environment_exists(prefix=prefix):
-            self._prefix = prefix
-        elif name and self._conda_process.environment_exists(name=name):
-            self._prefix = self.get_prefix_envname(name)
+        if prefix and self.api.environment_exists(prefix=prefix):
+            self.prefix = prefix
+        elif name and self.api.environment_exists(name=name):
+            self.prefix = self.get_prefix_envname(name)
         else:
-            self._prefix = self._root_prefix
+            self.prefix = self.root_prefix
 
         self.setup
 #        # Reset environent to reflect this environment in the package model
@@ -512,7 +516,7 @@ class CondaPackagesWidget(QWidget):
         """
         name = osp.basename(self._prefix)
 
-        if not (name and self._conda_process.environment_exists(name=name)):
+        if not (name and self.api.environment_exists(name=name)):
             name = self._prefix
 
         return name
@@ -522,13 +526,13 @@ class CondaPackagesWidget(QWidget):
         Get a list of conda environments located in the default conda
         environments directory.
         """
-        return self._conda_process.get_envs()
+        return self.api.get_envs()
 
     def get_prefix_envname(self, name):
         """
         Returns the prefix for a given environment by name.
         """
-        return self._conda_process.get_prefix_envname(name)
+        return self.api.get_prefix_envname(name)
 
     def get_package_versions(self, name):
         """ """

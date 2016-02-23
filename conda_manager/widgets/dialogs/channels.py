@@ -21,7 +21,7 @@ from qtpy.QtWidgets import (QDialog, QHBoxLayout, QListWidget, QListWidgetItem,
                             QPushButton, QVBoxLayout)
 
 # Local imports
-from conda_manager.api import AnacondaAPI
+from conda_manager.api import ManagerAPI
 
 
 _ = gettext.gettext
@@ -49,7 +49,7 @@ class ChannelsDialog(QDialog):
         self._conda_url = conda_url
         self._edited_channel_text = ''
         self._temp_channels = channels
-        self.api = AnacondaAPI()
+        self.api = ManagerAPI()
 
         # Widgets
         self.list = QListWidget(self)
@@ -170,7 +170,7 @@ class ChannelsDialog(QDialog):
             else:
                 url = "{0}/{1}".format(self._conda_url, channel)
 
-            worker = self.api.is_valid_url(url)
+            worker = self.api.download_is_valid_url(url)
             worker.sig_finished.connect(self._url_validated)
             worker.item = item
             worker.url = url

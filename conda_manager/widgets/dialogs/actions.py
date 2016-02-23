@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from conda_manager.models.dependencies import CondaDependenciesModel
 from conda_manager.utils import constants as C
 from conda_manager.utils.py3compat import to_text_string
-from conda_manager.api import AnacondaAPI
+from conda_manager.api import ManagerAPI
 
 _ = gettext.gettext
 
@@ -41,7 +41,7 @@ class CondaPackageActionDialog(QDialog):
         self._dependencies_dic = {}
         self._active_channels = active_channels
         self._packages_sizes = packages_sizes
-        self.api = AnacondaAPI()
+        self.api = ManagerAPI()
 
         # Widgets
         self.label = QLabel(self)

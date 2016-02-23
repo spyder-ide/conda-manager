@@ -25,7 +25,7 @@ from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
                             QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
 # Local imports
-from conda_manager.api import AnacondaAPI
+from conda_manager.api import ManagerAPI
 from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.py3compat import configparser as cp
@@ -61,8 +61,8 @@ class CondaPackagesWidget(QWidget):
                  channels=(),
                  active_channels=(),
                  conda_url='https://conda.anaconda.org',
+                 conda_api_url='https://api.anaconda.org',
                  setup=True,
-                 api=None,
                  data_directory=None):
 
         super(CondaPackagesWidget, self).__init__(parent)
@@ -73,21 +73,18 @@ class CondaPackagesWidget(QWidget):
                 raise Exception("'active_channels' must be also within "
                                 "'channels'")
 
-        # FIXME: Add the if's
-#        if api is None:
-        api = AnacondaAPI()
-
-#        if data_directory is None:
-        data_directory = self.CONDA_CONF_PATH
+        if data_directory is None:
+            data_directory = self.CONDA_CONF_PATH
 
         self._parent = parent
         self._hide_widgets = False
         self._metadata = {}        # From repo.continuum
         self._metadata_links = {}  # Bundled metadata
-        self.api = api
+        self.api = ManagerAPI()
         self.busy = False
         self.data_directory = data_directory
         self.conda_url = conda_url
+        self.conda_api_url = conda_api_url
         self.name = name
         self.prefix = prefix
         self.root_prefix = self.api.ROOT_PREFIX
@@ -97,7 +94,7 @@ class CondaPackagesWidget(QWidget):
             self._channels = channels
             self._active_channels = active_channels
         else:
-            self._channels = self.api.get_condarc_channels()
+            self._channels = self.api.conda_get_condarc_channels()
             self._active_channels = self._channels[:]
 
         # Widgets
@@ -183,6 +180,7 @@ class CondaPackagesWidget(QWidget):
         self.button_cancel.clicked.connect(self.cancel_process)
 
         # Setup
+        self.api.client_set_domain(conda_api_url)
         self._load_bundled_metadata()
 
         if setup:
@@ -219,9 +217,10 @@ class CondaPackagesWidget(QWidget):
         """
         """
         pip_packages = worker.pip_packages
-        linked_packages = self.api.linked(prefix=self.prefix)
-        worker = self.api.client_prepare_model_data(packages, linked_packages,
-                                                    pip_packages)
+        linked_packages = self.api.conda_linked(prefix=self.prefix)
+        worker = self.api.client_prepare_packages_data(packages,
+                                                       linked_packages,
+                                                       pip_packages)
         worker.packages = packages
         worker.sig_finished.connect(self._setup_packages)
 
@@ -491,9 +490,9 @@ class CondaPackagesWidget(QWidget):
 #        if name and prefix:
 #            raise Exception('#TODO:')
 
-        if prefix and self.api.environment_exists(prefix=prefix):
+        if prefix and self.api.conda_environment_exists(prefix=prefix):
             self.prefix = prefix
-        elif name and self.api.environment_exists(name=name):
+        elif name and self.api.conda_environment_exists(name=name):
             self.prefix = self.get_prefix_envname(name)
         else:
             self.prefix = self.root_prefix
@@ -526,13 +525,13 @@ class CondaPackagesWidget(QWidget):
         Get a list of conda environments located in the default conda
         environments directory.
         """
-        return self.api.get_envs()
+        return self.api.conda_get_envs()
 
     def get_prefix_envname(self, name):
         """
         Returns the prefix for a given environment by name.
         """
-        return self.api.get_prefix_envname(name)
+        return self.api.conda_get_prefix_envname(name)
 
     def get_package_versions(self, name):
         """ """
@@ -660,5 +659,5 @@ def test_dialog():
 
 
 if __name__ == '__main__':
-#    test_dialog()
-    test_widget()
+    test_dialog()
+    #test_widget()

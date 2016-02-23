@@ -346,7 +346,8 @@ class _CondaAPI(QObject):
         if name == 'root':
             prefix = self.ROOT_PREFIX
 
-        envs, error = self.get_envs().communicate()
+#        envs, error = self.get_envs().communicate()
+        envs = self.get_envs()
         for p in envs:
             if basename(p) == name:
                 prefix = p
@@ -457,7 +458,6 @@ class _CondaAPI(QObject):
                 cmd_list.extend(['--channel'])
                 cmd_list.extend([channel])
 
-        #print(' '.join(cmd_list))
         return self._call_conda(cmd_list)
 
     def install(self, name=None, prefix=None, pkgs=None, dep=True,

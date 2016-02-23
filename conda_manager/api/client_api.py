@@ -59,10 +59,12 @@ class _ClientAPI(QObject):
     """
     """
 
-    def __init__(self, token=None, domain='https://api.anaconda.org'):
+    def __init__(self):
         super(QObject, self).__init__()
-        self._anaconda_client_api = binstar_client.Binstar(token=token,
-                                                           domain=domain)
+        self._anaconda_client_api = binstar_client.Binstar(
+            token=None,
+            domain='https://api.anaconda.org')
+
         self._queue = deque()
         self._threads = []
         self._workers = []
@@ -241,6 +243,10 @@ class _ClientAPI(QObject):
     def prepare_model_data(self, packages, linked, pip):
         method = self._prepare_model_data
         return self._create_worker(method, packages, linked, pip)
+
+    def set_domain(self, domain, token=None):
+        self._anaconda_client_api = binstar_client.Binstar(token=token,
+                                                           domain=domain)
 
 
 CLIENT_API = None

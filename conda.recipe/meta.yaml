@@ -19,7 +19,7 @@ requirements:
     - requests
     - qtpy
     - qtawesome
-
+    - pyyaml
 test:
   imports:
     - conda_manager

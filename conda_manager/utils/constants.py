@@ -26,11 +26,9 @@ ACTIONS = (ACTION_INSTALL, ACTION_REMOVE, ACTION_UPGRADE, ACTION_DOWNGRADE,
            ACTION_CREATE, ACTION_CLONE,
            ACTION_REMOVE_ENV) = list(range(100, 107))
 PACKAGE_TYPES = (CONDA_PACKAGE, PIP_PACKAGE) = ['     conda', '    pip']
-PACKAGE_STATUS = (INSTALLED, NOT_INSTALLED, UPGRADABLE, DOWNGRADABLE,
-                  ALL_INSTALLABLE, ALL, NOT_INSTALLABLE,
-                  MIXGRADABLE) = list(range(200, 208))
+PACKAGE_STATUS = (INSTALLED, NOT_INSTALLED, UPGRADABLE, DOWNGRADABLE, ALL,
+                  MIXGRADABLE) = list(range(200, 206))
 COMBOBOX_VALUES_ORDERED = [_(u'Installed'), _(u'Not installed'),
-                           _(u'Upgradable'), _(u'Downgradable'),
-                           _(u'All installable'), _(u'All')]
+                           _(u'Upgradable'), _(u'Downgradable'), _(u'All')]
 COMBOBOX_VALUES = dict(zip(COMBOBOX_VALUES_ORDERED, PACKAGE_STATUS))
 ROOT = 'root'

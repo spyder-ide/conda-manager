@@ -85,7 +85,7 @@ setup(
     long_description=get_readme(),
     entry_points={
         'gui_scripts': [
-            'conda-manager = conda_manager.app.main:main'
+            'condamanager = conda_manager.app.main:main'
         ]
     },
     classifiers=[

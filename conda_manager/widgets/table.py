@@ -16,10 +16,10 @@ import os
 import gettext
 
 # Third party imports
-from qtpy.QtCore import Qt, QPoint, QSize, QUrl
+from qtpy.QtCore import Qt, QPoint, QSize, QUrl, Signal
 from qtpy.QtGui import QDesktopServices, QIcon, QPalette
 from qtpy.QtWidgets import (QAbstractItemView, QItemDelegate, QMenu,
-                            QMessageBox, QTableView)
+                            QTableView)
 
 # Local imports
 from conda_manager.models.filter import MultiColumnSortFilterProxy
@@ -49,6 +49,10 @@ class CondaPackagesTable(QTableView):
     WIDTH_NAME = 120
     WIDTH_ACTIONS = 24
     WIDTH_VERSION = 70
+
+    sig_status_updated = Signal(str, bool, list, bool)
+    sig_conda_action_requested = Signal(str, int, str, object, object)
+    sig_pip_action_requested = Signal(str, int)
 
     def __init__(self, parent):
         super(CondaPackagesTable, self).__init__(parent)
@@ -99,17 +103,19 @@ class CondaPackagesTable(QTableView):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()
 
-    def setup_model(self, packages_names, packages_versions, packages_sizes,
-                    row_data):
+    def setup_model(self, packages, data, metadata_links={}):
         """ """
-        self._packages_sizes = packages_sizes
         self.proxy_model = MultiColumnSortFilterProxy(self)
-        self.source_model = CondaPackagesModel(self, packages_names,
-                                               packages_versions,
-                                               packages_sizes,
-                                               row_data)
+        self.source_model = CondaPackagesModel(self, packages, data)
         self.proxy_model.setSourceModel(self.source_model)
         self.setModel(self.proxy_model)
+        self.metadata_links = metadata_links
+
+        # FIXME: packages sizes... move to a better place?
+        packages_sizes = {}
+        for name in packages:
+            packages_sizes[name] = packages[name].get('size')
+        self._packages_sizes = packages_sizes
 
         # Custom Proxy Model setup
         self.proxy_model.setDynamicSortFilter(True)
@@ -131,8 +137,8 @@ class CondaPackagesTable(QTableView):
         self.verticalScrollBar().valueChanged.connect(self.resize_rows)
 
         self.hide_columns()
-#        self.resizeRowsToContents()
         self.resize_rows()
+#        self.resizeRowsToContents()
 
     def resize_rows(self):
         """ """
@@ -170,8 +176,7 @@ class CondaPackagesTable(QTableView):
                              to_text_string(const.UPGRADABLE),
                              to_text_string(const.NOT_INSTALLED),
                              to_text_string(const.DOWNGRADABLE),
-                             to_text_string(const.MIXGRADABLE),
-                             to_text_string(const.NOT_INSTALLABLE)])
+                             to_text_string(const.MIXGRADABLE)])
         elif group in [const.INSTALLED]:
             group = ''.join([to_text_string(const.INSTALLED),
                              to_text_string(const.UPGRADABLE),
@@ -182,12 +187,6 @@ class CondaPackagesTable(QTableView):
                              to_text_string(const.MIXGRADABLE)])
         elif group in [const.DOWNGRADABLE]:
             group = ''.join([to_text_string(const.DOWNGRADABLE),
-                             to_text_string(const.MIXGRADABLE)])
-        elif group in [const.ALL_INSTALLABLE]:
-            group = ''.join([to_text_string(const.INSTALLED),
-                             to_text_string(const.UPGRADABLE),
-                             to_text_string(const.NOT_INSTALLED),
-                             to_text_string(const.DOWNGRADABLE),
                              to_text_string(const.MIXGRADABLE)])
         else:
             group = to_text_string(group)
@@ -208,7 +207,7 @@ class CondaPackagesTable(QTableView):
         if text != '':
             count_text = count_text + _('matching "{0}"').format(text)
 
-        self._parent._update_status(status=count_text, hide=False, env=True)
+        self.sig_status_updated.emit(count_text, False, [0, 0], True)
 
     def search_string_changed(self, text):
         """ """
@@ -324,21 +323,27 @@ class CondaPackagesTable(QTableView):
                 row_data = self.source_model.row(model_index.row())
                 type_ = row_data[const.COL_PACKAGE_TYPE]
                 name = row_data[const.COL_NAME]
-                versions = self.source_model.get_package_versions(name)
                 version = self.source_model.get_package_version(name)
+                versions = self.source_model.get_package_versions(name)
+
+                if not versions:
+                    versions = [version]
 
                 action = actions.get(column, None)
 
                 if type_ == const.CONDA_PACKAGE:
-                    self._parent._run_action(name, action, version, versions,
-                                             self._packages_sizes)
+                    self.sig_conda_action_requested.emit(name, action, version,
+                                                         versions,
+                                                         self._packages_sizes)
                 elif type_ == const.PIP_PACKAGE:
-                    self._parent._run_pip_action(name, action)
+                    self.sig_pip_action_requested.emit(name, action)
                 else:
                     pass
 
     def context_menu_requested(self, event):
-        """Custom context menu."""
+        """
+        Custom context menu.
+        """
         index = self.current_index
         model_index = self.proxy_model.mapToSource(index)
         row = self.source_model.row(model_index.row())
@@ -356,11 +361,11 @@ class CondaPackagesTable(QTableView):
         else:
             name, license_ = row[const.COL_NAME], row[const.COL_LICENSE]
 
-            metadata = self._parent.get_package_metadata(name)
-            pypi = metadata['pypi']
-            home = metadata['home']
-            dev = metadata['dev']
-            docs = metadata['docs']
+            metadata = self.metadata_links.get(name, {})
+            pypi = metadata.get('pypi', '')
+            home = metadata.get('home', '')
+            dev = metadata.get('dev', '')
+            docs = metadata.get('docs', '')
 
             q_pypi = QIcon(get_image_path('python.png'))
             q_home = QIcon(get_image_path('home.png'))
@@ -411,7 +416,9 @@ class CondaPackagesTable(QTableView):
             self._menu.popup(self.viewport().mapToGlobal(pos))
 
     def open_url(self, url):
-        """Open link from action in default operating system  browser"""
+        """
+        Open link from action in default operating system  browser.
+        """
         if url is None:
             return
         QDesktopServices.openUrl(QUrl(url))

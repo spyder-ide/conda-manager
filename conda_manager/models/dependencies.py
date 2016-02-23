@@ -18,8 +18,7 @@ from qtpy.QtCore import Qt, QAbstractTableModel, QModelIndex, QTimer
 from qtpy.QtGui import QFont
 
 # Local imports
-from conda_manager.utils import conda_api_q
-from conda_manager.utils.downloadmanager import human_bytes
+from conda_manager.utils.misc import human_bytes, split_canonical_name
 
 _ = gettext.gettext
 
@@ -85,7 +84,6 @@ class CondaDependenciesModel(QAbstractTableModel):
 
     def _build_packages_table(self, dic):
         """ """
-        cp = conda_api_q.CondaProcess
         self._timer.stop()
         sections = {'FETCH': None,
                     'EXTRACT': None,
@@ -98,14 +96,14 @@ class CondaDependenciesModel(QAbstractTableModel):
             if sections[section]:
                 for item in sections[section]:
                     i = item.split(' ')[0]
-                    name, version, build = cp.split_canonical_name(i)
+                    name, version, build = split_canonical_name(i)
                     packages[name] = {}
 
         for section in sections:
             pkgs = sections[section]
             for item in pkgs:
                 i = item.split(' ')[0]
-                name, version, build = cp.split_canonical_name(i)
+                name, version, build = split_canonical_name(i)
                 packages[name][section] = version
 
         total = 0
@@ -113,11 +111,12 @@ class CondaDependenciesModel(QAbstractTableModel):
             val = packages[pkg]
             if u'FETCH' in val:
                 v = val['FETCH']
-                size = self._packages_sizes[pkg].get(v, '-')
-                if size != '-':
-                    total += size
-                    size = human_bytes(size)
-                packages[pkg]['FETCH'] = size
+                if pkg in self._packages_sizes:
+                    size = self._packages_sizes[pkg].get(v, '-')
+                    if size != '-':
+                        total += size
+                        size = human_bytes(size)
+                    packages[pkg]['FETCH'] = size
         packages['TOTAL##'] = human_bytes(total)
 
         return packages

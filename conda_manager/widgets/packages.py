@@ -11,32 +11,28 @@ Conda Packager Manager Widget.
 
 # Standard library imports
 from __future__ import (absolute_import, division, print_function,
-                        unicode_literals, with_statement)
+                        with_statement)
 import json
 import gettext
-import os
 import os.path as osp
-import platform
-import shutil
 import sys
 
 # Third party imports
-from qtpy.QtCore import QSize, Qt, QThread, Signal
+from qtpy.QtCore import QSize, Qt, Signal
 from qtpy.QtGui import QIcon
-from qtpy.QtWidgets import (QApplication, QComboBox, QDialogButtonBox, QDialog,
+from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
                             QHBoxLayout, QLabel, QMessageBox, QPushButton,
                             QProgressBar, QSpacerItem, QVBoxLayout, QWidget)
 
 # Local imports
-from conda_manager.models import PackagesWorker
-from conda_manager.utils import (conda_api_q, get_conf_path,
-                                 get_module_data_path)
+from conda_manager.api import ManagerAPI
+from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
-from conda_manager.utils.downloadmanager import RequestsDownloadManager
 from conda_manager.utils.py3compat import configparser as cp
-from conda_manager.widgets import CondaPackagesTable, SearchLineEdit
-from conda_manager.widgets.dialogs import (CondaPackageActionDialog,
-                                           ChannelsDialog)
+from conda_manager.widgets.search import SearchLineEdit
+from conda_manager.widgets.table import CondaPackagesTable
+from conda_manager.widgets.dialogs import (ChannelsDialog,
+                                           CondaPackageActionDialog)
 
 
 _ = gettext.gettext
@@ -52,7 +48,6 @@ class CondaPackagesWidget(QWidget):
 
     # file inside DATA_PATH with metadata for conda packages
     DATABASE_FILE = 'packages.ini'
-    DEFAULT_CHANNELS = ('anaconda', 'spyder-ide',)
 
     sig_worker_ready = Signal()
     sig_packages_ready = Signal()
@@ -66,7 +61,9 @@ class CondaPackagesWidget(QWidget):
                  channels=(),
                  active_channels=(),
                  conda_url='https://conda.anaconda.org',
-                 setup=True):
+                 conda_api_url='https://api.anaconda.org',
+                 setup=True,
+                 data_directory=None):
 
         super(CondaPackagesWidget, self).__init__(parent)
 
@@ -76,358 +73,218 @@ class CondaPackagesWidget(QWidget):
                 raise Exception("'active_channels' must be also within "
                                 "'channels'")
 
+        if data_directory is None:
+            data_directory = self.CONDA_CONF_PATH
+
         self._parent = parent
-        self._status = ''  # Statusbar message
-        self._conda_process = conda_api_q.CondaProcess(self)
-        self._pip_process = conda_api_q.CondaProcess(self)
-        self._root_prefix = self._conda_process.ROOT_PREFIX
-        self._prefix = None
-        self._temporal_action_dic = {}
-        self._download_manager = RequestsDownloadManager(self,
-                                                         self.CONDA_CONF_PATH,
-                                                         async=False,
-                                                         check_size=False)
-        self._thread = QThread(self)
-        self._worker = None
-        self._db_metadata = cp.ConfigParser()
-        self._db_file = CondaPackagesWidget.DATABASE_FILE
-        self._db_metadata.readfp(open(osp.join(self.DATA_PATH, self._db_file)))
-        self._packages_names = None
-        self._row_data = None
         self._hide_widgets = False
-        self._first_run = True
+        self._metadata = {}        # From repo.continuum
+        self._metadata_links = {}  # Bundled metadata
+        self.api = ManagerAPI()
         self.busy = False
+        self.data_directory = data_directory
+        self.conda_url = conda_url
+        self.conda_api_url = conda_api_url
+        self.name = name
+        self.prefix = prefix
+        self.root_prefix = self.api.ROOT_PREFIX
+        self.message = ''
 
         if channels:
             self._channels = channels
             self._active_channels = active_channels
         else:
-            self._channels = self.DEFAULT_CHANNELS
-            self._active_channels = self.DEFAULT_CHANNELS
-
-        self._channels_queue = None
-        self._conda_url = conda_url
-        self._repo_name = None   # linux-64, win-32, etc...
-        self._repo_files = None  # [filepath, filepath, ...]
-        self._packages = {}
-        self._download_error = None
-        self._error = None
+            self._channels = self.api.conda_get_condarc_channels()
+            self._active_channels = self._channels[:]
 
         # Widgets
-        self.combobox_filter = QComboBox(self)
-        self.button_channels = QPushButton(_('Channels'))
-        self.button_update = QPushButton(_('Update package index'))
-        self.textbox_search = SearchLineEdit(self)
-
-        self.table = CondaPackagesTable(self)
-        self.status_bar = QLabel(self)
-        self.progress_bar = QProgressBar(self)
-        self.button_cancel = QPushButton('')
-
-        self.button_ok = QPushButton(_('Ok'))
-
         self.bbox = QDialogButtonBox(Qt.Horizontal)
-        self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
-
+        self.button_cancel = QPushButton('')
+        self.button_channels = QPushButton(_('Channels'))
+        self.button_ok = QPushButton(_('Ok'))
+        self.button_update = QPushButton(_('Update package index'))
+        self.combobox_filter = QComboBox(self)
+        self.progress_bar = QProgressBar(self)
+        self.status_bar = QLabel(self)
+        self.table = CondaPackagesTable(self)
+        self.textbox_search = SearchLineEdit(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
                         self.button_ok]
 
         # Widgets setup
-        fm = self.status_bar.fontMetrics()
-        max_height = fm.height()
-        self.status_bar.setFixedHeight(max_height*1.5)
-
-        fm = self.textbox_search.fontMetrics()
-        max_width = fm.width('M'*23)
-        self.textbox_search.setMaximumWidth(max_width)
-
-        self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
-        self.combobox_filter.setMinimumWidth(120)
-        self.button_ok.setDefault(True)
+        max_height = self.status_bar.fontMetrics().height()
+        max_width = self.textbox_search.fontMetrics().width('M'*23)
+        self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
         self.button_ok.setAutoDefault(True)
-        self.button_ok.setVisible(False)
+        self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
-        self.button_channels.setCheckable(True)
+        self.button_ok.setVisible(False)
         self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
         self.button_cancel.setFixedWidth(max_height*2)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setTextVisible(False)
+        self.button_channels.setCheckable(True)
+        self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
+        self.combobox_filter.setMinimumWidth(120)
         self.progress_bar.setMaximumHeight(max_height*1.2)
         self.progress_bar.setMaximumWidth(max_height*12)
-
-        self.setWindowTitle(_("Conda Package Manager"))
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setVisible(False)
         self.setMinimumSize(QSize(480, 300))
-
-        # Signals and slots
-        self.combobox_filter.currentIndexChanged.connect(self.filter_package)
-        self.button_update.clicked.connect(self.update_package_index)
-        self.textbox_search.textChanged.connect(self.search_package)
-        self.button_channels.clicked.connect(self.show_channels_dialog)
-        self._conda_process.sig_partial.connect(self._on_conda_process_partial)
-        self._conda_process.sig_finished.connect(self._on_conda_process_ready)
-        self._pip_process.sig_finished.connect(self._on_pip_process_ready)
-        self._download_manager.sig_finished.connect(self._on_download_finished)
-        self._download_manager.sig_partial.connect(self._on_download_partial)
-        self.button_cancel.clicked.connect(self.cancel_process)
-
-        # NOTE: do not try to save the QSpacerItems in a variable for reuse
-        # it will crash python on exit if you do!
+        self.setWindowTitle(_("Conda Package Manager"))
+        self.status_bar.setFixedHeight(max_height*1.5)
+        self.textbox_search.setMaximumWidth(max_width)
 
         # Layout
-        self._spacer_w = 250
-        self._spacer_h = 5
+        spacer_w = 250
+        spacer_h = 5
 
-        self._top_layout = QHBoxLayout()
-        self._top_layout.addWidget(self.combobox_filter)
-        self._top_layout.addWidget(self.button_channels)
-        self._top_layout.addWidget(self.button_update)
-        self._top_layout.addWidget(self.textbox_search)
-        self._top_layout.addStretch()
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self.combobox_filter)
+        top_layout.addWidget(self.button_channels)
+        top_layout.addWidget(self.button_update)
+        top_layout.addWidget(self.textbox_search)
+        top_layout.addStretch()
 
-        self._middle_layout = QVBoxLayout()
-        self._middle_layout.addWidget(self.table)
+        middle_layout = QVBoxLayout()
+        middle_layout.addWidget(self.table)
 
-        self._bottom_layout = QHBoxLayout()
-        self._bottom_layout.addWidget(self.status_bar, Qt.AlignLeft)
-        self._bottom_layout.addWidget(self.progress_bar, Qt.AlignRight)
-        self._bottom_layout.addWidget(self.button_cancel, Qt.AlignRight)
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.status_bar, Qt.AlignLeft)
+        bottom_layout.addWidget(self.progress_bar, Qt.AlignRight)
+        bottom_layout.addWidget(self.button_cancel, Qt.AlignRight)
 
-        self._layout = QVBoxLayout(self)
-        self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h))
-        self._layout.addLayout(self._top_layout)
-        self._layout.addLayout(self._middle_layout)
-        self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h))
-        self._layout.addLayout(self._bottom_layout)
-        self._layout.addItem(QSpacerItem(self._spacer_w, self._spacer_h/2))
+        layout = QVBoxLayout(self)
+        layout.addItem(QSpacerItem(spacer_w, spacer_h))
+        layout.addLayout(top_layout)
+        layout.addLayout(middle_layout)
+        layout.addItem(QSpacerItem(spacer_w, spacer_h))
+        layout.addLayout(bottom_layout)
+        layout.addItem(QSpacerItem(spacer_w, spacer_h/2))
 
-        self.setLayout(self._layout)
+        self.setLayout(layout)
 
         self.setTabOrder(self.combobox_filter, self.button_channels)
         self.setTabOrder(self.button_channels, self.button_update)
         self.setTabOrder(self.button_update, self.textbox_search)
         self.setTabOrder(self.textbox_search, self.table)
 
+        # Signals and slots
+        self.api.sig_repodata_updated.connect(self._repodata_updated)
+        self.combobox_filter.currentIndexChanged.connect(self.filter_package)
+        self.button_update.clicked.connect(self.update_package_index)
+        self.button_channels.clicked.connect(self.show_channels_dialog)
+        self.textbox_search.textChanged.connect(self.search_package)
+        self.table.sig_status_updated.connect(self.update_status)
+        self.table.sig_pip_action_requested.connect(self._run_pip_action)
+        self.table.sig_conda_action_requested.connect(self._run_conda_action)
+        self.button_cancel.clicked.connect(self.cancel_process)
+
         # Setup
+        self.api.client_set_domain(conda_api_url)
+        self._load_bundled_metadata()
+
         if setup:
-            self.set_environment(name=name, prefix=prefix, update=False)
+            self.set_environment(name=name, prefix=prefix)
+            self.setup()
 
-            if self._supports_architecture():
-                self.update_package_index(check_size=False)
-            else:
-                status = _('no packages supported for this architecture!')
-                self._update_status(progress=[0, 0], hide=True, status=status)
-
-    def _supports_architecture(self):
-        """ """
-        self._set_repo_name()
-
-        if self._repo_name is None:
-            return False
-        else:
-            return True
-
-    def _set_repo_name(self):
+    # --- Helpers/Callbacks
+    # -------------------------------------------------------------------------
+    def _load_bundled_metadata(self):
         """
-        Get system and bitness, and sets default repo name.
         """
-        system = sys.platform.lower()
-        bitness = 64 if sys.maxsize > 2**32 else 32
-        machine = platform.machine()
-        fname = [None, None]
+        parser = cp.ConfigParser()
+        db_file = CondaPackagesWidget.DATABASE_FILE
+        with open(osp.join(self.DATA_PATH, db_file)) as f:
+            parser.readfp(f)
 
-        if 'osx' in system or 'darwin' in system:
-            fname[0] = 'osx'
-        elif 'lin' in system:
-            fname[0] = 'linux'
-        elif 'win' in system or 'nt' in system:
-            fname[0] = 'win'
-        else:
-            return None
+        for name in parser.sections():
+            metadata = {}
+            for key, data in parser.items(name):
+                metadata[key] = data
+            self._metadata_links[name] = metadata
 
-        if bitness == 32:
-            fname[1] = '32'
-        elif bitness == 64:
-            fname[1] = '64'
-        else:
-            return None
-
-        # armv6l
-        if machine.startswith('armv6'):
-            fname[1] = 'armv6l'
-
-        if None in fname:
-            self._repo_name = None
-        else:
-            self._repo_name = '-'.join(fname)
-
-    def _set_channels(self):
-        """ """
-        channels = self._channels
-        body = self._repo_name
-        tail = '/repodata.json.bz2'
-        channels_queue = []
-        files = []
-
-        for channel in channels:
-            if channel.startswith('https://') or channel.startswith('http://'):
-                url = '{0}/{1}{2}'.format(channel, body, tail)
-                base_url = '/'.join(channel.split('/')[:-1])
-                ch = channel.split('/')[-1]
-            else:
-                ch = channel
-                base_url = self._conda_url
-                url = '{0}/{1}/{2}{3}'.format(self._conda_url, channel, body,
-                                              tail)
-            file_prefix = base_url.split('//')[-1]
-            file_prefix = file_prefix.replace('/', '') + '_'
-            name = '{0}{1}.json.bz2'.format(file_prefix, ch, body)
-            channels_queue.append([name, url])
-
-            if channel in self._active_channels:
-                files.append(osp.join(self.CONDA_CONF_PATH, name))
-
-        self._repo_files = files
-        self._channels_queue = channels_queue
-
-    def _download_repodata(self):
-        """download the latest version available of the repo(s)"""
-        status = _('Updating package index...')
-        self._update_status(hide=True, progress=[0, 0], status=status)
-        self._download_manager.set_queue(self._channels_queue)
-        self._download_manager.start_download()
-
-    # --- Callback download manager
-    # ------------------------------------------------------------------------
-    def _on_download_partial(self, progress, total):
-        """function called by download manager when receiving data
-
-        progress : [int, int]
-            A two item list of integers with relating [downloaded, total]
+    def _setup_packages(self, worker, data, error):
         """
-        self._update_status(hide=True, progress=[progress, total], status=None)
-
-    def _on_download_finished(self):
-        """function called by download manager when finished all downloads.
-
-        This will be called even if errors were encountered, so error handling
-        is done here as well.
         """
-        error = self._download_manager.get_errors()
+        self.table.setup_model(worker.packages, data, self._metadata_links)
+        self.combobox_filter.setCurrentIndex(0)
+        self.filter_package(C.INSTALLED)
 
+        if error:
+            self.update_status(error, False)
+
+    def _prepare_model_data(self, worker, packages, error):
+        """
+        """
+        pip_packages = worker.pip_packages
+        linked_packages = self.api.conda_linked(prefix=self.prefix)
+        worker = self.api.client_prepare_packages_data(packages,
+                                                       linked_packages,
+                                                       pip_packages)
+        worker.packages = packages
+        worker.sig_finished.connect(self._setup_packages)
+
+    def _pip_list_ready(self, worker, pip_packages, error):
+        """
+        """
+        worker = self.api.client_load_repodata(worker.paths,
+                                               metadata=self._metadata)
+        worker.pip_packages = pip_packages
+        worker.sig_finished.connect(self._prepare_model_data)
+
+    def _repodata_updated(self, paths):
+        """
+        """
+        worker = self.api.pip_list(prefix=self.prefix)
+        worker.sig_finished.connect(self._pip_list_ready)
+        worker.paths = paths
+
+    def _metadata_updated(self, url, path):
+        """
+        """
+        with open(path, 'r') as f:
+            data = f.read()
+        try:
+            self._metadata = json.loads(data)
+        except Exception:
+            self._metadata = {}
+        self.api.update_repodata(self.data_directory, channels=self._channels)
+
+    def _pip_process_ready(self, worker, output, error):
+        """
+        """
         if error is not None:
-            self._update_status(hide=False)
-
-            if not osp.isdir(self.CONDA_CONF_PATH):
-                os.mkdir(self.CONDA_CONF_PATH)
-                os.mkdir(osp.join(self.CONDA_CONF_PATH, 'repo'))
-
-            for repo_file in self._repo_files:
-                # if a file does not exists, look for one in DATA_PATH
-                if not osp.isfile(repo_file):
-                    filename = osp.basename(repo_file)
-                    bck_repo_file = osp.join(self.DATA_PATH, filename)
-
-                    # if available copy to CONDA_CONF_PATH
-                    if osp.isfile(bck_repo_file):
-                        shutil.copy(bck_repo_file, repo_file)
-                    # otherwise remove from the repo_files list
-                    else:
-                        self._repo_files.remove(repo_file)
-            self._error = None
-
-        self.setup_packages()
-
-    # ------------------------------------------------------------------------
-    def setup_packages(self):
-        """ """
-        self._pip_packages = []
-        self._pip_process.pip_list(prefix=self._prefix)
-        self._download_manager.set_check_size(False)
-
-    def _post_setup(self):
-        self._set_channels()
-        self._thread.terminate()
-        self._thread = QThread(self)
-        self._worker = PackagesWorker(self, self._repo_files,
-                                      self._prefix, self._root_prefix,
-                                      self._pip_packages)
-        self._worker.sig_status_updated.connect(self._update_status)
-        self._worker.sig_ready.connect(self._worker_ready)
-        self._worker.sig_ready.connect(self._thread.quit)
-        self._worker.moveToThread(self._thread)
-
-        self._thread.started.connect(self._worker._prepare_model)
-        self._thread.start()
-
-    def _worker_ready(self):
-        """ """
-        self._packages_names = self._worker.packages_names
-        self._packages_versions = self._worker.packages_versions
-        self._packages_sizes = self._worker.packages_sizes
-        self._row_data = self._worker.row_data
-
-        # depending on the size of table this might lock the gui for a moment
-        self.table.setup_model(self._packages_names, self._packages_versions,
-                               self._packages_sizes, self._row_data)
-        self.table.filter_changed()
-
-        self._update_status(hide=False)
-
-        if self._first_run:
-            self.filter_package(C.INSTALLED)
-            self._first_run = False
+            status = _('there was an error')
+            self.update_status(hide=False, message=status)
         else:
-            index = self.combobox_filter.currentIndex()
-            self.filter_package(index)
-        self.sig_worker_ready.emit()
-        self.sig_packages_ready.emit()
+            self.update_status(hide=True)
 
-    def _update_status(self, status=None, hide=True, progress=None, env=False):
-        """Update status bar, progress bar display and widget visibility
+        self.setup()
 
-        status : str
-            TODO:
-        hide : bool
-            TODO:
-        progress : [int, int]
-            TODO:
+    def _conda_process_ready(self, worker, output, error):
         """
-        self.busy = hide
-        for widget in self.widgets:
-            widget.setDisabled(hide)
-
-        self.progress_bar.setVisible(hide)
-        self.button_cancel.setVisible(hide)
-
-        if status is not None:
-            self._status = status
-
-        if self._prefix == self._root_prefix:
-            short_env = 'root'
-#        elif self._conda_process.environment_exists(prefix=self._prefix):
-#            short_env = osp.basename(self._prefix)
+        """
+        if error is not None:
+            status = _('there was an error')
+            self.update_status(hide=False, message=status)
         else:
-            short_env = self._prefix
+            self.update_status(hide=True)
 
-        if env:
-            self._status = '{0} (<b>{1}</b>)'.format(self._status,
-                                                     short_env)
-        self.status_bar.setText(self._status)
+        dic = self._temporal_action_dic
 
-        if progress is not None:
-            self.progress_bar.setMinimum(0)
-            self.progress_bar.setMaximum(progress[1])
-            self.progress_bar.setValue(progress[0])
+        if dic['action'] == C.ACTION_CREATE:
+            self.sig_environment_created.emit()
+
+        self.setup()
 
     def _run_pip_action(self, package_name, action):
         """
         """
-        prefix = self._prefix
+        prefix = self.prefix
 
-        if prefix == self._root_prefix:
+        if prefix == self.root_prefix:
             name = 'root'
-        elif self._conda_process.environment_exists(prefix=prefix):
+        elif self.api.environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix
@@ -439,17 +296,19 @@ class CondaPackagesWidget(QWidget):
                                           "Do you want to proceed?",
                                           QMessageBox.Yes | QMessageBox.No)
             if msgbox == QMessageBox.Yes:
-                self._update_status()
-                self._pip_process.pip_remove(prefix=self._prefix,
+                self.update_status()
+                worker = self.api.pip_remove(prefix=self.prefix,
                                              pkgs=[package_name])
+                worker.sig_finished.connect(self._pip_process_ready)
                 status = (_('Removing pip package <b>') + package_name +
                           '</b>' + _(' from <i>') + name + '</i>')
-                self._update_status(hide=True, status=status, progress=[0, 0])
+                self.update_status(hide=True, message=status,
+                                   progress=[0, 0])
 
-    def _run_action(self, package_name, action, version, versions,
-                    packages_sizes):
+    def _run_conda_action(self, package_name, action, version, versions,
+                          packages_sizes):
         """ """
-        prefix = self._prefix
+        prefix = self.prefix
         dlg = CondaPackageActionDialog(self, prefix, package_name, action,
                                        version, versions, packages_sizes,
                                        self._active_channels)
@@ -458,7 +317,7 @@ class CondaPackagesWidget(QWidget):
             dic = {}
 
             self.status = 'Processing'
-            self._update_status(hide=True)
+            self.update_status(hide=True)
             self.repaint()
 
             ver1 = dlg.label_version.text()
@@ -475,12 +334,11 @@ class CondaPackagesWidget(QWidget):
 
     def _run_conda_process(self, action, dic):
         """ """
-        cp = self._conda_process
-        prefix = self._prefix
+        prefix = self.prefix
 
-        if prefix == self._root_prefix:
+        if prefix == self.root_prefix:
             name = 'root'
-        elif self._conda_process.environment_exists(prefix=prefix):
+        elif self.api.environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix
@@ -495,84 +353,83 @@ class CondaPackagesWidget(QWidget):
            action == C.ACTION_DOWNGRADE):
             status = _('Installing <b>') + dic['pkg'] + '</b>'
             status = status + _(' into <i>') + name + '</i>'
-            cp.install(prefix=prefix, pkgs=pkgs, dep=dep,
-                       channels=self._active_channels)
+            worker = self.api.conda_install(prefix=prefix, pkgs=pkgs, dep=dep,
+                                            channels=self._active_channels)
         elif action == C.ACTION_REMOVE:
             status = (_('Removing <b>') + dic['pkg'] + '</b>' +
                       _(' from <i>') + name + '</i>')
-            cp.remove(pkgs[0], prefix=prefix)
+            worker = self.api.conda_remove(pkgs[0], prefix=prefix)
 
         # --- Environment management actions
         elif action == C.ACTION_CREATE:
             status = _('Creating environment <b>') + name + '</b>'
-            cp.create(prefix=prefix, pkgs=pkgs, channels=self._active_channels)
+            worker = self.api.conda_create(prefix=prefix, pkgs=pkgs,
+                                           channels=self._active_channels)
         elif action == C.ACTION_CLONE:
             status = (_('Cloning ') + '<i>' + dic['cloned from'] +
                       _('</i> into <b>') + name + '</b>')
         elif action == C.ACTION_REMOVE_ENV:
             status = _('Removing environment <b>') + name + '</b>'
 
-        self._update_status(hide=True, status=status, progress=[0, 0])
+        worker.sig_finished.connect(self._conda_process_ready)
+        self.update_status(hide=True, message=status, progress=[0, 0])
         self._temporal_action_dic = dic
 
-    def _on_pip_process_ready(self, function, output, error):
-        error = self._pip_process.error
+    # Public API
+    # -------------------------------------------------------------------------
+    def setup(self):
+        """
+        Setup packages.
 
-        if error is None:
-            status = _('there was an error')
-            self._update_status(hide=False, status=status)
+        Downloads repodata, loads repodata, prepares and updates model data.
+        """
+        self.update_status('Updating package index', True)
+        worker = self.api.update_metadata(self.data_directory)
+        worker.sig_download_finished.connect(self._metadata_updated)
+
+    def update_status(self, message=None, hide=True, progress=None,
+                      env=False):
+        """
+        Update status bar, progress bar display and widget visibility
+
+        message : str
+            Message to display in status bar.
+        hide : bool
+            Enable/Disable widgets.
+        progress : [int, int]
+            Show status bar progress. [0, 0] means spinning statusbar.
+        """
+        self.busy = hide
+        for widget in self.widgets:
+            widget.setDisabled(hide)
+
+        self.progress_bar.setVisible(hide)
+        self.button_cancel.setVisible(hide)
+
+        if message is not None:
+            self.message = message
+
+        if self.prefix == self.root_prefix:
+            short_env = 'root'
+#        elif self.api.environment_exists(prefix=self.prefix):
+#            short_env = osp.basename(self.prefix)
         else:
-            self._update_status(hide=True)
+            short_env = self.prefix
 
-        if function == 'pip_list':
-            self._pip_packages = output
-            self._post_setup()
-        elif function == 'pip_remove':
-            self.setup_packages()
+        if env:
+            self.message = '{0} (<b>{1}</b>)'.format(
+                self.message, short_env,
+                )
+        self.status_bar.setText(self.message)
+
+        if progress is not None:
+            self.progress_bar.setMinimum(0)
+            self.progress_bar.setMaximum(progress[1])
+            self.progress_bar.setValue(progress[0])
         else:
-            pass
+            self.progress_bar.setMinimum(0)
+            self.progress_bar.setMaximum(0)
 
-    def _on_conda_process_ready(self, function, output, error):
-        """ """
-        error = self._conda_process.error
-
-        if error is None:
-            status = _('there was an error')
-            self._update_status(hide=False, status=status)
-        else:
-            self._update_status(hide=True)
-
-        dic = self._temporal_action_dic
-
-        if dic['action'] == C.ACTION_CREATE:
-            self.sig_environment_created.emit()
-
-        self.setup_packages()
-
-    def _on_conda_process_partial(self):
-        """ """
-        try:
-            partial = self._conda_process.partial.split('\n')[0]
-            partial = json.loads(partial)
-        except:
-            partial = {'progress': 0, 'maxval': 0}
-
-        progress = partial['progress']
-        maxval = partial['maxval']
-
-        if 'fetch' in partial:
-            status = _('Downloading <b>') + partial['fetch'] + '</b>'
-        elif 'name' in partial:
-            status = _('Installing and linking <b>') + partial['name'] + '</b>'
-        else:
-            progress = 0
-            maxval = 0
-            status = None
-
-        self._update_status(status=status, progress=[progress, maxval])
-
-    # Public api
-    # ----------
     def show_channels_dialog(self):
         """
         Show the channels dialog.
@@ -581,7 +438,7 @@ class CondaPackagesWidget(QWidget):
         self.dlg = ChannelsDialog(self,
                                   channels=self._channels,
                                   active_channels=self._active_channels,
-                                  conda_url=self._conda_url)
+                                  conda_url=self.conda_url)
         button_channels.setDisabled(True)
         self.dlg.sig_channels_updated.connect(self.update_channels)
         self.dlg.rejected.connect(lambda: button_channels.setEnabled(True))
@@ -596,45 +453,29 @@ class CondaPackagesWidget(QWidget):
         self.dlg.move(x, y)
         self.dlg.button_add.setFocus()
 
-    def update_channels(self, channels=None, active_channels=None):
+    def update_channels(self, channels=None, active_channels=None, ui=True):
         """
         Update the current channels and active channels.
 
         Note: Assumes that channels and active channels are valid.
         """
-        self.button_channels.toggle()
-        self.button_channels.setDisabled(False)
+        if ui:
+            self.button_channels.toggle()
+            self.button_channels.setDisabled(False)
 
         if sorted(self._active_channels) != sorted(active_channels) or \
                 sorted(self._channels) != sorted(channels):
-            self._update_status(hide=True)
+            self.update_status(hide=True)
             self._active_channels = active_channels
             self._channels = channels
             self.sig_channels_updated.emit(tuple(channels),
                                            tuple(active_channels))
-            self.update_package_index()
         self.button_channels.setFocus()
+        self.setup()
 
-    def get_package_metadata(self, name):
+    def update_package_index(self):
         """ """
-        db = self._db_metadata
-        metadata = dict(description='', url='', pypi='', home='', docs='',
-                        dev='')
-        for key in metadata:
-            name_lower = name.lower()
-            for name_key in (name_lower, name_lower.split('-')[0]):
-                try:
-                    metadata[key] = db.get(name_key, key)
-                    break
-                except (cp.NoSectionError, cp.NoOptionError):
-                    pass
-        return metadata
-
-    def update_package_index(self, other=None, check_size=True):
-        """ """
-        self._download_manager.set_check_size(check_size)
-        self._set_channels()
-        self._download_repodata()
+        self.setup()
 
     def search_package(self, text):
         """ """
@@ -649,19 +490,22 @@ class CondaPackagesWidget(QWidget):
 #        if name and prefix:
 #            raise Exception('#TODO:')
 
-        if prefix and self._conda_process.environment_exists(prefix=prefix):
-            self._prefix = prefix
-        elif name and self._conda_process.environment_exists(name=name):
-            self._prefix = self.get_prefix_envname(name)
+        if prefix and self.api.conda_environment_exists(prefix=prefix):
+            self.prefix = prefix
+        elif name and self.api.conda_environment_exists(name=name):
+            self.prefix = self.get_prefix_envname(name)
         else:
-            self._prefix = self._root_prefix
+            self.prefix = self.root_prefix
 
-        # Reset environent to reflect this environment in the package model
-        if update:
-            self.setup_packages()
+        self.setup
+#        # Reset environent to reflect this environment in the package model
+#        if update:
+#            self.setup_packages()
 
     def get_environment_prefix(self):
-        """Returns the active environment prefix."""
+        """
+        Returns the active environment prefix.
+        """
         return self._prefix
 
     def get_environment_name(self):
@@ -671,7 +515,7 @@ class CondaPackagesWidget(QWidget):
         """
         name = osp.basename(self._prefix)
 
-        if not (name and self._conda_process.environment_exists(name=name)):
+        if not (name and self.api.environment_exists(name=name)):
             name = self._prefix
 
         return name
@@ -681,11 +525,13 @@ class CondaPackagesWidget(QWidget):
         Get a list of conda environments located in the default conda
         environments directory.
         """
-        return self._conda_process.get_envs()
+        return self.api.conda_get_envs()
 
     def get_prefix_envname(self, name):
-        """Returns the prefix for a given environment by name."""
-        return self._conda_process.get_prefix_envname(name)
+        """
+        Returns the prefix for a given environment by name.
+        """
+        return self.api.conda_get_prefix_envname(name)
 
     def get_package_versions(self, name):
         """ """
@@ -722,8 +568,8 @@ class CondaPackagesWidget(QWidget):
                 buttons=QMessageBox.Yes | QMessageBox.No)
 
             if answer == QMessageBox.Yes:
-                self._thread.terminate()
-                self._update_status(hide=False, status='Process cancelled')
+                self.api.conda_terminate()
+                self.update_status(hide=False, message='Process cancelled')
         else:
             QDialog.reject(self)
 
@@ -798,7 +644,7 @@ def test_widget():
     """Run conda packages widget test"""
     from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
-    widget = CondaPackagesWidget(None)
+    widget = CondaPackagesWidget(None, prefix='/home/goanpeca/anaconda2')
     widget.show()
     sys.exit(app.exec_())
 
@@ -811,6 +657,7 @@ def test_dialog():
     dialog.exec_()
     sys.exit(app.exec_())
 
+
 if __name__ == '__main__':
     test_dialog()
-#    test_widget()
+    #test_widget()

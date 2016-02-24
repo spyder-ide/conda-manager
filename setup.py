@@ -33,14 +33,14 @@ def get_data_files():
     if sys.platform.startswith('linux'):
         if PY3:
             data_files = [('share/applications',
-                           ['scripts/conda-manager3.desktop']),
+                           ['scripts/condamanager3.desktop']),
                           ('share/pixmaps',
-                           ['img_src/conda-manager3.png'])]
+                           ['img_src/condamanager3.png'])]
         else:
             data_files = [('share/applications',
-                           ['scripts/conda-manager.desktop']),
+                           ['scripts/condamanager.desktop']),
                           ('share/pixmaps',
-                           ['img_src/conda-manager.png'])]
+                           ['img_src/condamanager.png'])]
     elif os.name == 'nt':
         data_files = [('scripts', ['img_src/conda-manager.ico'])]
     else:
@@ -61,7 +61,7 @@ def get_package_data(name, extlist):
 
 
 # Requirements
-REQUIREMENTS = ['qtpy', 'qtawesome', 'requests']
+REQUIREMENTS = ['qtpy', 'qtawesome', 'requests', 'pyyaml', 'anaconda-client']
 EXTLIST = ['.jpg', '.png', '.json', '.mo', '.ini']
 LIBNAME = 'conda_manager'
 
@@ -85,7 +85,7 @@ setup(
     long_description=get_readme(),
     entry_points={
         'gui_scripts': [
-            'conda-manager = conda_manager.app.main:main'
+            'condamanager = conda_manager.app.main:main'
         ]
     },
     classifiers=[

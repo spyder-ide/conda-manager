@@ -344,6 +344,9 @@ class CondaPackagesTable(QTableView):
         """
         Custom context menu.
         """
+        if self.proxy_model is None:
+            return
+
         index = self.current_index
         model_index = self.proxy_model.mapToSource(index)
         row = self.source_model.row(model_index.row())

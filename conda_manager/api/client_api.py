@@ -145,7 +145,12 @@ class _ClientAPI(QObject):
                 name, version, b = tuple(canonical_name.rsplit('-', 2))
 
                 if name not in all_packages:
-                    all_packages[name] = {'versions': set(), 'size': {}}
+                    all_packages[name] = {'versions': set(),
+                                          'size': {},
+                                          'type': {},
+                                          'app_entry': {},
+                                          'app_type': {},
+                                          }
                 elif name in metadata:
                     temp_data = all_packages[name]
                     temp_data['home'] = metadata[name].get('home', '')
@@ -156,13 +161,21 @@ class _ClientAPI(QObject):
 
                 all_packages[name]['versions'].add(version)
                 all_packages[name]['size'][version] = data['size']
-                all_packages[name]['size'][version] = data['size']
+                all_packages[name]['type'][version] = data.get('type', None)
+                all_packages[name]['app_entry'][version] = data.get('app_entry', None)
+                all_packages[name]['app_type'][version] = data.get('app_type', None)
 
+        all_apps = {}
         for name in all_packages:
             versions = sort_versions(list(all_packages[name]['versions']))
             all_packages[name]['versions'] = versions
 
-        return all_packages
+            for version in versions:
+                is_app = all_packages[name]['type'][version]
+                if is_app:
+                    all_apps[name] = all_packages[name]
+
+        return all_packages, all_apps
 
     def _prepare_model_data(self, packages, linked, pip):
         data = []

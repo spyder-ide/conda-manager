@@ -22,7 +22,7 @@ from qtpy.QtWidgets import (QDialog, QHBoxLayout, QListWidget, QListWidgetItem,
 
 # Local imports
 from conda_manager.api import ManagerAPI
-
+import qtawesome as qta
 
 _ = gettext.gettext
 
@@ -53,10 +53,13 @@ class ChannelsDialog(QDialog):
 
         # Widgets
         self.list = QListWidget(self)
-        self.button_add = QPushButton(_('Add'))
-        self.button_delete = QPushButton(_('Delete'))
+        self.button_add = QPushButton('')
+        self.button_delete = QPushButton('')
+        self.button_ok = QPushButton(_('Update channels'))
 
         # Widget setup
+        self.button_add.setIcon(qta.icon('fa.plus'))
+        self.button_delete.setIcon(qta.icon('fa.minus'))
         self.setMinimumWidth(350)
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setWindowOpacity(0.96)
@@ -68,19 +71,25 @@ class ChannelsDialog(QDialog):
 
         # Layout
         layout = QVBoxLayout()
-        layout.addWidget(self.list)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        button_layout.addWidget(self.button_delete)
         button_layout.addWidget(self.button_add)
+        button_layout.addWidget(self.button_delete)
+
+        ok_layout = QHBoxLayout()
+        ok_layout.addStretch()
+        ok_layout.addWidget(self.button_ok)
 
         layout.addLayout(button_layout)
+        layout.addWidget(self.list)
+        layout.addLayout(ok_layout)
         self.setLayout(layout)
 
         # Signals
         self.button_add.clicked.connect(self.add_channel)
         self.button_delete.clicked.connect(self.delete_channel)
+        self.button_ok.clicked.connect(self.update_channels)
 
         self.setup()
 
@@ -212,7 +221,9 @@ class ChannelsDialog(QDialog):
                 sorted(temp_active_channels) != sorted(self._active_channels)):
             self.sig_channels_updated.emit(tuple(channels),
                                            tuple(temp_active_channels))
-        self.accept()
+            self.accept()
+        else:
+            self.reject()
 
     def refresh(self):
         """

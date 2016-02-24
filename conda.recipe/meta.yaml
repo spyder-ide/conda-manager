@@ -32,6 +32,8 @@ test:
     - qtawesome
     - qtpy
     - requests
+    - qt
+    - pyqt
 
 about:
   home: https://github.com/spyder-ide/conda-manager

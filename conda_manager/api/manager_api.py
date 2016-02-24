@@ -158,8 +158,7 @@ class _ManagerAPI(QObject):
         repopaths = []
 
         for repourl in repodata_urls:
-            fullpath = os.sep.join([data_directory,
-                                    self._repo_url_to_path(repourl)])
+            fullpath = os.sep.join([self._repo_url_to_path(repourl)])
             repopaths.append(fullpath)
 
         return repopaths

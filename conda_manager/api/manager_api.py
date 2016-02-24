@@ -17,8 +17,8 @@ from conda_manager.api.download_api import DownloadAPI, RequestsDownloadAPI
 class _ManagerAPI(QObject):
     """
     """
-    sig_channels_updated = Signal(object)
     sig_repodata_updated = Signal(object)
+    sig_repodata_errored = Signal()
 
     def __init__(self):
         """
@@ -54,6 +54,7 @@ class _ManagerAPI(QObject):
         self.conda_get_envs = self._conda_api.get_envs
         self.conda_linked = self._conda_api.linked
         self.conda_get_prefix_envname = self._conda_api.get_prefix_envname
+        self.conda_package_version = self._conda_api.package_version
 
         # These download methods return a worker
         self.download = self._requests_download_api.download
@@ -143,7 +144,33 @@ class _ManagerAPI(QObject):
 
     # --- Public API
     # -------------------------------------------------------------------------
-    def update_repodata(self, data_directory, channels=None):
+    def repodata_files(self, data_directory, channels=None):
+        """
+        Return the repodata paths based on `channels` and the `data_directory`.
+
+        There is no check for validity here.
+        """
+        if channels is None:
+            channels = self.conda_get_condarc_channels()
+
+        repodata_urls = self._set_repo_urls_from_channels(channels)
+
+        repopaths = []
+
+        for repourl in repodata_urls:
+            fullpath = os.sep.join([data_directory,
+                                    self._repo_url_to_path(repourl)])
+            repopaths.append(fullpath)
+
+        return repopaths
+
+    def set_data_directory(self, data_directory):
+        """
+        Set the directory where repodata and metadata are stored.
+        """
+        self._data_directory = data_directory
+
+    def update_repodata(self, channels=None):
         """
         Update repodata defined `channels`. If no channels are provided,
         the default channels are used.
@@ -151,23 +178,25 @@ class _ManagerAPI(QObject):
         When finished, this method emits the `sig_repodata_updated` signal
         with a list of the downloaded files.
         """
-        self._data_directory = data_directory
-
         if channels is None:
             channels = self.conda_get_condarc_channels()
 
         repodata_urls = self._set_repo_urls_from_channels(channels)
         self._check_repos(repodata_urls)
 
-    def update_metadata(self, data_directory):
+    def update_metadata(self):
         """
         Update the metadata available for packages in repo.continuum.io.
 
         Returns a download worker.
         """
+        if self._data_directory is None:
+            raise Exception('Need to call `api.set_data_directory` first.')
+
         metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
-        filepath = os.sep.join([data_directory, 'metadata.json'])
-        return self.download_async(metadata_url, filepath)
+        filepath = os.sep.join([self._data_directory, 'metadata.json'])
+        worker = self.download_async(metadata_url, filepath)
+        return worker
 
 
 MANAGER_API = None

@@ -181,6 +181,7 @@ class CondaPackagesWidget(QWidget):
 
         # Setup
         self.api.client_set_domain(conda_api_url)
+        self.api.set_data_directory(self.data_directory)
         self._load_bundled_metadata()
 
         if setup:
@@ -213,10 +214,19 @@ class CondaPackagesWidget(QWidget):
         if error:
             self.update_status(error, False)
 
-    def _prepare_model_data(self, worker, packages, error):
+    def _prepare_model_data(self, worker=None, output=None, error=None):
         """
         """
-        pip_packages = worker.pip_packages
+        packages, apps = output
+        worker = self.api.pip_list(prefix=self.prefix)
+        worker.sig_finished.connect(self._pip_list_ready)
+        worker.packages = packages
+        worker.apps = apps
+
+    def _pip_list_ready(self, worker, pip_packages, error):
+        """
+        """
+        packages = worker.packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
         worker = self.api.client_prepare_packages_data(packages,
                                                        linked_packages,
@@ -224,20 +234,12 @@ class CondaPackagesWidget(QWidget):
         worker.packages = packages
         worker.sig_finished.connect(self._setup_packages)
 
-    def _pip_list_ready(self, worker, pip_packages, error):
-        """
-        """
-        worker = self.api.client_load_repodata(worker.paths,
-                                               metadata=self._metadata)
-        worker.pip_packages = pip_packages
-        worker.sig_finished.connect(self._prepare_model_data)
-
     def _repodata_updated(self, paths):
         """
         """
-        worker = self.api.pip_list(prefix=self.prefix)
-        worker.sig_finished.connect(self._pip_list_ready)
+        worker = self.api.client_load_repodata(paths, metadata=self._metadata)
         worker.paths = paths
+        worker.sig_finished.connect(self._prepare_model_data)
 
     def _metadata_updated(self, url, path):
         """
@@ -248,8 +250,10 @@ class CondaPackagesWidget(QWidget):
             self._metadata = json.loads(data)
         except Exception:
             self._metadata = {}
-        self.api.update_repodata(self.data_directory, channels=self._channels)
+        self.api.update_repodata(self._channels)
 
+    # ---
+    # -------------------------------------------------------------------------
     def _pip_process_ready(self, worker, output, error):
         """
         """
@@ -338,7 +342,7 @@ class CondaPackagesWidget(QWidget):
 
         if prefix == self.root_prefix:
             name = 'root'
-        elif self.api.environment_exists(prefix=prefix):
+        elif self.api.conda_environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix
@@ -372,7 +376,7 @@ class CondaPackagesWidget(QWidget):
             status = _('Removing environment <b>') + name + '</b>'
 
         worker.sig_finished.connect(self._conda_process_ready)
-        self.update_status(hide=True, message=status, progress=[0, 0])
+        self.update_status(hide=True, message=status, progress=None)
         self._temporal_action_dic = dic
 
     # Public API
@@ -384,8 +388,13 @@ class CondaPackagesWidget(QWidget):
         Downloads repodata, loads repodata, prepares and updates model data.
         """
         self.update_status('Updating package index', True)
-        worker = self.api.update_metadata(self.data_directory)
+        worker = self.api.update_metadata()
         worker.sig_download_finished.connect(self._metadata_updated)
+
+    def prepare_model_data(self, packages, apps):
+        """
+        """
+        self._prepare_model_data(output=(packages, apps))
 
     def update_status(self, message=None, hide=True, progress=None,
                       env=False):
@@ -422,13 +431,13 @@ class CondaPackagesWidget(QWidget):
                 )
         self.status_bar.setText(self.message)
 
-        if progress is not None:
-            self.progress_bar.setMinimum(0)
-            self.progress_bar.setMaximum(progress[1])
-            self.progress_bar.setValue(progress[0])
-        else:
-            self.progress_bar.setMinimum(0)
-            self.progress_bar.setMaximum(0)
+#        if progress is not None:
+#            self.progress_bar.setMinimum(0)
+#            self.progress_bar.setMaximum(progress[1])
+#            self.progress_bar.setValue(progress[0])
+#        else:
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(0)
 
     def show_channels_dialog(self):
         """
@@ -444,6 +453,7 @@ class CondaPackagesWidget(QWidget):
         self.dlg.rejected.connect(lambda: button_channels.setEnabled(True))
         self.dlg.rejected.connect(button_channels.toggle)
         self.dlg.rejected.connect(button_channels.setFocus)
+        self.dlg.accepted.connect(self.accept_channels_dialog)
         self.dlg.show()
 
         geo_tl = button_channels.geometry().topLeft()
@@ -453,25 +463,20 @@ class CondaPackagesWidget(QWidget):
         self.dlg.move(x, y)
         self.dlg.button_add.setFocus()
 
-    def update_channels(self, channels=None, active_channels=None, ui=True):
-        """
-        Update the current channels and active channels.
+    def accept_channels_dialog(self):
+        self.button_channels.setFocus()
+        self.button_channels.toggle()
 
-        Note: Assumes that channels and active channels are valid.
+    def update_channels(self, channels, active_channels):
         """
-        if ui:
-            self.button_channels.toggle()
-            self.button_channels.setDisabled(False)
-
+        """
         if sorted(self._active_channels) != sorted(active_channels) or \
                 sorted(self._channels) != sorted(channels):
-            self.update_status(hide=True)
-            self._active_channels = active_channels
             self._channels = channels
+            self._active_channels = active_channels
             self.sig_channels_updated.emit(tuple(channels),
                                            tuple(active_channels))
-        self.button_channels.setFocus()
-        self.setup()
+            self.setup()
 
     def update_package_index(self):
         """ """
@@ -497,7 +502,7 @@ class CondaPackagesWidget(QWidget):
         else:
             self.prefix = self.root_prefix
 
-        self.setup
+        self.setup()
 #        # Reset environent to reflect this environment in the package model
 #        if update:
 #            self.setup_packages()

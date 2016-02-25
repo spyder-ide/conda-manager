@@ -84,9 +84,9 @@ class CondaPackagesModel(QAbstractTableModel):
         # Carefull here with the order, this has to be adjusted manually
         # For look purposes the first column is empty
         if self._rows[row] == row:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = [0, u'', u'', '-', -1, u'', u'', False, False, False, False]
+            [__, type_, name, description, version, status, url, license_, i, r, u, d, action, action_version] = [0, u'', u'', '-', -1, u'', u'', False, False, False, False, C.ACTION_NONE, None]
         else:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = self._rows[row]
+            [__, type_, name, description, version, status, url, license_, i, r, u, d, action, action_version] = self._rows[row]
 
         if role == Qt.DisplayRole:
             if column == C.COL_PACKAGE_TYPE:
@@ -99,13 +99,31 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(status)
             elif column == C.COL_DESCRIPTION:
                 return to_qvariant(description)
+            elif column == C.COL_ACTION:
+                return to_qvariant(action)
         elif role == Qt.TextAlignmentRole:
             if column in [C.COL_NAME, C.COL_DESCRIPTION]:
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
             else:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
-            if column == C.COL_PACKAGE_TYPE:
+            if column == C.COL_ACTION:
+                if action == C.ACTION_NONE:
+                    if status == C.NOT_INSTALLED:
+                        return to_qvariant(self._icons['add.inactive'])
+                    elif status in [C.UPGRADABLE, C.MIXGRADABLE]:
+                        return to_qvariant(self._icons['upgrade.inactive'])
+                    elif status in [C.INSTALLED, C.DOWNGRADABLE, C.MIXGRADABLE]:
+                        return to_qvariant(self._icons['remove.inactive'])
+                elif action == C.ACTION_INSTALL:
+                    return to_qvariant(self._icons['add.active'])
+                elif action == C.ACTION_REMOVE:
+                    return to_qvariant(self._icons['remove.active'])
+                elif action == C.ACTION_UPGRADE:
+                    return to_qvariant(self._icons['upgrade.active'])
+                else:
+                    return to_qvariant()
+            elif column == C.COL_PACKAGE_TYPE:
                 if type_ == C.CONDA_PACKAGE:
                     return to_qvariant(self._icons['anaconda'])
                 elif type_ == C.PIP_PACKAGE:
@@ -284,6 +302,51 @@ class CondaPackagesModel(QAbstractTableModel):
         status = self._rows[row][C.COL_STATUS]
         return status == C.DOWNGRADABLE or \
             status == C.MIXGRADABLE
+
+    def action_status(self, model_index):
+        """ """
+        row = model_index.row()
+        action_status = self._rows[row][C.COL_ACTION]
+        return action_status
+
+    def set_action_status(self, model_index, status, version=None):
+        """
+        """
+        row = model_index.row()
+        self._rows[row][C.COL_ACTION] = status
+        self._rows[row][C.COL_ACTION_VERSION] = version
+        self._update_cell(row, model_index.column())
+
+    def clear_actions(self):
+        """
+        """
+        for i, row in enumerate(self._rows):
+            self._rows[i][C.COL_ACTION] = C.ACTION_NONE
+            self._rows[i][C.COL_ACTION_VERSION] = None
+            self._update_cell(i, C.COL_ACTION)
+            self._update_cell(i, C.COL_ACTION_VERSION)
+
+    def get_actions(self):
+        """
+        """
+        dic = {C.CONDA_PACKAGE: {C.ACTION_INSTALL: [],
+                                 C.ACTION_REMOVE: [],
+                                 C.ACTION_UPGRADE: [],
+                                 },
+               C.PIP_PACKAGE: {C.ACTION_REMOVE: [],
+                               }
+               }
+
+        for i, row in enumerate(self._rows):
+            action = self._rows[i][C.COL_ACTION]
+            name = self._rows[i][C.COL_NAME]
+            type_ = self._rows[i][C.COL_PACKAGE_TYPE]
+            action_version = self._rows[i][C.COL_ACTION_VERSION]
+            if action != C.ACTION_NONE:
+                if action_version:
+                    name = '{0}={1}'.format(name, action_version)
+                dic[type_][action].append(name)
+        return dic
 
     def get_package_versions(self, name):
         """

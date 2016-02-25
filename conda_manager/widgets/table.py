@@ -31,7 +31,7 @@ from conda_manager.utils.qthelpers import add_actions, create_action
 
 _ = gettext.gettext
 HIDE_COLUMNS = [const.COL_STATUS, const.COL_URL, const.COL_LICENSE,
-                const.COL_REMOVE]
+                const.COL_REMOVE, const.COL_ACTION_VERSION]
 
 
 class CustomDelegate(QItemDelegate):
@@ -53,6 +53,7 @@ class CondaPackagesTable(QTableView):
     sig_status_updated = Signal(str, bool, list, bool)
     sig_conda_action_requested = Signal(str, int, str, object, object)
     sig_pip_action_requested = Signal(str, int)
+    sig_actions_updated = Signal(int)
 
     def __init__(self, parent):
         super(CondaPackagesTable, self).__init__(parent)
@@ -61,6 +62,7 @@ class CondaPackagesTable(QTableView):
         self._filterbox = const.ALL
         self._delegate = CustomDelegate(self)
         self.row_count = None
+        self._advanced_mode = True
 
         # To manage icon states
         self._model_index_clicked = None
@@ -138,6 +140,7 @@ class CondaPackagesTable(QTableView):
 
         self.hide_columns()
         self.resize_rows()
+        self.refresh_actions()
 #        self.resizeRowsToContents()
 
     def resize_rows(self):
@@ -156,14 +159,16 @@ class CondaPackagesTable(QTableView):
         """ """
         for col in const.COLUMNS:
             self.showColumn(col)
-        for col in HIDE_COLUMNS:
-            self.hideColumn(col)
 
-    def hide_action_columns(self):
-        """ """
-        for col in const.COLUMNS:
-            self.showColumn(col)
-        for col in HIDE_COLUMNS + const.ACTION_COLUMNS:
+        hide = HIDE_COLUMNS
+        if self._advanced_mode:
+            columns = const.ACTION_COLUMNS[:]
+            columns.remove(const.COL_ACTION)
+            hide += columns
+        else:
+            hide += [const.COL_ACTION]
+
+        for col in hide:
             self.hideColumn(col)
 
     def filter_changed(self):
@@ -232,12 +237,19 @@ class CondaPackagesTable(QTableView):
         """Override Qt method"""
         w = self.width()
         width_start = 20
+
+        if self._advanced_mode:
+            action_cols = [const.ACTION_COLUMNS[-1], 0]
+        else:
+            action_cols = const.ACTION_COLUMNS[:-1]
+
         self.setColumnWidth(const.COL_START, width_start)
         self.setColumnWidth(const.COL_PACKAGE_TYPE, self.WIDTH_TYPE)
         self.setColumnWidth(const.COL_NAME, self.WIDTH_NAME)
         self.setColumnWidth(const.COL_VERSION, self.WIDTH_VERSION)
-        w_new = w - (width_start + self.WIDTH_TYPE + self.WIDTH_NAME + self.WIDTH_VERSION +
-                     (len(const.ACTION_COLUMNS) + 1)*self.WIDTH_ACTIONS)
+        w_new = w - (width_start + self.WIDTH_TYPE + self.WIDTH_NAME +
+                     self.WIDTH_VERSION +
+                     (len(action_cols) + 1)*self.WIDTH_ACTIONS)
         self.setColumnWidth(const.COL_DESCRIPTION, w_new)
 
         for col in const.ACTION_COLUMNS:
@@ -288,15 +300,20 @@ class CondaPackagesTable(QTableView):
             self._model_index_clicked = model_index
             self.valid = True
 
-            if column == const.COL_INSTALL and model.is_installable(model_index):
+            if (column == const.COL_INSTALL and
+                    model.is_installable(model_index)):
                 model.update_row_icon(model_index.row(), const.COL_INSTALL)
-            elif column == const.COL_INSTALL and model.is_removable(model_index):
+
+            elif (column == const.COL_INSTALL and
+                    model.is_removable(model_index)):
                 model.update_row_icon(model_index.row(), const.COL_REMOVE)
+
             elif ((column == const.COL_UPGRADE and
                    model.is_upgradable(model_index)) or
                   (column == const.COL_DOWNGRADE and
                    model.is_downgradable(model_index))):
                 model.update_row_icon(model_index.row(), model_index.column())
+
             else:
                 self._model_index_clicked = None
                 self.valid = False
@@ -340,6 +357,15 @@ class CondaPackagesTable(QTableView):
                 else:
                     pass
 
+    def set_advanced_mode(self, value=True):
+        self._advanced_mode = value
+#        self.resizeEvent(None)
+
+    def set_action_status(self, model_index, status=const.ACTION_NONE,
+                          version=None):
+        self.source_model.set_action_status(model_index, status, version)
+        self.refresh_actions()
+
     def context_menu_requested(self, event):
         """
         Custom context menu.
@@ -352,8 +378,74 @@ class CondaPackagesTable(QTableView):
         row = self.source_model.row(model_index.row())
         column = model_index.column()
 
-        if column in const.ACTION_COLUMNS:
-            return
+        if column == const.COL_ACTION:
+            is_installable = self.source_model.is_installable(model_index)
+            is_removable = self.source_model.is_removable(model_index)
+            is_upgradable = self.source_model.is_upgradable(model_index)
+
+            action_status = self.source_model.action_status(model_index)
+            actions = []
+            action_unmark = create_action(
+                self,
+                _('Unmark'),
+                triggered=lambda: self.set_action_status(model_index,
+                                                         const.ACTION_NONE))
+            action_install = create_action(
+                self,
+                _('Mark for installation'),
+                triggered=lambda: self.set_action_status(model_index,
+                                                         const.ACTION_INSTALL))
+            action_upgrade = create_action(
+                self,
+                _('Mark for upgrade'),
+                triggered=lambda: self.set_action_status(model_index,
+                                                         const.ACTION_UPGRADE))
+            action_remove = create_action(
+                self,
+                _('Mark for removal'),
+                triggered=lambda: self.set_action_status(model_index,
+                                                         const.ACTION_REMOVE))
+
+            name = self.source_model.row(model_index.row())[const.COL_NAME]
+            versions = self.source_model.get_package_versions(name)
+            version_actions = []
+            for version in reversed(versions):
+                if version != self.source_model.get_package_version(name):
+                    def trigger(model_index=model_index,
+                                action=const.ACTION_INSTALL,
+                                version=versions):
+                        return lambda: self.set_action_status(model_index,
+                                                              action,
+                                                              version)
+                    version_action = create_action(
+                        self,
+                        version,
+                        icon=QIcon(),
+                        triggered=trigger(model_index, const.ACTION_INSTALL,
+                                          version))
+                    version_actions.append(version_action)
+
+            install_versions_menu = QMenu('Mark for specific version '
+                                          'installation', self)
+            add_actions(install_versions_menu, version_actions)
+            actions = [action_unmark, action_install, action_upgrade,
+                       action_remove]
+            if len(version_actions) > 1:
+                actions += [None, install_versions_menu]
+
+            if action_status is const.ACTION_NONE:
+                action_unmark.setDisabled(True)
+                action_install.setDisabled(not is_installable)
+                action_upgrade.setDisabled(not is_upgradable)
+                action_remove.setDisabled(not is_removable)
+                install_versions_menu.setDisabled(False)
+            else:
+                action_unmark.setDisabled(False)
+                action_install.setDisabled(True)
+                action_upgrade.setDisabled(True)
+                action_remove.setDisabled(True)
+                install_versions_menu.setDisabled(True)
+
         elif column in [const.COL_VERSION]:
             name = self.source_model.row(model_index.row())[const.COL_NAME]
             versions = self.source_model.get_package_versions(name)
@@ -417,6 +509,23 @@ class CondaPackagesTable(QTableView):
             pos = QPoint(event.x(), event.y())
             add_actions(self._menu, actions)
             self._menu.popup(self.viewport().mapToGlobal(pos))
+
+    def get_actions(self):
+        return self.source_model.get_actions()
+
+    def clear_actions(self):
+        self.source_model.clear_actions()
+        self.refresh_actions()
+
+    def refresh_actions(self):
+        actions_per_package_type = self.source_model.get_actions()
+        number_of_actions = 0
+        for type_ in actions_per_package_type:
+            actions = actions_per_package_type[type_]
+            for key in actions:
+                data = actions[key]
+                number_of_actions += len(data)
+        self.sig_actions_updated.emit(number_of_actions)
 
     def open_url(self, url):
         """

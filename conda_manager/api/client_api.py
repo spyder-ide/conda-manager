@@ -228,7 +228,7 @@ class _ClientAPI(QObject):
                 status = C.NOT_INSTALLED
 
             row = [0, type_, name, summary, version, status, url,
-                   license_, False, False, False, False]
+                   license_, False, False, False, False, C.ACTION_NONE, None]
             data.append(row)
         return data
 

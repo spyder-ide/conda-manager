@@ -255,7 +255,8 @@ class CondaPackagesWidget(QWidget):
     def _repodata_updated(self, paths):
         """
         """
-        worker = self.api.client_load_repodata(paths, metadata=self._metadata)
+        worker = self.api.client_load_repodata(paths, extra_data={},
+                                               metadata=self._metadata)
         worker.paths = paths
         worker.sig_finished.connect(self._prepare_model_data)
 
@@ -409,7 +410,7 @@ class CondaPackagesWidget(QWidget):
 
         if prefix == self.root_prefix:
             name = 'root'
-        elif self.api.environment_exists(prefix=prefix):
+        elif self.api.conda_environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix

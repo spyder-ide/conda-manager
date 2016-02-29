@@ -12,12 +12,12 @@ from __future__ import (division, print_function, unicode_literals,
                         with_statement)
 
 # Standard library imports
-import os
 import gettext
 
 # Third party imports
+from qtpy import PYQT5
 from qtpy.QtCore import Qt, QPoint, QSize, QUrl, Signal
-from qtpy.QtGui import QDesktopServices, QIcon, QPalette
+from qtpy.QtGui import QDesktopServices, QIcon
 from qtpy.QtWidgets import (QAbstractItemView, QItemDelegate, QMenu,
                             QTableView)
 
@@ -48,7 +48,7 @@ class CondaPackagesTable(QTableView):
     WIDTH_TYPE = 24
     WIDTH_NAME = 120
     WIDTH_ACTIONS = 24
-    WIDTH_VERSION = 70
+    WIDTH_VERSION = 90
 
     sig_status_updated = Signal(str, bool, list, bool)
     sig_conda_action_requested = Signal(str, int, str, object, object)
@@ -77,30 +77,26 @@ class CondaPackagesTable(QTableView):
         self.source_model = None
         self.proxy_model = None
 
-#        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-#        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
-        self.setAlternatingRowColors(True)
+
+#        self.setAlternatingRowColors(True)
         self.setItemDelegate(self._delegate)
         self.setShowGrid(False)
         self.setWordWrap(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._palette = QPalette()
 
         # Header setup
         self._hheader = self.horizontalHeader()
-        # TODO: Change this to use a qtpy constant once a new version
-        # of qtpy is released
-        if os.environ['QT_API'] == 'pyqt5':
+        if PYQT5:
             self._hheader.setSectionResizeMode(self._hheader.Fixed)
         else:
             self._hheader.setResizeMode(self._hheader.Fixed)
         self._hheader.setStyleSheet("""QHeaderView {border: 0px;
                                                     border-radius: 0px;};
                                                     """)
-        self.setPalette(self._palette)
         self.sortByColumn(const.COL_NAME, Qt.AscendingOrder)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()
@@ -276,11 +272,14 @@ class CondaPackagesTable(QTableView):
         """Override Qt method"""
         QTableView.mousePressEvent(self, event)
         self.current_index = self.currentIndex()
+        column = self.current_index.column()
 
         if event.button() == Qt.LeftButton:
             pos = QPoint(event.x(), event.y())
             index = self.indexAt(pos)
             self.action_pressed(index)
+            if column == const.COL_ACTION:
+                self.context_menu_requested(event)
         elif event.button() == Qt.RightButton:
             self.context_menu_requested(event)
 
@@ -362,8 +361,8 @@ class CondaPackagesTable(QTableView):
 #        self.resizeEvent(None)
 
     def set_action_status(self, model_index, status=const.ACTION_NONE,
-                          version=None):
-        self.source_model.set_action_status(model_index, status, version)
+                          version_to=None):
+        self.source_model.set_action_status(model_index, status, version_to)
         self.refresh_actions()
 
     def context_menu_requested(self, event):
@@ -377,6 +376,10 @@ class CondaPackagesTable(QTableView):
         model_index = self.proxy_model.mapToSource(index)
         row = self.source_model.row(model_index.row())
         column = model_index.column()
+        name = row[const.COL_NAME]
+        package_type = row[const.COL_PACKAGE_TYPE]
+        versions = self.source_model.get_package_versions(name)
+        current_version = self.source_model.get_package_version(name)
 
         if column == const.COL_ACTION:
             is_installable = self.source_model.is_installable(model_index)
@@ -407,23 +410,39 @@ class CondaPackagesTable(QTableView):
                                                          const.ACTION_REMOVE))
 
             name = self.source_model.row(model_index.row())[const.COL_NAME]
-            versions = self.source_model.get_package_versions(name)
             version_actions = []
             for version in reversed(versions):
-                if version != self.source_model.get_package_version(name):
-                    def trigger(model_index=model_index,
-                                action=const.ACTION_INSTALL,
-                                version=versions):
-                        return lambda: self.set_action_status(model_index,
-                                                              action,
-                                                              version)
+                def trigger(model_index=model_index,
+                            action=const.ACTION_INSTALL,
+                            version=versions):
+                    return lambda: self.set_action_status(model_index,
+                                                          action,
+                                                          version)
+                if version != current_version:
+                    if ((version in versions and versions.index(version)) >
+                            (current_version in versions and
+                             versions.index(current_version))):
+                        upgrade_or_downgrade_action = const.ACTION_UPGRADE
+                    else:
+                        upgrade_or_downgrade_action = const.ACTION_DOWNGRADE
+
                     version_action = create_action(
                         self,
                         version,
                         icon=QIcon(),
-                        triggered=trigger(model_index, const.ACTION_INSTALL,
+                        triggered=trigger(model_index,
+                                          upgrade_or_downgrade_action,
                                           version))
-                    version_actions.append(version_action)
+                else:
+                    version_action = create_action(
+                        self,
+                        version,
+                        icon=QIcon())
+                    version_action.setCheckable(True)
+                    version_action.setChecked(True)
+#                    version_action.setDisabled(True)
+
+                version_actions.append(version_action)
 
             install_versions_menu = QMenu('Mark for specific version '
                                           'installation', self)
@@ -447,14 +466,13 @@ class CondaPackagesTable(QTableView):
                 install_versions_menu.setDisabled(True)
 
         elif column in [const.COL_VERSION]:
-            name = self.source_model.row(model_index.row())[const.COL_NAME]
-            versions = self.source_model.get_package_versions(name)
             actions = []
-            for version in reversed(versions):
-                actions.append(create_action(self, version,
-                                             icon=QIcon()))
+            if package_type == const.CONDA_PACKAGE:
+                for version in reversed(versions):
+                    actions.append(create_action(self, version,
+                                                 icon=QIcon()))
         else:
-            name, license_ = row[const.COL_NAME], row[const.COL_LICENSE]
+            license_ = row[const.COL_LICENSE]
 
             metadata = self.metadata_links.get(name, {})
             pypi = metadata.get('pypi', '')
@@ -506,8 +524,12 @@ class CondaPackagesTable(QTableView):
                                              self.open_url(dev)))
         if len(actions) > 1:
             self._menu = QMenu(self)
-            pos = QPoint(event.x(), event.y())
             add_actions(self._menu, actions)
+
+#            delta_x = self._menu.sizeHint().width()
+            delta_x = 0
+
+            pos = QPoint(event.x() - delta_x, event.y())
             self._menu.popup(self.viewport().mapToGlobal(pos))
 
     def get_actions(self):

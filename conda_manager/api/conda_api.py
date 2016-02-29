@@ -937,7 +937,8 @@ class _CondaAPI(QObject):
         lines = to_text_string(stdout).split('\n')
 
         for line in lines:
-            if '<pip>' in line:
+            # FIXME: NEED A MORE ROBUST WAY!
+            if '<pip>' in line and '#' not in line:
                 temp = line.split()[:-1] + ['pip']
                 temp = '-'.join(temp)
                 if '-(' in temp:

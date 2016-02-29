@@ -12,6 +12,7 @@ Conda Packager Manager Widget.
 # Standard library imports
 from __future__ import (absolute_import, division, print_function,
                         with_statement)
+from collections import deque
 import json
 import gettext
 import os.path as osp
@@ -103,6 +104,8 @@ class CondaPackagesWidget(QWidget):
         self.button_channels = QPushButton(_('Channels'))
         self.button_ok = QPushButton(_('Ok'))
         self.button_update = QPushButton(_('Update package index'))
+        self.button_apply = QPushButton(_('Apply'))
+        self.button_clear = QPushButton(_('Clear'))
         self.combobox_filter = QComboBox(self)
         self.progress_bar = QProgressBar(self)
         self.status_bar = QLabel(self)
@@ -148,6 +151,11 @@ class CondaPackagesWidget(QWidget):
         middle_layout = QVBoxLayout()
         middle_layout.addWidget(self.table)
 
+        actions_layout = QHBoxLayout()
+        actions_layout.addStretch()
+        actions_layout.addWidget(self.button_apply)
+        actions_layout.addWidget(self.button_clear)
+
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.status_bar, Qt.AlignLeft)
         bottom_layout.addWidget(self.progress_bar, Qt.AlignRight)
@@ -157,6 +165,7 @@ class CondaPackagesWidget(QWidget):
         layout.addItem(QSpacerItem(spacer_w, spacer_h))
         layout.addLayout(top_layout)
         layout.addLayout(middle_layout)
+        layout.addLayout(actions_layout)
         layout.addItem(QSpacerItem(spacer_w, spacer_h))
         layout.addLayout(bottom_layout)
         layout.addItem(QSpacerItem(spacer_w, spacer_h/2))
@@ -171,25 +180,34 @@ class CondaPackagesWidget(QWidget):
         # Signals and slots
         self.api.sig_repodata_updated.connect(self._repodata_updated)
         self.combobox_filter.currentIndexChanged.connect(self.filter_package)
-        self.button_update.clicked.connect(self.update_package_index)
-        self.button_channels.clicked.connect(self.show_channels_dialog)
-        self.textbox_search.textChanged.connect(self.search_package)
-        self.table.sig_status_updated.connect(self.update_status)
-        self.table.sig_pip_action_requested.connect(self._run_pip_action)
-        self.table.sig_conda_action_requested.connect(self._run_conda_action)
+        self.button_apply.clicked.connect(self._handle_multiple_actions)
+        self.button_clear.clicked.connect(self.table.clear_actions)
         self.button_cancel.clicked.connect(self.cancel_process)
+        self.button_channels.clicked.connect(self.show_channels_dialog)
+        self.button_update.clicked.connect(self.update_package_index)
+        self.textbox_search.textChanged.connect(self.search_package)
+        self.table.sig_conda_action_requested.connect(self._run_conda_action)
+        self.table.sig_actions_updated.connect(self.update_actions)
+        self.table.sig_pip_action_requested.connect(self._run_pip_action)
+        self.table.sig_status_updated.connect(self.update_status)
 
         # Setup
         self.api.client_set_domain(conda_api_url)
         self.api.set_data_directory(self.data_directory)
         self._load_bundled_metadata()
-
+        self.update_actions(0)
         if setup:
             self.set_environment(name=name, prefix=prefix)
             self.setup()
 
     # --- Helpers/Callbacks
     # -------------------------------------------------------------------------
+    def update_actions(self, number_of_actions):
+        """
+        """
+        self.button_apply.setVisible(bool(number_of_actions))
+        self.button_clear.setVisible(bool(number_of_actions))
+
     def _load_bundled_metadata(self):
         """
         """
@@ -237,7 +255,8 @@ class CondaPackagesWidget(QWidget):
     def _repodata_updated(self, paths):
         """
         """
-        worker = self.api.client_load_repodata(paths, metadata=self._metadata)
+        worker = self.api.client_load_repodata(paths, extra_data={},
+                                               metadata=self._metadata)
         worker.paths = paths
         worker.sig_finished.connect(self._prepare_model_data)
 
@@ -254,6 +273,109 @@ class CondaPackagesWidget(QWidget):
 
     # ---
     # -------------------------------------------------------------------------
+    def _handle_multiple_actions(self):
+        """
+        """
+        prefix = self.prefix
+
+        if prefix == self.root_prefix:
+            name = 'root'
+        elif self.api.environment_exists(prefix=prefix):
+            name = osp.basename(prefix)
+        else:
+            name = prefix
+
+        actions = self.table.get_actions()
+        self._multiple_process = deque()
+
+        pip_actions = actions[C.PIP_PACKAGE]
+        conda_actions = actions[C.CONDA_PACKAGE]
+
+        pip_remove = pip_actions.get(C.ACTION_REMOVE, [])
+        conda_remove = conda_actions.get(C.ACTION_REMOVE, [])
+        conda_install = conda_actions.get(C.ACTION_INSTALL, [])
+        conda_upgrade = conda_actions.get(C.ACTION_UPGRADE, [])
+
+        message = ''
+        if pip_remove:
+            temp = ["<li><b>{0}</b></li>".format(i) for i in pip_remove]
+            message += ('The following pip packages will be removed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_remove:
+            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_remove]
+            message += ('<br>The following conda packages will be removed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_install:
+            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_install]
+            message += ('<br>The following conda packages will be installed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_upgrade:
+            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_upgrade]
+            message += ('<br>The following conda packages will be upgraded: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        message += '<br>'
+        reply = QMessageBox.question(self,
+                                     'Proceed with the following actions?',
+                                     message,
+                                     buttons=QMessageBox.Ok |
+                                     QMessageBox.Cancel)
+
+        if reply == QMessageBox.Ok:
+            # Pip remove
+            for pkg in pip_remove:
+                status = (_('Removing pip package <b>') + pkg +
+                          '</b>' + _(' from <i>') + name + '</i>')
+
+                def trigger(prefix=prefix, pkgs=[pkg]):
+                    return lambda: self.api.pip_remove(prefix=prefix,
+                                                       pkgs=pkgs)
+
+                self._multiple_process.append([status, trigger()])
+
+            # Process conda actions
+            if conda_remove:
+                status = (_('Removing conda packages <b>') +
+                          '</b>' + _(' from <i>') + name + '</i>')
+
+                def trigger(prefix=prefix, pkgs=conda_remove):
+                    return lambda: self.api.conda_remove(prefix=prefix,
+                                                         pkgs=pkgs)
+                self._multiple_process.append([status, trigger()])
+
+            if conda_install:
+                status = (_('Installing conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                def trigger(prefix=prefix, pkgs=conda_install):
+                    return lambda: self.api.conda_install(prefix=prefix,
+                                                          pkgs=pkgs)
+                self._multiple_process.append([status, trigger()])
+
+            # Conda update
+            if conda_upgrade:
+                status = (_('Upgrading conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                def trigger(prefix=prefix, pkgs=conda_upgrade):
+                    return lambda: self.api.pip_remove(prefix=prefix,
+                                                       pkgs=pkgs)
+                self._multiple_process.append([status, trigger()])
+
+            self._multiple_process
+            self._run_multiple_actions()
+
+    def _run_multiple_actions(self, worker=None, output=None, error=None):
+        """
+        """
+        if self._multiple_process:
+            status, func = self._multiple_process.popleft()
+            self.update_status(status)
+            worker = func()
+            worker.sig_finished.connect(self._run_multiple_actions)
+        else:
+            self.update_status('', hide=False)
+            self.setup()
+
     def _pip_process_ready(self, worker, output, error):
         """
         """
@@ -288,7 +410,7 @@ class CondaPackagesWidget(QWidget):
 
         if prefix == self.root_prefix:
             name = 'root'
-        elif self.api.environment_exists(prefix=prefix):
+        elif self.api.conda_environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix

@@ -14,7 +14,7 @@ import gettext
 # Third party imports
 from qtpy.compat import to_qvariant
 from qtpy.QtCore import (QAbstractTableModel, QModelIndex, QSize, Qt)
-from qtpy.QtGui import QPalette
+from qtpy.QtGui import QPalette, QColor
 
 # Local imports
 from conda_manager.utils import get_icon, sort_versions
@@ -48,6 +48,13 @@ class CondaPackagesModel(QAbstractTableModel):
             'remove.active': get_icon('conda_remove_active.png'),
             'remove.inactive': get_icon('conda_remove_inactive.png'),
             'remove.pressed': get_icon('conda_remove_pressed.png'),
+            'action.not_installed': get_icon('conda_action_not_installed.png'),
+            'action.installed': get_icon('conda_action_installed.png'),
+            'action.installed_upgradable': get_icon('conda_action_installed_upgradable.png'),
+            'action.remove': get_icon('conda_action_remove.png'),
+            'action.add': get_icon('conda_action_add.png'),
+            'action.upgrade': get_icon('conda_action_upgrade.png'),
+            'action.downgrade': get_icon('conda_action_downgrade.png'),
             'python': get_icon('python.png'),
             'anaconda': get_icon('anaconda.png'),
             }
@@ -59,19 +66,8 @@ class CondaPackagesModel(QAbstractTableModel):
 
     def flags(self, index):
         """Override Qt method"""
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-
-        column = index.column()
-        if column in (C.COL_PACKAGE_TYPE, C.COL_NAME, C.COL_DESCRIPTION,
-                      C.COL_VERSION):
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column in C.ACTION_COLUMNS:
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column == C.COL_END:
-            return Qt.ItemFlags(Qt.NoItemFlags)
-        else:
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
+        if index.isValid():
+            return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
     def data(self, index, role=Qt.DisplayRole):
         """Override Qt method"""
@@ -84,9 +80,38 @@ class CondaPackagesModel(QAbstractTableModel):
         # Carefull here with the order, this has to be adjusted manually
         # For look purposes the first column is empty
         if self._rows[row] == row:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = [0, u'', u'', '-', -1, u'', u'', False, False, False, False]
+#            [__, action, type_, name, description, version, status, url, license_, i, r, u, d, action_version] = [0, C.ACTION_NONE, u'', u'', '-', -1, u'', u'', False, False, False, False, None]
+            action = C.ACTION_NONE
+            type_ = u''
+            name = u''
+            description = u''
+            version = u'-'
+            status = -1
+            url = u''
+            license_ = u''
+            i = False
+            r = False
+            u = False
+            d = False
+            action_version = None
         else:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = self._rows[row]
+            action = self._rows[row][C.COL_ACTION]
+            type_ = self._rows[row][C.COL_PACKAGE_TYPE]
+            name = self._rows[row][C.COL_NAME]
+            description = self._rows[row][C.COL_DESCRIPTION]
+            version = self._rows[row][C.COL_VERSION]
+            status = self._rows[row][C.COL_STATUS]
+            url = self._rows[row][C.COL_URL]
+            license_ = self._rows[row][C.COL_LICENSE]
+            i = self._rows[row][C.COL_INSTALL]
+            r = self._rows[row][C.COL_REMOVE]
+            u = self._rows[row][C.COL_UPGRADE]
+            d = self._rows[row][C.COL_DOWNGRADE]
+            action_version = self._rows[row][C.COL_ACTION_VERSION]
+#            [__, action, type_, name, description, version, status, url, license_, i, r, u, d, action_version] = self._rows[row]
+
+        if self.is_upgradable(self.index(row, C.COL_VERSION)):
+            version += C.UPGRADE_SYMBOL
 
         if role == Qt.DisplayRole:
             if column == C.COL_PACKAGE_TYPE:
@@ -99,13 +124,42 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(status)
             elif column == C.COL_DESCRIPTION:
                 return to_qvariant(description)
+            elif column == C.COL_ACTION:
+                return to_qvariant(action)
+        elif role == Qt.BackgroundRole:
+            if action == C.ACTION_REMOVE:
+                return to_qvariant(QColor(128, 0, 0, 50))
+            elif action == C.ACTION_INSTALL:
+                return to_qvariant(QColor(0, 128, 0, 50))
+            elif action == C.ACTION_UPGRADE:
+                return to_qvariant(QColor(0, 0, 128, 50))
+            elif action == C.ACTION_DOWNGRADE:
+                return to_qvariant(QColor(128, 0, 128, 50))
         elif role == Qt.TextAlignmentRole:
             if column in [C.COL_NAME, C.COL_DESCRIPTION]:
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
             else:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
-            if column == C.COL_PACKAGE_TYPE:
+            if column == C.COL_ACTION:
+                if action == C.ACTION_NONE:
+                    if status == C.NOT_INSTALLED:
+                        return to_qvariant(self._icons['action.not_installed'])
+                    elif status in [C.UPGRADABLE, C.MIXGRADABLE]:
+                        return to_qvariant(self._icons['action.installed'])
+                    elif status in [C.INSTALLED, C.DOWNGRADABLE, C.MIXGRADABLE]:
+                        return to_qvariant(self._icons['action.installed'])
+                elif action == C.ACTION_INSTALL:
+                    return to_qvariant(self._icons['action.add'])
+                elif action == C.ACTION_REMOVE:
+                    return to_qvariant(self._icons['action.remove'])
+                elif action == C.ACTION_UPGRADE:
+                    return to_qvariant(self._icons['action.upgrade'])
+                elif action == C.ACTION_DOWNGRADE:
+                    return to_qvariant(self._icons['action.downgrade'])
+                else:
+                    return to_qvariant()
+            elif column == C.COL_PACKAGE_TYPE:
                 if type_ == C.CONDA_PACKAGE:
                     return to_qvariant(self._icons['anaconda'])
                 elif type_ == C.PIP_PACKAGE:
@@ -285,6 +339,52 @@ class CondaPackagesModel(QAbstractTableModel):
         return status == C.DOWNGRADABLE or \
             status == C.MIXGRADABLE
 
+    def action_status(self, model_index):
+        """ """
+        row = model_index.row()
+        action_status = self._rows[row][C.COL_ACTION]
+        return action_status
+
+    def set_action_status(self, model_index, status, version=None):
+        """
+        """
+        row = model_index.row()
+        self._rows[row][C.COL_ACTION] = status
+        self._rows[row][C.COL_ACTION_VERSION] = version
+        self._update_cell(row, model_index.column())
+
+    def clear_actions(self):
+        """
+        """
+        for i, row in enumerate(self._rows):
+            self._rows[i][C.COL_ACTION] = C.ACTION_NONE
+            self._rows[i][C.COL_ACTION_VERSION] = None
+            self._update_cell(i, C.COL_ACTION)
+            self._update_cell(i, C.COL_ACTION_VERSION)
+
+    def get_actions(self):
+        """
+        """
+        dic = {C.CONDA_PACKAGE: {C.ACTION_INSTALL: [],
+                                 C.ACTION_REMOVE: [],
+                                 C.ACTION_UPGRADE: [],
+                                 C.ACTION_DOWNGRADE: [],
+                                 },
+               C.PIP_PACKAGE: {C.ACTION_REMOVE: [],
+                               }
+               }
+
+        for i, row in enumerate(self._rows):
+            action = self._rows[i][C.COL_ACTION]
+            name = self._rows[i][C.COL_NAME]
+            type_ = self._rows[i][C.COL_PACKAGE_TYPE]
+            action_version = self._rows[i][C.COL_ACTION_VERSION]
+            if action != C.ACTION_NONE:
+                if action_version:
+                    name = '{0}={1}'.format(name, action_version)
+                dic[type_][action].append(name)
+        return dic
+
     def get_package_versions(self, name):
         """
         Gives all the compatible package canonical name
@@ -304,6 +404,7 @@ class CondaPackagesModel(QAbstractTableModel):
         """  """
         if name in self._name_to_index:
             index = self._name_to_index[name]
-            return self.row(index)[C.COL_VERSION]
+            version = self.row(index)[C.COL_VERSION]
+            return version.replace(C.UPGRADE_SYMBOL, '')
         else:
             return u''

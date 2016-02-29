@@ -3,8 +3,6 @@
 # -*- coding: utf-8 -*-
 
 """
-Updated `conda-api` to include additional methods, queued worker processes
-calling `QProcess` instead of `subprocess.Popen`.
 """
 
 # Standard library imports
@@ -23,8 +21,6 @@ from conda_manager.utils import constants as C
 
 
 class ClientWorker(QObject):
-    """
-    """
     sig_finished = Signal(object, object, object)
 
     def __init__(self, method, args, kwargs):
@@ -36,11 +32,14 @@ class ClientWorker(QObject):
 
     def is_finished(self):
         """
+        Return wether or not the worker has finished or not executing its
+        current process.
         """
         return self._is_finished
 
     def start(self):
         """
+        Start the worker process.
         """
         error, output = None, None
         try:
@@ -99,6 +98,7 @@ class _ClientAPI(QObject):
 
     def _create_worker(self, method, *args, **kwargs):
         """
+        Create a worker for this client to be run in a separate thread.
         """
         # FIXME: this might be heavy...
         thread = QThread()
@@ -113,8 +113,12 @@ class _ClientAPI(QObject):
         self._start()
         return worker
 
-    def _load_repodata(self, filepaths, metadata={}):
+    def _load_repodata(self, filepaths, extra_data={}, metadata={}):
         """
+        Load all the available pacakges information for downloaded repodata
+        files (repo.continuum.io), additional data provided (anaconda cloud),
+        and additional metadata and merge into a single set of packages and
+        apps.
         """
         repodata = []
         for filepath in filepaths:
@@ -162,8 +166,10 @@ class _ClientAPI(QObject):
                 all_packages[name]['versions'].add(version)
                 all_packages[name]['size'][version] = data['size']
                 all_packages[name]['type'][version] = data.get('type', None)
-                all_packages[name]['app_entry'][version] = data.get('app_entry', None)
-                all_packages[name]['app_type'][version] = data.get('app_type', None)
+                all_packages[name]['app_entry'][version] = data.get('app_entry',
+                                                                    None)
+                all_packages[name]['app_type'][version] = data.get('app_type',
+                                                                   None)
 
         all_apps = {}
         for name in all_packages:
@@ -178,6 +184,8 @@ class _ClientAPI(QObject):
         return all_packages, all_apps
 
     def _prepare_model_data(self, packages, linked, pip):
+        """
+        """
         data = []
 
         linked_packages = {}
@@ -195,13 +203,13 @@ class _ClientAPI(QObject):
                                          list(packages.keys()))))
 
         for name in packages_names:
-            packagedata = packages.get(name, None)
+            p_data = packages.get(name, None)
 
-            summary = packagedata.get('summary', '') if packagedata else ''
-            url = packagedata.get('home', '') if packagedata else ''
-            license_ = packagedata.get('license', '') if packagedata else ''
-            versions = packagedata.get('versions', '') if packagedata else []
-            version = packagedata.get('latest_version', '') if packagedata else ''
+            summary = p_data.get('summary', '') if p_data else ''
+            url = p_data.get('home', '') if p_data else ''
+            license_ = p_data.get('license', '') if p_data else ''
+            versions = p_data.get('versions', '') if p_data else []
+            version = p_data.get('latest_version', '') if p_data else ''
 
             if name in pip_packages:
                 type_ = C.PIP_PACKAGE
@@ -227,8 +235,23 @@ class _ClientAPI(QObject):
                 type_ = C.CONDA_PACKAGE
                 status = C.NOT_INSTALLED
 
-            row = [0, type_, name, summary, version, status, url,
-                   license_, False, False, False, False]
+            row = {C.COL_ACTION: C.ACTION_NONE,
+                   C.COL_PACKAGE_TYPE: type_,
+                   C.COL_NAME: name,
+                   C.COL_DESCRIPTION: summary.capitalize(),
+                   C.COL_VERSION: version,
+                   C.COL_STATUS: status,
+                   C.COL_URL: url,
+                   C.COL_LICENSE: license_,
+                   C.COL_INSTALL: False,
+                   C.COL_REMOVE: False,
+                   C.COL_UPGRADE: False,
+                   C.COL_DOWNGRADE: False,
+                   C.COL_ACTION_VERSION: None
+                   }
+
+#            row = [0, C.ACTION_NONE, type_, name, summary, version, status,
+#                   url, license_, False, False, False, False, None]
             data.append(row)
         return data
 
@@ -236,6 +259,7 @@ class _ClientAPI(QObject):
     # -------------------------------------------------------------------------
     def login(self, username, password, application, application_url):
         """
+        Login to anaconda cloud.
         """
         method = self._anaconda_client_api.authenticate
         return self._create_worker(method, username, password, application,
@@ -243,21 +267,31 @@ class _ClientAPI(QObject):
 
     def logout(self):
         """
+        Logout from anaconda cloud.
         """
         method = self._anaconda_client_api.remove_authentication
         return self._create_worker(method)
 
-    def load_repodata(self, filepaths, metadata={}):
+    def load_repodata(self, filepaths, extra_data={}, metadata={}):
         """
+        Load all the available pacakges information for downloaded repodata
+        files (repo.continuum.io), additional data provided (anaconda cloud),
+        and additional metadata and merge into a single set of packages and
+        apps.
         """
         method = self._load_repodata
-        return self._create_worker(method, filepaths, metadata=metadata)
+        return self._create_worker(method, filepaths, extra_data=extra_data,
+                                   metadata=metadata)
 
     def prepare_model_data(self, packages, linked, pip):
+        """
+        """
         method = self._prepare_model_data
         return self._create_worker(method, packages, linked, pip)
 
     def set_domain(self, domain, token=None):
+        """
+        """
         self._anaconda_client_api = binstar_client.Binstar(token=token,
                                                            domain=domain)
 

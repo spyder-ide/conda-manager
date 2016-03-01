@@ -199,7 +199,7 @@ class CondaPackagesWidget(QWidget):
         self.update_actions(0)
 
         if setup:
-            self.set_environment(name=name, prefix=prefix, update=False)
+            self.set_environment(name=name, prefix=prefix)
             self.setup()
 
     # --- Helpers/Callbacks
@@ -738,6 +738,7 @@ class CondaPackagesWidget(QWidget):
 
             if answer == QMessageBox.Yes:
                 self.api.conda_terminate()
+                self.api.download_terminate()
                 self.update_status(hide=False, message='Process cancelled')
         else:
             QDialog.reject(self)

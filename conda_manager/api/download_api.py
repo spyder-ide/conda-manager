@@ -313,6 +313,12 @@ class _RequestsDownloadAPI(QObject):
         method = self._download
         return self._create_worker(method, url, path=path, force=force)
 
+    def download_terminate(self):
+        for t in self._threads:
+            t.kill()
+        self._thread = []
+        self._workers = []
+
     def is_valid_url(self, url):
         logger.debug(str((url)))
         method = self._is_valid_url

@@ -170,6 +170,7 @@ class ProcessWorker(QObject):
     def start(self):
         """
         """
+        # print(self._cmd_list)
         if not self._fired:
             self._process.start(self._cmd_list[0], self._cmd_list[1:])
             self._timer.start()
@@ -521,7 +522,7 @@ class _CondaAPI(QObject):
         return self._call_and_parse(cmd_list, abspath=kwargs.get('abspath',
                                                                  True))
 
-    def remove(self, *pkgs, **kwargs):
+    def remove(self, name=None, prefix=None, pkgs=None, all_=False):
         """
         Remove a package (from an environment) by name.
 
@@ -532,29 +533,22 @@ class _CondaAPI(QObject):
         """
         cmd_list = ['remove', '--json', '--quiet', '--yes']
 
-        if not pkgs and not kwargs.get('all'):
+
+        if not pkgs and not all_:
             raise TypeError("Must specify at least one package to remove, or "
                             "all=True.")
 
-        if kwargs.get('name') and kwargs.get('path'):
-            raise TypeError('conda remove: At most one of name, path allowed')
-
-        if kwargs.get('name'):
-            cmd_list.extend(['--name', kwargs.pop('name')])
-
-        if kwargs.get('path'):
-            cmd_list.extend(['--prefix', kwargs.pop('path')])
-
-        cmd_list.extend(
-            self._setup_install_commands_from_kwargs(
-                kwargs,
-                ('dry_run', 'features', 'override_channels',
-                 'no_pin', 'force', 'all')))
+        if name:
+            cmd_list.extend(['--name', name])
+        elif prefix:
+            cmd_list.extend(['--prefix', prefix])
+        else:
+            raise TypeError('must specify either an environment name or a '
+                            'path for package removal')
 
         cmd_list.extend(pkgs)
 
-        return self._call_and_parse(cmd_list,
-                                    abspath=kwargs.get('abspath', True))
+        return self._call_and_parse(cmd_list)
 
     def remove_environment(self, name=None, path=None, **kwargs):
         """

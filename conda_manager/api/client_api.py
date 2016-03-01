@@ -235,6 +235,9 @@ class _ClientAPI(QObject):
                 type_ = C.CONDA_PACKAGE
                 status = C.NOT_INSTALLED
 
+                if version == '' and len(versions) != 0:
+                    version = versions[-1]
+
             row = {C.COL_ACTION: C.ACTION_NONE,
                    C.COL_PACKAGE_TYPE: type_,
                    C.COL_NAME: name,
@@ -250,8 +253,6 @@ class _ClientAPI(QObject):
                    C.COL_ACTION_VERSION: None
                    }
 
-#            row = [0, C.ACTION_NONE, type_, name, summary, version, status,
-#                   url, license_, False, False, False, False, None]
             data.append(row)
         return data
 

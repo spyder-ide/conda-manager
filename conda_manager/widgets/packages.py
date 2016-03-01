@@ -295,22 +295,37 @@ class CondaPackagesWidget(QWidget):
         conda_remove = conda_actions.get(C.ACTION_REMOVE, [])
         conda_install = conda_actions.get(C.ACTION_INSTALL, [])
         conda_upgrade = conda_actions.get(C.ACTION_UPGRADE, [])
+        conda_downgrade = conda_actions.get(C.ACTION_DOWNGRADE, [])
 
         message = ''
+        template_1 = '<li><b>{0}={1}</b></li>'
+        template_2 = '<li><b>{0}: {1} -> {2}</b></li>'
+
         if pip_remove:
-            temp = ["<li><b>{0}</b></li>".format(i) for i in pip_remove]
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    pip_remove]
             message += ('The following pip packages will be removed: '
                         '<ul>' + ''.join(temp) + '</ul>')
         if conda_remove:
-            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_remove]
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    conda_remove]
             message += ('<br>The following conda packages will be removed: '
                         '<ul>' + ''.join(temp) + '</ul>')
         if conda_install:
-            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_install]
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    conda_install]
             message += ('<br>The following conda packages will be installed: '
                         '<ul>' + ''.join(temp) + '</ul>')
+        if conda_downgrade:
+            temp = [template_2.format(
+                    i['name'], i['version_from'], i['version_to']) for i in
+                    conda_downgrade]
+            message += ('<br>The following conda packages will be downgraded: '
+                        '<ul>' + ''.join(temp) + '</ul>')
         if conda_upgrade:
-            temp = ["<li><b>{0}</b></li>".format(i) for i in conda_upgrade]
+            temp = [template_2.format(
+                    i['name'], i['version_from'], i['version_to']) for i in
+                    conda_upgrade]
             message += ('<br>The following conda packages will be upgraded: '
                         '<ul>' + ''.join(temp) + '</ul>')
         message += '<br>'
@@ -323,10 +338,11 @@ class CondaPackagesWidget(QWidget):
         if reply == QMessageBox.Ok:
             # Pip remove
             for pkg in pip_remove:
-                status = (_('Removing pip package <b>') + pkg +
+                status = (_('Removing pip package <b>') + pkg['name'] +
                           '</b>' + _(' from <i>') + name + '</i>')
+                pkgs = [pkg['name']]
 
-                def trigger(prefix=prefix, pkgs=[pkg]):
+                def trigger(prefix=prefix, pkgs=pkgs):
                     return lambda: self.api.pip_remove(prefix=prefix,
                                                        pkgs=pkgs)
 
@@ -336,17 +352,34 @@ class CondaPackagesWidget(QWidget):
             if conda_remove:
                 status = (_('Removing conda packages <b>') +
                           '</b>' + _(' from <i>') + name + '</i>')
+                pkgs = [i['name'] for i in conda_remove]
 
-                def trigger(prefix=prefix, pkgs=conda_remove):
-                    return lambda: self.api.conda_remove(prefix=prefix,
-                                                         pkgs=pkgs)
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_remove(pkgs=pkgs,
+                                                         prefix=prefix)
                 self._multiple_process.append([status, trigger()])
 
             if conda_install:
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_install]
+
                 status = (_('Installing conda packages <b>') +
                           '</b>' + _(' on <i>') + name + '</i>')
 
-                def trigger(prefix=prefix, pkgs=conda_install):
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_install(prefix=prefix,
+                                                          pkgs=pkgs)
+                self._multiple_process.append([status, trigger()])
+
+            # Conda downgrade
+            if conda_downgrade:
+                status = (_('Downgrading conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_downgrade]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
                     return lambda: self.api.conda_install(prefix=prefix,
                                                           pkgs=pkgs)
                 self._multiple_process.append([status, trigger()])
@@ -356,9 +389,12 @@ class CondaPackagesWidget(QWidget):
                 status = (_('Upgrading conda packages <b>') +
                           '</b>' + _(' on <i>') + name + '</i>')
 
-                def trigger(prefix=prefix, pkgs=conda_upgrade):
-                    return lambda: self.api.pip_remove(prefix=prefix,
-                                                       pkgs=pkgs)
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_upgrade]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_install(prefix=prefix,
+                                                          pkgs=pkgs)
                 self._multiple_process.append([status, trigger()])
 
             self._multiple_process

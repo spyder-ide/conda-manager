@@ -361,8 +361,8 @@ class CondaPackagesTable(QTableView):
 #        self.resizeEvent(None)
 
     def set_action_status(self, model_index, status=const.ACTION_NONE,
-                          version_to=None):
-        self.source_model.set_action_status(model_index, status, version_to)
+                          version=None):
+        self.source_model.set_action_status(model_index, status, version)
         self.refresh_actions()
 
     def context_menu_requested(self, event):
@@ -392,29 +392,33 @@ class CondaPackagesTable(QTableView):
                 self,
                 _('Unmark'),
                 triggered=lambda: self.set_action_status(model_index,
-                                                         const.ACTION_NONE))
+                                                         const.ACTION_NONE,
+                                                         current_version))
             action_install = create_action(
                 self,
                 _('Mark for installation'),
                 triggered=lambda: self.set_action_status(model_index,
-                                                         const.ACTION_INSTALL))
+                                                         const.ACTION_INSTALL,
+                                                         versions[-1]))
             action_upgrade = create_action(
                 self,
                 _('Mark for upgrade'),
                 triggered=lambda: self.set_action_status(model_index,
-                                                         const.ACTION_UPGRADE))
+                                                         const.ACTION_UPGRADE,
+                                                         versions[-1]))
             action_remove = create_action(
                 self,
                 _('Mark for removal'),
                 triggered=lambda: self.set_action_status(model_index,
-                                                         const.ACTION_REMOVE))
+                                                         const.ACTION_REMOVE,
+                                                         current_version))
 
             name = self.source_model.row(model_index.row())[const.COL_NAME]
             version_actions = []
             for version in reversed(versions):
                 def trigger(model_index=model_index,
                             action=const.ACTION_INSTALL,
-                            version=versions):
+                            version=version):
                     return lambda: self.set_action_status(model_index,
                                                           action,
                                                           version)

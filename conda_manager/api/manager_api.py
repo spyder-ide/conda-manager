@@ -57,9 +57,10 @@ class _ManagerAPI(QObject):
         self.conda_package_version = self._conda_api.package_version
 
         # These download methods return a worker
-        self.download = self._requests_download_api.download
+        self.download_requests = self._requests_download_api.download
         self.download_async = self._download_api.download
         self.download_is_valid_url = self._requests_download_api.is_valid_url
+        self.download_teminate = self._requests_download_api.terminate
 
         # These client methods return a worker
         self.client_login = self._client_api.login
@@ -102,7 +103,8 @@ class _ManagerAPI(QObject):
     def _repos_checked(self, worker, output, error):
         """
         """
-        self._checking_repos.remove(worker.repo)
+        if worker.repo in self._checking_repos:
+            self._checking_repos.remove(worker.repo)
 
         if output:
             self._valid_repos.append(worker.repo)
@@ -125,22 +127,25 @@ class _ManagerAPI(QObject):
         """
         self._files_downloaded = []
         self._repodata_files = []
+        self.__counter = -1
 
         for repo in checked_repos:
             path = self._repo_url_to_path(repo)
             self._files_downloaded.append(path)
             self._repodata_files.append(path)
-            worker = self.download_async(repo, path)
-            worker.sig_download_finished.connect(self._repodata_downloaded)
+            worker = self.download_requests(repo, path)
+            worker.url = repo
+            worker.path = path
+            worker.sig_finished.connect(self._repodata_downloaded)
 
-    def _repodata_downloaded(self, url, path):
+    def _repodata_downloaded(self, worker, output, error):
         """
         """
-        if path in self._files_downloaded:
-            self._files_downloaded.remove(path)
+        if worker.path in self._files_downloaded:
+            self._files_downloaded.remove(worker.path)
 
         if len(self._files_downloaded) == 0:
-            self.sig_repodata_updated.emit(self._repodata_files)
+            self.sig_repodata_updated.emit(list(set(self._repodata_files)))
 
     # --- Public API
     # -------------------------------------------------------------------------
@@ -194,7 +199,7 @@ class _ManagerAPI(QObject):
 
         metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
-        worker = self.download_async(metadata_url, filepath)
+        worker = self.download_requests(metadata_url, filepath)
         return worker
 
 
@@ -226,11 +231,12 @@ def test():
     from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
     api = ManagerAPI()
-    api.sig_repodata_updated.connect(repodata_updated)
+#    api.sig_repodata_updated.connect(repodata_updated)
     data_directory = tempfile.mkdtemp()
-    worker = api.update_metadata(data_directory)
-    worker.sig_download_finished.connect(download_finished)
-    api.update_repodata(data_directory)
+    api.set_data_directory(data_directory)
+#    worker = api.update_metadata()
+#    worker.sig_download_finished.connect(download_finished)
+    api.update_repodata()
     app.exec_()
 
 

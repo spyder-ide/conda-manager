@@ -53,6 +53,7 @@ def handle_qbytearray(obj, encoding):
 class DownloadWorker(QObject):
     sig_download_finished = Signal(str, str)            # url, path
     sig_download_progress = Signal(str, str, int, int)  # url, path, progress_size, total_size
+    sig_finished = Signal(object, object, object)
 
     def __init__(self, url, path):
         super(DownloadWorker, self).__init__()
@@ -112,6 +113,7 @@ class _DownloadAPI(QObject):
                     lambda r, t, w=worker: self._progress(r, t, w))
             else:
                 worker.sig_download_finished.emit(url, path)
+                worker.sig_finished.emit(worker, path, None)
                 self._workers.pop(url)
         elif url in self._get_requests:
             data = reply.readAll()
@@ -127,6 +129,7 @@ class _DownloadAPI(QObject):
 
         # Clean up
         worker.sig_download_finished.emit(url, path)
+        worker.sig_finished.emit(worker, path, None)
         req = self._get_requests.pop(url)
         self._old_requests.append(req)
         self._workers.pop(url)
@@ -187,9 +190,12 @@ class RequestsDownloadWorker(QObject):
         try:
             output = self.method(*self.args, **self.kwargs)
         except Exception as error:
-            pass
+            logger.debug(str((self.method.__name__,
+                              self.method.__module__,
+                              error)))
 
         self.sig_finished.emit(self, output, error)
+#        print('emited', self.method.__name__)
         self._is_finished = True
 
 
@@ -278,7 +284,7 @@ class _RequestsDownloadAPI(QObject):
 
             # Check if existing file matches size of requested file
             if file_size == total_size:
-                self.sig_download_finished.emit(url, path)
+                self._sig_download_finished.emit(url, path)
                 return path
 
         # File not found or file size did not match. Download file.
@@ -309,6 +315,12 @@ class _RequestsDownloadAPI(QObject):
         logger.debug(str((url, path, force)))
         method = self._download
         return self._create_worker(method, url, path=path, force=force)
+
+    def terminate(self):
+        for t in self._threads:
+            t.kill()
+        self._thread = []
+        self._workers = []
 
     def is_valid_url(self, url):
         logger.debug(str((url)))

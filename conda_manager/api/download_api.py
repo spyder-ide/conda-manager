@@ -53,6 +53,7 @@ def handle_qbytearray(obj, encoding):
 class DownloadWorker(QObject):
     sig_download_finished = Signal(str, str)            # url, path
     sig_download_progress = Signal(str, str, int, int)  # url, path, progress_size, total_size
+    sig_finished = Signal(object, object, object)
 
     def __init__(self, url, path):
         super(DownloadWorker, self).__init__()
@@ -112,6 +113,7 @@ class _DownloadAPI(QObject):
                     lambda r, t, w=worker: self._progress(r, t, w))
             else:
                 worker.sig_download_finished.emit(url, path)
+                worker.sig_finished.emit(worker, path, None)
                 self._workers.pop(url)
         elif url in self._get_requests:
             data = reply.readAll()
@@ -127,6 +129,7 @@ class _DownloadAPI(QObject):
 
         # Clean up
         worker.sig_download_finished.emit(url, path)
+        worker.sig_finished.emit(worker, path, None)
         req = self._get_requests.pop(url)
         self._old_requests.append(req)
         self._workers.pop(url)

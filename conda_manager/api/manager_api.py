@@ -57,7 +57,7 @@ class _ManagerAPI(QObject):
         self.conda_package_version = self._conda_api.package_version
 
         # These download methods return a worker
-        self.download = self._requests_download_api.download
+        self.download_requests = self._requests_download_api.download
         self.download_async = self._download_api.download
         self.download_is_valid_url = self._requests_download_api.is_valid_url
         self.download_teminate = self._requests_download_api.terminate
@@ -133,7 +133,7 @@ class _ManagerAPI(QObject):
             path = self._repo_url_to_path(repo)
             self._files_downloaded.append(path)
             self._repodata_files.append(path)
-            worker = self.download(repo, path)
+            worker = self.download_requests(repo, path)
             worker.url = repo
             worker.path = path
             worker.sig_finished.connect(self._repodata_downloaded)
@@ -199,7 +199,7 @@ class _ManagerAPI(QObject):
 
         metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
-        worker = self.download(metadata_url, filepath)
+        worker = self.download_requests(metadata_url, filepath)
         return worker
 
 

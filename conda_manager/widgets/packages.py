@@ -197,8 +197,9 @@ class CondaPackagesWidget(QWidget):
         self.api.set_data_directory(self.data_directory)
         self._load_bundled_metadata()
         self.update_actions(0)
+
         if setup:
-            self.set_environment(name=name, prefix=prefix)
+            self.set_environment(name=name, prefix=prefix, update=False)
             self.setup()
 
     # --- Helpers/Callbacks
@@ -261,7 +262,7 @@ class CondaPackagesWidget(QWidget):
         worker.paths = paths
         worker.sig_finished.connect(self._prepare_model_data)
 
-    def _metadata_updated(self, url, path):
+    def _metadata_updated(self, worker, path, error):
         """
         """
         with open(path, 'r') as f:
@@ -548,11 +549,13 @@ class CondaPackagesWidget(QWidget):
 
         Downloads repodata, loads repodata, prepares and updates model data.
         """
-        logger.debug('')
+        if self.busy:
+            return
 
+        logger.debug('')
         self.update_status('Updating package index', True)
         worker = self.api.update_metadata()
-        worker.sig_download_finished.connect(self._metadata_updated)
+        worker.sig_finished.connect(self._metadata_updated)
 
     def prepare_model_data(self, packages, apps):
         """
@@ -656,12 +659,9 @@ class CondaPackagesWidget(QWidget):
         """ """
         self.table.filter_status_changed(value)
 
-    def set_environment(self, name=None, prefix=None, update=True):
+    def set_environment(self, name=None, prefix=None):
         """ """
-        logger.debug(str((name, prefix, update)))
-
-#        if name and prefix:
-#            raise Exception('#TODO:')
+        logger.debug(str((name, prefix)))
 
         if prefix and self.api.conda_environment_exists(prefix=prefix):
             self.prefix = prefix
@@ -669,11 +669,6 @@ class CondaPackagesWidget(QWidget):
             self.prefix = self.get_prefix_envname(name)
         else:
             self.prefix = self.root_prefix
-
-        self.setup()
-#        # Reset environent to reflect this environment in the package model
-#        if update:
-#            self.setup_packages()
 
     def get_environment_prefix(self):
         """

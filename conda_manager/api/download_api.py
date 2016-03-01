@@ -187,9 +187,12 @@ class RequestsDownloadWorker(QObject):
         try:
             output = self.method(*self.args, **self.kwargs)
         except Exception as error:
-            pass
+            logger.debug(str((self.method.__name__,
+                              self.method.__module__,
+                              error)))
 
         self.sig_finished.emit(self, output, error)
+#        print('emited', self.method.__name__)
         self._is_finished = True
 
 
@@ -278,7 +281,7 @@ class _RequestsDownloadAPI(QObject):
 
             # Check if existing file matches size of requested file
             if file_size == total_size:
-                self.sig_download_finished.emit(url, path)
+                self._sig_download_finished.emit(url, path)
                 return path
 
         # File not found or file size did not match. Download file.

@@ -102,7 +102,8 @@ class _ManagerAPI(QObject):
     def _repos_checked(self, worker, output, error):
         """
         """
-        self._checking_repos.remove(worker.repo)
+        if worker.repo in self._checking_repos:
+            self._checking_repos.remove(worker.repo)
 
         if output:
             self._valid_repos.append(worker.repo)
@@ -125,22 +126,26 @@ class _ManagerAPI(QObject):
         """
         self._files_downloaded = []
         self._repodata_files = []
+        self.__counter = -1
 
         for repo in checked_repos:
             path = self._repo_url_to_path(repo)
             self._files_downloaded.append(path)
             self._repodata_files.append(path)
-            worker = self.download_async(repo, path)
-            worker.sig_download_finished.connect(self._repodata_downloaded)
+            worker = self.download(repo, path)
+            worker.url = repo
+            worker.path = path
+            worker.sig_finished.connect(self._repodata_downloaded)
 
-    def _repodata_downloaded(self, url, path):
+    def _repodata_downloaded(self, worker, output, error):
         """
         """
-        if path in self._files_downloaded:
-            self._files_downloaded.remove(path)
+        if worker.path in self._files_downloaded:
+            self._files_downloaded.remove(worker.path)
 
         if len(self._files_downloaded) == 0:
-            self.sig_repodata_updated.emit(self._repodata_files)
+            print(self._repodata_files)
+            self.sig_repodata_updated.emit(list(set(self._repodata_files)))
 
     # --- Public API
     # -------------------------------------------------------------------------
@@ -181,6 +186,7 @@ class _ManagerAPI(QObject):
             channels = self.conda_get_condarc_channels()
 
         repodata_urls = self._set_repo_urls_from_channels(channels)
+        print('update repodata')
         self._check_repos(repodata_urls)
 
     def update_metadata(self):
@@ -189,12 +195,14 @@ class _ManagerAPI(QObject):
 
         Returns a download worker.
         """
+        print('update metadata')
         if self._data_directory is None:
             raise Exception('Need to call `api.set_data_directory` first.')
 
         metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
-        worker = self.download_async(metadata_url, filepath)
+#        worker = self.download_async(metadata_url, filepath)
+        worker = self.download(metadata_url, filepath)
         return worker
 
 
@@ -226,11 +234,12 @@ def test():
     from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
     api = ManagerAPI()
-    api.sig_repodata_updated.connect(repodata_updated)
+#    api.sig_repodata_updated.connect(repodata_updated)
     data_directory = tempfile.mkdtemp()
-    worker = api.update_metadata(data_directory)
-    worker.sig_download_finished.connect(download_finished)
-    api.update_repodata(data_directory)
+    api.set_data_directory(data_directory)
+#    worker = api.update_metadata()
+#    worker.sig_download_finished.connect(download_finished)
+    api.update_repodata()
     app.exec_()
 
 

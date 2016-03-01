@@ -18,6 +18,9 @@ import yaml
 # Third party imports
 from qtpy.QtCore import QByteArray, QObject, QProcess, QTimer, Signal
 
+# Local imports
+from conda_manager.utils.logs import logger
+
 
 __version__ = '1.3.0'
 
@@ -136,6 +139,8 @@ class ProcessWorker(QObject):
                                           stderr))
             elif stderr.strip() and self._pip:
                 raise PipError(cmd_list)
+        else:
+            result[-1] = ''
 
         if self._parse:
             try:
@@ -153,6 +158,10 @@ class ProcessWorker(QObject):
 
         self._result = result
         self.sig_finished.emit(self, result[0], result[-1])
+
+        if result[-1]:
+            logger.error(str(('error', result[-1])))
+
         self._fired = True
 
         return result
@@ -170,6 +179,7 @@ class ProcessWorker(QObject):
     def start(self):
         """
         """
+        # print(self._cmd_list)
         if not self._fired:
             self._process.start(self._cmd_list[0], self._cmd_list[1:])
             self._timer.start()
@@ -334,6 +344,7 @@ class _CondaAPI(QObject):
         Return all of the (named) environment (this does not include the root
         environment), as a list of absolute path to their prefixes.
         """
+        logger.debug('')
 #        return self._call_and_parse(['info', '--json'],
 #                                    callback=lambda o, e: o['envs'])
         return os.listdir(os.sep.join([self.ROOT_PREFIX, 'envs']))
@@ -358,6 +369,8 @@ class _CondaAPI(QObject):
         """
         Return the (set of canonical names) of linked packages in `prefix`.
         """
+        logger.debug(str(prefix))
+
         if not isdir(prefix):
             raise Exception('no such directory: {0}'.format(prefix))
 
@@ -381,6 +394,7 @@ class _CondaAPI(QObject):
         No guarantee is made about which keys exist.  Therefore this function
         should only be used for testing and debugging.
         """
+        logger.debug(str(''))
         return self._call_and_parse(['info', '--json'], abspath=abspath)
 
     def package_info(self, package, abspath=True):
@@ -422,6 +436,7 @@ class _CondaAPI(QObject):
         Create an environment either by name or path with a specified set of
         packages.
         """
+        logger.debug(str((prefix, pkgs, channels)))
         # TODO: Fix temporal hack
         if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
@@ -466,6 +481,8 @@ class _CondaAPI(QObject):
         Install packages into an environment either by name or path with a
         specified set of packages
         """
+        logger.debug(str((prefix, pkgs, channels)))
+
         # TODO: Fix temporal hack
         if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
@@ -521,7 +538,7 @@ class _CondaAPI(QObject):
         return self._call_and_parse(cmd_list, abspath=kwargs.get('abspath',
                                                                  True))
 
-    def remove(self, *pkgs, **kwargs):
+    def remove(self, name=None, prefix=None, pkgs=None, all_=False):
         """
         Remove a package (from an environment) by name.
 
@@ -530,31 +547,26 @@ class _CondaAPI(QObject):
             (other information)
         }
         """
+        logger.debug(str((prefix, pkgs, channels)))
+
         cmd_list = ['remove', '--json', '--quiet', '--yes']
 
-        if not pkgs and not kwargs.get('all'):
+
+        if not pkgs and not all_:
             raise TypeError("Must specify at least one package to remove, or "
                             "all=True.")
 
-        if kwargs.get('name') and kwargs.get('path'):
-            raise TypeError('conda remove: At most one of name, path allowed')
-
-        if kwargs.get('name'):
-            cmd_list.extend(['--name', kwargs.pop('name')])
-
-        if kwargs.get('path'):
-            cmd_list.extend(['--prefix', kwargs.pop('path')])
-
-        cmd_list.extend(
-            self._setup_install_commands_from_kwargs(
-                kwargs,
-                ('dry_run', 'features', 'override_channels',
-                 'no_pin', 'force', 'all')))
+        if name:
+            cmd_list.extend(['--name', name])
+        elif prefix:
+            cmd_list.extend(['--prefix', prefix])
+        else:
+            raise TypeError('must specify either an environment name or a '
+                            'path for package removal')
 
         cmd_list.extend(pkgs)
 
-        return self._call_and_parse(cmd_list,
-                                    abspath=kwargs.get('abspath', True))
+        return self._call_and_parse(cmd_list)
 
     def remove_environment(self, name=None, path=None, **kwargs):
         """
@@ -776,6 +788,8 @@ class _CondaAPI(QObject):
         Check if an environment exists by 'name' or by 'prefix'. If query is
         by 'name' only the default conda environments directory is searched.
         """
+        logger.debug(str((name, prefix)))
+
         if name and prefix:
             raise TypeError("Exactly one of 'name' or 'prefix' is required.")
 
@@ -954,6 +968,8 @@ class _CondaAPI(QObject):
         """
         Remove a pip package in given environment by `name` or `prefix`.
         """
+        logger.debug(str((prefix, pkgs)))
+
         if isinstance(pkgs, list) or isinstance(pkgs, tuple):
             pkg = ' '.join(pkgs)
         else:
@@ -1023,7 +1039,7 @@ def test():
     conda_api = CondaAPI()
     print(conda_api.get_condarc_channels())
     worker = conda_api.info()
-    worker.sig_finished.connect(ready_print)
+#    worker.sig_finished.connect(ready_print)
     worker = conda_api.info()
     worker = conda_api.info()
     worker = conda_api.info()

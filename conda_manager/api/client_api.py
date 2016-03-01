@@ -18,6 +18,7 @@ import binstar_client
 # Local imports
 from conda_manager.utils import sort_versions
 from conda_manager.utils import constants as C
+from conda_manager.utils.logs import logger
 
 
 class ClientWorker(QObject):
@@ -45,6 +46,8 @@ class ClientWorker(QObject):
         try:
             output = self.method(*self.args, **self.kwargs)
         except Exception as err:
+            logger.debug(str((self.method.__module__, self.method.__name___,
+                              err)))
             try:
                 error = err[0]
             except Exception:
@@ -235,6 +238,9 @@ class _ClientAPI(QObject):
                 type_ = C.CONDA_PACKAGE
                 status = C.NOT_INSTALLED
 
+                if version == '' and len(versions) != 0:
+                    version = versions[-1]
+
             row = {C.COL_ACTION: C.ACTION_NONE,
                    C.COL_PACKAGE_TYPE: type_,
                    C.COL_NAME: name,
@@ -250,8 +256,6 @@ class _ClientAPI(QObject):
                    C.COL_ACTION_VERSION: None
                    }
 
-#            row = [0, C.ACTION_NONE, type_, name, summary, version, status,
-#                   url, license_, False, False, False, False, None]
             data.append(row)
         return data
 
@@ -261,6 +265,7 @@ class _ClientAPI(QObject):
         """
         Login to anaconda cloud.
         """
+        logger.debug(str((username, application, application_url)))
         method = self._anaconda_client_api.authenticate
         return self._create_worker(method, username, password, application,
                                    application_url)
@@ -269,6 +274,7 @@ class _ClientAPI(QObject):
         """
         Logout from anaconda cloud.
         """
+        logger.debug('')
         method = self._anaconda_client_api.remove_authentication
         return self._create_worker(method)
 
@@ -279,6 +285,7 @@ class _ClientAPI(QObject):
         and additional metadata and merge into a single set of packages and
         apps.
         """
+        logger.debug(str((filepaths)))
         method = self._load_repodata
         return self._create_worker(method, filepaths, extra_data=extra_data,
                                    metadata=metadata)
@@ -286,12 +293,14 @@ class _ClientAPI(QObject):
     def prepare_model_data(self, packages, linked, pip):
         """
         """
+        logger.debug('')
         method = self._prepare_model_data
         return self._create_worker(method, packages, linked, pip)
 
     def set_domain(self, domain, token=None):
         """
         """
+        logger.debug(str((domain)))
         self._anaconda_client_api = binstar_client.Binstar(token=token,
                                                            domain=domain)
 

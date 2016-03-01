@@ -80,20 +80,19 @@ class CondaPackagesModel(QAbstractTableModel):
         # Carefull here with the order, this has to be adjusted manually
         # For look purposes the first column is empty
         if self._rows[row] == row:
-#            [__, action, type_, name, description, version, status, url, license_, i, r, u, d, action_version] = [0, C.ACTION_NONE, u'', u'', '-', -1, u'', u'', False, False, False, False, None]
             action = C.ACTION_NONE
             type_ = u''
             name = u''
             description = u''
             version = u'-'
             status = -1
-            url = u''
-            license_ = u''
+            # url = u''
+            # license_ = u''
             i = False
             r = False
             u = False
             d = False
-            action_version = None
+            # action_version = None
         else:
             action = self._rows[row][C.COL_ACTION]
             type_ = self._rows[row][C.COL_PACKAGE_TYPE]
@@ -101,14 +100,13 @@ class CondaPackagesModel(QAbstractTableModel):
             description = self._rows[row][C.COL_DESCRIPTION]
             version = self._rows[row][C.COL_VERSION]
             status = self._rows[row][C.COL_STATUS]
-            url = self._rows[row][C.COL_URL]
-            license_ = self._rows[row][C.COL_LICENSE]
+            # url = self._rows[row][C.COL_URL]
+            # license_ = self._rows[row][C.COL_LICENSE]
             i = self._rows[row][C.COL_INSTALL]
             r = self._rows[row][C.COL_REMOVE]
             u = self._rows[row][C.COL_UPGRADE]
             d = self._rows[row][C.COL_DOWNGRADE]
-            action_version = self._rows[row][C.COL_ACTION_VERSION]
-#            [__, action, type_, name, description, version, status, url, license_, i, r, u, d, action_version] = self._rows[row]
+            # action_version = self._rows[row][C.COL_ACTION_VERSION]
 
         if self.is_upgradable(self.index(row, C.COL_VERSION)):
             version += C.UPGRADE_SYMBOL
@@ -379,10 +377,15 @@ class CondaPackagesModel(QAbstractTableModel):
             name = self._rows[i][C.COL_NAME]
             type_ = self._rows[i][C.COL_PACKAGE_TYPE]
             action_version = self._rows[i][C.COL_ACTION_VERSION]
+            current_version = self.get_package_version(name)
+
             if action != C.ACTION_NONE:
-                if action_version:
-                    name = '{0}={1}'.format(name, action_version)
-                dic[type_][action].append(name)
+                version_from = current_version
+                version_to = action_version
+                dic[type_][action].append({'name': name,
+                                           'version_from': version_from,
+                                           'version_to': version_to,
+                                           })
         return dic
 
     def get_package_versions(self, name):

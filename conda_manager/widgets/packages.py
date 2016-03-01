@@ -29,6 +29,7 @@ from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
 from conda_manager.api import ManagerAPI
 from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
+from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
 from conda_manager.widgets.search import SearchLineEdit
 from conda_manager.widgets.table import CondaPackagesTable
@@ -276,6 +277,8 @@ class CondaPackagesWidget(QWidget):
     def _handle_multiple_actions(self):
         """
         """
+        logger.debug('')
+
         prefix = self.prefix
 
         if prefix == self.root_prefix:
@@ -545,6 +548,8 @@ class CondaPackagesWidget(QWidget):
 
         Downloads repodata, loads repodata, prepares and updates model data.
         """
+        logger.debug('')
+
         self.update_status('Updating package index', True)
         worker = self.api.update_metadata()
         worker.sig_download_finished.connect(self._metadata_updated)
@@ -552,6 +557,7 @@ class CondaPackagesWidget(QWidget):
     def prepare_model_data(self, packages, apps):
         """
         """
+        logger.debug('')
         self._prepare_model_data(output=(packages, apps))
 
     def update_status(self, message=None, hide=True, progress=None,
@@ -628,6 +634,8 @@ class CondaPackagesWidget(QWidget):
     def update_channels(self, channels, active_channels):
         """
         """
+        logger.debug(str(channels, active_channels))
+
         if sorted(self._active_channels) != sorted(active_channels) or \
                 sorted(self._channels) != sorted(channels):
             self._channels = channels
@@ -650,6 +658,8 @@ class CondaPackagesWidget(QWidget):
 
     def set_environment(self, name=None, prefix=None, update=True):
         """ """
+        logger.debug(str((name, prefix, update)))
+
 #        if name and prefix:
 #            raise Exception('#TODO:')
 
@@ -723,6 +733,7 @@ class CondaPackagesWidget(QWidget):
         """
         Allow user to cancel an ongoing process.
         """
+        logger.debug(str('process canceled by user.'))
         if self.busy:
             answer = QMessageBox.question(
                 self,

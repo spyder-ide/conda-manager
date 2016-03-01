@@ -14,6 +14,8 @@ from qtpy.QtCore import QObject, QTimer, QThread, QUrl, Signal, QByteArray
 from qtpy.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import requests
 
+# Local imports
+from conda_manager.utils.logs import logger
 
 PY2 = sys.version[0] == '2'
 PY3 = sys.version[0] == '3'
@@ -139,6 +141,7 @@ class _DownloadAPI(QObject):
     def download(self, url, path):
         """
         """
+        logger.debug(str((url, path)))
         worker = DownloadWorker(url, path)
         if url in self._workers:
             return worker
@@ -264,8 +267,8 @@ class _RequestsDownloadAPI(QObject):
         # Start actual download
         try:
             r = requests.get(url, stream=True)
-        except Exception:
-            return
+        except Exception as error:
+            logger.error(str(error))
 
         total_size = int(r.headers.get('Content-Length', 0))
 
@@ -296,16 +299,19 @@ class _RequestsDownloadAPI(QObject):
         try:
             r = requests.head(url)
             value = r.status_code in [200]
-        except Exception:
+        except Exception as error:
+            logger.error(str(error))
             value = False
 
         return value
 
     def download(self, url, path=None, force=False):
+        logger.debug(str((url, path, force)))
         method = self._download
         return self._create_worker(method, url, path=path, force=force)
 
     def is_valid_url(self, url):
+        logger.debug(str((url)))
         method = self._is_valid_url
         return self._create_worker(method, url)
 

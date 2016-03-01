@@ -788,7 +788,7 @@ class _CondaAPI(QObject):
         Check if an environment exists by 'name' or by 'prefix'. If query is
         by 'name' only the default conda environments directory is searched.
         """
-        logger.debug(str((prefix)))
+        logger.debug(str((name, prefix)))
 
         if name and prefix:
             raise TypeError("Exactly one of 'name' or 'prefix' is required.")

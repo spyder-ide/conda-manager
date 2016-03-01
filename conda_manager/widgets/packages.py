@@ -101,7 +101,7 @@ class CondaPackagesWidget(QWidget):
 
         # Widgets
         self.bbox = QDialogButtonBox(Qt.Horizontal)
-        self.button_cancel = QPushButton('')
+        self.button_cancel = QPushButton('Cancel')
         self.button_channels = QPushButton(_('Channels'))
         self.button_ok = QPushButton(_('Ok'))
         self.button_update = QPushButton(_('Update package index'))
@@ -119,13 +119,14 @@ class CondaPackagesWidget(QWidget):
         # Widgets setup
         max_height = self.status_bar.fontMetrics().height()
         max_width = self.textbox_search.fontMetrics().width('M'*23)
+        cancel_width = self.button_cancel.fontMetrics().width('Cancel')*2
         self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
         self.button_ok.setAutoDefault(True)
         self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
         self.button_ok.setVisible(False)
         self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
-        self.button_cancel.setFixedWidth(max_height*2)
+        self.button_cancel.setFixedWidth(cancel_width)
         self.button_channels.setCheckable(True)
         self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
         self.combobox_filter.setMinimumWidth(120)
@@ -284,7 +285,7 @@ class CondaPackagesWidget(QWidget):
 
         if prefix == self.root_prefix:
             name = 'root'
-        elif self.api.environment_exists(prefix=prefix):
+        elif self.api.conda_environment_exists(prefix=prefix):
             name = osp.basename(prefix)
         else:
             name = prefix
@@ -737,9 +738,9 @@ class CondaPackagesWidget(QWidget):
                 buttons=QMessageBox.Yes | QMessageBox.No)
 
             if answer == QMessageBox.Yes:
+                self.update_status(hide=False, message='Process cancelled')
                 self.api.conda_terminate()
                 self.api.download_terminate()
-                self.update_status(hide=False, message='Process cancelled')
         else:
             QDialog.reject(self)
 

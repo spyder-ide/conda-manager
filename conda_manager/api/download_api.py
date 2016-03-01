@@ -313,7 +313,7 @@ class _RequestsDownloadAPI(QObject):
         method = self._download
         return self._create_worker(method, url, path=path, force=force)
 
-    def download_terminate(self):
+    def terminate(self):
         for t in self._threads:
             t.kill()
         self._thread = []

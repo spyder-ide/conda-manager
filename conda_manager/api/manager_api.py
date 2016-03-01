@@ -60,6 +60,7 @@ class _ManagerAPI(QObject):
         self.download = self._requests_download_api.download
         self.download_async = self._download_api.download
         self.download_is_valid_url = self._requests_download_api.is_valid_url
+        self.download_teminate = self._requests_download_api.terminate
 
         # These client methods return a worker
         self.client_login = self._client_api.login
@@ -144,7 +145,6 @@ class _ManagerAPI(QObject):
             self._files_downloaded.remove(worker.path)
 
         if len(self._files_downloaded) == 0:
-            print(self._repodata_files)
             self.sig_repodata_updated.emit(list(set(self._repodata_files)))
 
     # --- Public API
@@ -186,7 +186,6 @@ class _ManagerAPI(QObject):
             channels = self.conda_get_condarc_channels()
 
         repodata_urls = self._set_repo_urls_from_channels(channels)
-        print('update repodata')
         self._check_repos(repodata_urls)
 
     def update_metadata(self):
@@ -195,13 +194,11 @@ class _ManagerAPI(QObject):
 
         Returns a download worker.
         """
-        print('update metadata')
         if self._data_directory is None:
             raise Exception('Need to call `api.set_data_directory` first.')
 
         metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
-#        worker = self.download_async(metadata_url, filepath)
         worker = self.download(metadata_url, filepath)
         return worker
 

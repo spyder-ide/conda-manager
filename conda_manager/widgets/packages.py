@@ -634,7 +634,7 @@ class CondaPackagesWidget(QWidget):
     def update_channels(self, channels, active_channels):
         """
         """
-        logger.debug(str(channels, active_channels))
+        logger.debug(str((channels, active_channels)))
 
         if sorted(self._active_channels) != sorted(active_channels) or \
                 sorted(self._channels) != sorted(channels):

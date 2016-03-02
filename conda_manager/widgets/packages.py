@@ -372,8 +372,10 @@ class CondaPackagesWidget(QWidget):
                           '</b>' + _(' on <i>') + name + '</i>')
 
                 def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(prefix=prefix,
-                                                          pkgs=pkgs)
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
                 self._multiple_process.append([status, trigger()])
 
             # Conda downgrade
@@ -385,8 +387,11 @@ class CondaPackagesWidget(QWidget):
                         conda_downgrade]
 
                 def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(prefix=prefix,
-                                                          pkgs=pkgs)
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
+
                 self._multiple_process.append([status, trigger()])
 
             # Conda update
@@ -398,8 +403,11 @@ class CondaPackagesWidget(QWidget):
                         conda_upgrade]
 
                 def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(prefix=prefix,
-                                                          pkgs=pkgs)
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
+
                 self._multiple_process.append([status, trigger()])
 
             self._multiple_process

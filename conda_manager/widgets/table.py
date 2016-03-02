@@ -233,22 +233,25 @@ class CondaPackagesTable(QTableView):
         """Override Qt method"""
         w = self.width()
         width_start = 20
+        width_end = width_start
 
         if self._advanced_mode:
-            action_cols = [const.ACTION_COLUMNS[-1], 0]
+            action_cols = [const.COL_ACTION]
         else:
-            action_cols = const.ACTION_COLUMNS[:-1]
+            action_cols = [const.COL_UPGRADE, const.COL_INSTALL,
+                           const.COL_REMOVE, const.COL_DOWNGRADE]
 
         self.setColumnWidth(const.COL_START, width_start)
         self.setColumnWidth(const.COL_PACKAGE_TYPE, self.WIDTH_TYPE)
         self.setColumnWidth(const.COL_NAME, self.WIDTH_NAME)
         self.setColumnWidth(const.COL_VERSION, self.WIDTH_VERSION)
-        w_new = w - (width_start + self.WIDTH_TYPE + self.WIDTH_NAME +
-                     self.WIDTH_VERSION +
-                     (len(action_cols) + 1)*self.WIDTH_ACTIONS)
+        w_new = w - (width_start + self.WIDTH_ACTIONS + self.WIDTH_TYPE +
+                     self.WIDTH_NAME + self.WIDTH_VERSION +
+                     (len(action_cols))*self.WIDTH_ACTIONS + width_end)
         self.setColumnWidth(const.COL_DESCRIPTION, w_new)
+        self.setColumnWidth(const.COL_END, width_end)
 
-        for col in const.ACTION_COLUMNS:
+        for col in action_cols:
             self.setColumnWidth(col, self.WIDTH_ACTIONS)
         QTableView.resizeEvent(self, event)
         self.resize_rows()
@@ -278,10 +281,11 @@ class CondaPackagesTable(QTableView):
             pos = QPoint(event.x(), event.y())
             index = self.indexAt(pos)
             self.action_pressed(index)
-            if column == const.COL_ACTION:
+            if column != const.COL_DESCRIPTION:
                 self.context_menu_requested(event)
         elif event.button() == Qt.RightButton:
-            self.context_menu_requested(event)
+            if column == const.COL_DESCRIPTION:
+                self.context_menu_requested(event)
 
     def mouseReleaseEvent(self, event):
         """Override Qt method"""
@@ -381,7 +385,7 @@ class CondaPackagesTable(QTableView):
         versions = self.source_model.get_package_versions(name)
         current_version = self.source_model.get_package_version(name)
 
-        if column == const.COL_ACTION:
+        if column in [const.COL_ACTION, const.COL_VERSION, const.COL_NAME]:
             is_installable = self.source_model.is_installable(model_index)
             is_removable = self.source_model.is_removable(model_index)
             is_upgradable = self.source_model.is_upgradable(model_index)

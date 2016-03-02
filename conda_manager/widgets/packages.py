@@ -114,7 +114,7 @@ class CondaPackagesWidget(QWidget):
         self.textbox_search = SearchLineEdit(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
-                        self.button_ok]
+                        self.button_ok, self.button_apply, self.button_clear]
 
         # Widgets setup
         max_height = self.status_bar.fontMetrics().height()
@@ -421,6 +421,7 @@ class CondaPackagesWidget(QWidget):
             self.update_status(status)
             worker = func()
             worker.sig_finished.connect(self._run_multiple_actions)
+            worker.sig_partial.connect(self._partial_output_ready)
         else:
             self.update_status('', hide=False)
             self.setup()
@@ -451,6 +452,28 @@ class CondaPackagesWidget(QWidget):
             self.sig_environment_created.emit()
 
         self.setup()
+
+    def _partial_output_ready(self, worker, output, error):
+        """
+        """
+        message = None
+        progress = (0, 0)
+
+        if isinstance(output, dict):
+            progress = (output.get('progress', None),
+                        output.get('maxval', None))
+            name = output.get('name', None)
+            fetch = output.get('fetch', None)
+
+            if fetch:
+                message = "Downloading <b>{0}</b>...".format(fetch)
+
+            if name:
+                self._current_action_name = name
+                message = "Linking <b>{0}</b>...".format(name)
+
+        logger.debug(message)
+        self.update_status(message, progress=progress)
 
     def _run_pip_action(self, package_name, action):
         """
@@ -607,13 +630,21 @@ class CondaPackagesWidget(QWidget):
                 )
         self.status_bar.setText(self.message)
 
-#        if progress is not None:
-#            self.progress_bar.setMinimum(0)
-#            self.progress_bar.setMaximum(progress[1])
-#            self.progress_bar.setValue(progress[0])
-#        else:
-        self.progress_bar.setMinimum(0)
-        self.progress_bar.setMaximum(0)
+        if progress is not None:
+            current_progress, max_progress = 0, 0
+
+            if progress[1]:
+                max_progress = progress[1]
+
+            if progress[0]:
+                current_progress = progress[0]
+
+            self.progress_bar.setMinimum(0)
+            self.progress_bar.setMaximum(max_progress)
+            self.progress_bar.setValue(current_progress)
+        else:
+            self.progress_bar.setMinimum(0)
+            self.progress_bar.setMaximum(0)
 
     def show_channels_dialog(self):
         """

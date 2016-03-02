@@ -575,10 +575,9 @@ class _CondaAPI(QObject):
             (other information)
         }
         """
-        logger.debug(str((prefix, pkgs, channels)))
+        logger.debug(str((prefix, pkgs)))
 
         cmd_list = ['remove', '--json', '--quiet', '--yes']
-
 
         if not pkgs and not all_:
             raise TypeError("Must specify at least one package to remove, or "

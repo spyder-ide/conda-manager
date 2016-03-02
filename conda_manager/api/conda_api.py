@@ -87,6 +87,7 @@ class ProcessWorker(QObject):
     """
     """
     sig_finished = Signal(object, object, object)
+    sig_partial = Signal(object, object, object)
 
     def __init__(self, cmd_list, parse=False, pip=False, callback=None):
         super(ProcessWorker, self).__init__()
@@ -98,6 +99,7 @@ class ProcessWorker(QObject):
         self._callback = callback
         self._fired = False
         self._communicate_first = False
+        self._partial_stdout = None
 
         self._timer = QTimer()
         self._process = QProcess()
@@ -106,6 +108,24 @@ class ProcessWorker(QObject):
 
         self._timer.timeout.connect(self._communicate)
         self._process.finished.connect(self._communicate)
+        self._process.readyReadStandardOutput.connect(self._partial)
+
+    def _partial(self):
+        raw_stdout = self._process.readAllStandardOutput()
+        stdout = handle_qbytearray(raw_stdout, _CondaAPI.UTF8)
+
+        json_stdout = stdout.replace('\n\x00', '')
+        try:
+            json_stdout = json.loads(json_stdout)
+        except Exception:
+            json_stdout = stdout
+
+        if self._partial_stdout is None:
+            self._partial_stdout = stdout
+        else:
+            self._partial_stdout += stdout
+
+        self.sig_partial.emit(self, json_stdout, None)
 
     def _communicate(self):
         """
@@ -121,10 +141,14 @@ class ProcessWorker(QObject):
         """
         self._communicate_first = True
         self._process.waitForFinished()
-        raw_stdout = self._process.readAllStandardOutput()
-        raw_stderr = self._process.readAllStandardError()
 
-        stdout = handle_qbytearray(raw_stdout, _CondaAPI.UTF8)
+        if self._partial_stdout is None:
+            raw_stdout = self._process.readAllStandardOutput()
+            stdout = handle_qbytearray(raw_stdout, _CondaAPI.UTF8)
+        else:
+            stdout = self._partial_stdout
+
+        raw_stderr = self._process.readAllStandardError()
         stderr = handle_qbytearray(raw_stderr, _CondaAPI.UTF8)
         result = [stdout.encode(_CondaAPI.UTF8), stderr.encode(_CondaAPI.UTF8)]
 
@@ -179,8 +203,10 @@ class ProcessWorker(QObject):
     def start(self):
         """
         """
-        # print(self._cmd_list)
+        logger.debug(str(' '.join(self._cmd_list)))
+
         if not self._fired:
+            self._partial_ouput = None
             self._process.start(self._cmd_list[0], self._cmd_list[1:])
             self._timer.start()
         else:
@@ -437,6 +463,7 @@ class _CondaAPI(QObject):
         packages.
         """
         logger.debug(str((prefix, pkgs, channels)))
+
         # TODO: Fix temporal hack
         if not pkgs or not isinstance(pkgs, (list, tuple, str)):
             raise TypeError('must specify a list of one or more packages to '
@@ -445,7 +472,8 @@ class _CondaAPI(QObject):
         cmd_list = ['create', '--yes', '--quiet', '--json', '--mkdir']
         if name:
             ref = name
-            search = [os.path.join(d, name) for d in self.info()['envs_dirs']]
+            search = [os.path.join(d, name) for d in
+                      self.info().communicate()['envs_dirs']]
             cmd_list = ['create', '--yes', '--quiet', '--name', name]
         elif prefix:
             ref = prefix
@@ -547,10 +575,9 @@ class _CondaAPI(QObject):
             (other information)
         }
         """
-        logger.debug(str((prefix, pkgs, channels)))
+        logger.debug(str((prefix, pkgs)))
 
         cmd_list = ['remove', '--json', '--quiet', '--yes']
-
 
         if not pkgs and not all_:
             raise TypeError("Must specify at least one package to remove, or "

@@ -66,8 +66,13 @@ class CondaPackagesModel(QAbstractTableModel):
 
     def flags(self, index):
         """Override Qt method"""
+        column = index.column()
+
         if index.isValid():
-            return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            if column in [C.COL_START, C.COL_END]:
+                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            else:
+                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
     def data(self, index, role=Qt.DisplayRole):
         """Override Qt method"""

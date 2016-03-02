@@ -15,7 +15,7 @@
    version="1.1"
    inkscape:version="0.48.4 r9939"
    sodipodi:docname="icons-template.svg"
-   inkscape:export-filename="/home/goanpeca/Dropbox/it/repos/git/conda-manager/conda_manager/data/images/conda_action_downgrade.png"
+   inkscape:export-filename="/home/goanpeca/Dropbox/it/repos/git/conda-manager/conda_manager/data/images/conda_action_installed.png"
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90">
   <defs
@@ -48,7 +48,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -69,7 +69,7 @@
        inkscape:export-xdpi="90"
        inkscape:export-ydpi="90" />
     <rect
-       style="fill:#f9f9f9;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-miterlimit:1;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:4;stroke-miterlimit:1;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0"
        id="rect3116-7-4"
        width="44"
        height="44"

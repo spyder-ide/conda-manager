@@ -139,7 +139,8 @@ class _ClientAPI(QObject):
 
                 try:
                     data = json.loads(data)
-                except Exception:
+                except Exception as error:
+                    logger.error(str(error))
                     data = {}
 
                 repodata.append(data)

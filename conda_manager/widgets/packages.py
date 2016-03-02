@@ -87,6 +87,7 @@ class CondaPackagesWidget(QWidget):
         self.data_directory = data_directory
         self.conda_url = conda_url
         self.conda_api_url = conda_api_url
+        self._current_action_name = ''
         self.name = name
         self.prefix = prefix
         self.root_prefix = self.api.ROOT_PREFIX
@@ -864,8 +865,7 @@ def test_dialog():
     from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
     dialog = CondaPackagesDialog(name='root')
-    dialog.exec_()
-    sys.exit(app.exec_())
+    sys.exit(dialog.exec_())
 
 
 if __name__ == '__main__':

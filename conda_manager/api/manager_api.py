@@ -41,6 +41,7 @@ class _ManagerAPI(QObject):
 
         # Expose some methods for convenient access. Methods return a worker
         self.conda_create = self._conda_api.create
+        self.conda_clone = self._conda_api.clone_environment
         self.conda_dependencies = self._conda_api.dependencies
         self.conda_get_condarc_channels = self._conda_api.get_condarc_channels
         self.conda_install = self._conda_api.install
@@ -60,7 +61,7 @@ class _ManagerAPI(QObject):
         self.download_requests = self._requests_download_api.download
         self.download_async = self._download_api.download
         self.download_is_valid_url = self._requests_download_api.is_valid_url
-        self.download_teminate = self._requests_download_api.terminate
+        self.download_terminate = self._requests_download_api.terminate
 
         # These client methods return a worker
         self.client_login = self._client_api.login

@@ -17,24 +17,25 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtWidgets import (QDialog, QHBoxLayout, QListWidget, QListWidgetItem,
-                            QPushButton, QVBoxLayout)
+from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
+                            QListWidgetItem, QPushButton, QVBoxLayout)
 
 # Local imports
 from conda_manager.api import ManagerAPI
+from conda_manager.widgets import ButtonCancel
 import qtawesome as qta
 
 _ = gettext.gettext
 
 
-class ChannelsDialog(QDialog):
+class DialogChannels(QDialog):
     """
     A dialog to add delete and select active channels to search for packages.
     """
     sig_channels_updated = Signal(object, object)  # channels, active_channels
 
     def __init__(self, parent=None, channels=None, active_channels=None,
-                 conda_url=None):
+                 conda_url=None, flat=True):
 
         # Check arguments: active channels, must be within channels
         for channel in active_channels:
@@ -42,7 +43,7 @@ class ChannelsDialog(QDialog):
                 raise Exception("'active_channels' must be also within "
                                 "'channels'")
 
-        super(ChannelsDialog, self).__init__(parent)
+        super(DialogChannels, self).__init__(parent)
         self._parent = parent
         self._channels = channels
         self._active_channels = active_channels
@@ -54,7 +55,7 @@ class ChannelsDialog(QDialog):
         # Widgets
         self.list = QListWidget(self)
         self.button_add = QPushButton('')
-        self.button_delete = QPushButton('')
+        self.button_delete = ButtonCancel('')
         self.button_ok = QPushButton(_('Update channels'))
 
         # Widget setup
@@ -64,10 +65,6 @@ class ChannelsDialog(QDialog):
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setWindowOpacity(0.96)
         self.setModal(False)
-        self.setStyleSheet("""ChannelsDialog {border-style: outset;
-                                              border-width: 1px;
-                                              border-color: beige;
-                                              border-radius: 4px;}""")
 
         # Layout
         layout = QVBoxLayout()
@@ -95,6 +92,10 @@ class ChannelsDialog(QDialog):
 
         self.list.itemChanged.connect(self.edit_channel)
         self.button_add.setFocus()
+
+        if flat:
+            self.list.setFrameStyle(QFrame.NoFrame)
+            self.list.setFrameShape(QFrame.NoFrame)
 
     def _height(self):
         """
@@ -138,6 +139,10 @@ class ChannelsDialog(QDialog):
 
     # --- Public API
     # -------------------------------------------------------------------------
+    def update_style_sheet(self, style_sheet=None):
+        if style_sheet:
+            self.setStyleSheet(style_sheet)
+
     def setup(self):
         for channel in sorted(self._channels):
             item = QListWidgetItem(channel, self.list)
@@ -238,7 +243,7 @@ class ChannelsDialog(QDialog):
 def test_widget():
     from spyderlib.utils.qthelpers import qapplication
     app = qapplication()
-    widget = ChannelsDialog(
+    widget = DialogChannels(
         None,
         ['http://repo.continuum.io/free', 'https://conda.anaconda.org/malev'],
         ['https://conda.anaconda.org/malev'],

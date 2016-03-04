@@ -46,7 +46,7 @@ class ClientWorker(QObject):
         try:
             output = self.method(*self.args, **self.kwargs)
         except Exception as err:
-            logger.debug(str((self.method.__module__, self.method.__name___,
+            logger.debug(str((self.method.__module__, self.method.__name__,
                               err)))
             try:
                 error = err[0]
@@ -64,9 +64,9 @@ class _ClientAPI(QObject):
     def __init__(self):
         super(QObject, self).__init__()
         self._anaconda_client_api = binstar_client.Binstar(
-            token=None,
-            domain='https://api.anaconda.org')
-
+            token=None, domain='https://api.anaconda.org')
+#        self._anaconda_client_api = binstar_client.utils.get_server_api(
+#            token=None, site='https://api.anaconda.org')
         self._queue = deque()
         self._threads = []
         self._workers = []
@@ -302,8 +302,8 @@ class _ClientAPI(QObject):
         """
         """
         logger.debug(str((domain)))
-        self._anaconda_client_api = binstar_client.Binstar(token=token,
-                                                           domain=domain)
+#        self._anaconda_client_api = binstar_client.utils.get_server_api(
+#            token=token, site='default')
 
 
 CLIENT_API = None

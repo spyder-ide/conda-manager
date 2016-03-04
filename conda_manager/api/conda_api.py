@@ -373,13 +373,16 @@ class _CondaAPI(QObject):
         logger.debug('')
 #        return self._call_and_parse(['info', '--json'],
 #                                    callback=lambda o, e: o['envs'])
-        return os.listdir(os.sep.join([self.ROOT_PREFIX, 'envs']))
+        envs = os.listdir(os.sep.join([self.ROOT_PREFIX, 'envs']))
+        envs = [os.sep.join([self.ROOT_PREFIX, 'envs', i]) for i in envs]
+        return envs
 
     def get_prefix_envname(self, name):
         """
         Given the name of an environment return its full prefix path, or None
         if it cannot be found.
         """
+        prefix = None
         if name == 'root':
             prefix = self.ROOT_PREFIX
 
@@ -473,7 +476,7 @@ class _CondaAPI(QObject):
         if name:
             ref = name
             search = [os.path.join(d, name) for d in
-                      self.info().communicate()['envs_dirs']]
+                      self.info().communicate()[0]['envs_dirs']]
             cmd_list = ['create', '--yes', '--quiet', '--name', name]
         elif prefix:
             ref = prefix
@@ -591,7 +594,10 @@ class _CondaAPI(QObject):
             raise TypeError('must specify either an environment name or a '
                             'path for package removal')
 
-        cmd_list.extend(pkgs)
+        if all_:
+            cmd_list.extend(['--all'])
+        else:
+            cmd_list.extend(pkgs)
 
         return self._call_and_parse(cmd_list)
 
@@ -603,21 +609,21 @@ class _CondaAPI(QObject):
         """
         return self.remove(name=name, path=path, all=True, **kwargs)
 
-    def clone_environment(self, clone, name=None, path=None, **kwargs):
+    def clone_environment(self, clone, name=None, prefix=None, **kwargs):
         """
-        Clone the environment ``clone`` into ``name`` or ``path``.
+        Clone the environment `clone` into `name` or `prefix`.
         """
         cmd_list = ['create', '--json', '--quiet']
 
-        if (name and path) or not (name or path):
-            raise TypeError("conda clone_environment: exactly one of name or "
-                            "path required")
+        if (name and prefix) or not (name or prefix):
+            raise TypeError("conda clone_environment: exactly one of `name` "
+                            "or `path` required")
 
         if name:
             cmd_list.extend(['--name', name])
 
-        if path:
-            cmd_list.extend(['--prefix', path])
+        if prefix:
+            cmd_list.extend(['--prefix', prefix])
 
         cmd_list.extend(['--clone', clone])
 
@@ -822,6 +828,9 @@ class _CondaAPI(QObject):
 
         if name:
             prefix = self.get_prefix_envname(name)
+
+        if prefix is None:
+            prefix = self.ROOT_PREFIX
 
         return os.path.isdir(os.path.join(prefix, 'conda-meta'))
 

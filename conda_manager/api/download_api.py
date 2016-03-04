@@ -318,7 +318,7 @@ class _RequestsDownloadAPI(QObject):
 
     def terminate(self):
         for t in self._threads:
-            t.kill()
+            t.quit()
         self._thread = []
         self._workers = []
 

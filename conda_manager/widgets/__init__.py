@@ -8,3 +8,13 @@
 """
 
 """
+
+from qtpy.QtWidgets import QFrame, QLabel, QPushButton
+
+
+class ButtonCancel(QPushButton):
+    pass
+
+
+class LabelStatus(QLabel):
+    pass

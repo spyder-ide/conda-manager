@@ -300,6 +300,10 @@ class CondaPackagesWidget(QWidget):
             name = prefix
 
         actions = self.table.get_actions()
+
+        if actions is None:
+            return
+
         self._multiple_process = deque()
 
         pip_actions = actions[C.PIP_PACKAGE]

@@ -56,6 +56,7 @@ class _ManagerAPI(QObject):
         self.conda_linked = self._conda_api.linked
         self.conda_get_prefix_envname = self._conda_api.get_prefix_envname
         self.conda_package_version = self._conda_api.package_version
+        self.conda_platform = self._conda_api.get_platform
 
         # These download methods return a worker
         self.download_requests = self._requests_download_api.download

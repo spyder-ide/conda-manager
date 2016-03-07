@@ -726,7 +726,6 @@ class CondaPackagesWidget(QWidget):
             self.prefix = self.get_prefix_envname(name)
         else:
             self.prefix = self.root_prefix
-        print(name, self.prefix, self.api.conda_environment_exists(name=name))
 
     def get_environment_prefix(self):
         """

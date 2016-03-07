@@ -300,6 +300,10 @@ class CondaPackagesWidget(QWidget):
             name = prefix
 
         actions = self.table.get_actions()
+
+        if actions is None:
+            return
+
         self._multiple_process = deque()
 
         pip_actions = actions[C.PIP_PACKAGE]
@@ -722,7 +726,6 @@ class CondaPackagesWidget(QWidget):
             self.prefix = self.get_prefix_envname(name)
         else:
             self.prefix = self.root_prefix
-        print(name, self.prefix, self.api.conda_environment_exists(name=name))
 
     def get_environment_prefix(self):
         """

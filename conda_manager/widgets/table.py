@@ -541,21 +541,24 @@ class CondaPackagesTable(QTableView):
             self._menu.popup(self.viewport().mapToGlobal(pos))
 
     def get_actions(self):
-        return self.source_model.get_actions()
+        if self.source_model:
+            return self.source_model.get_actions()
 
     def clear_actions(self):
-        self.source_model.clear_actions()
-        self.refresh_actions()
+        if self.source_model:
+            self.source_model.clear_actions()
+            self.refresh_actions()
 
     def refresh_actions(self):
-        actions_per_package_type = self.source_model.get_actions()
-        number_of_actions = 0
-        for type_ in actions_per_package_type:
-            actions = actions_per_package_type[type_]
-            for key in actions:
-                data = actions[key]
-                number_of_actions += len(data)
-        self.sig_actions_updated.emit(number_of_actions)
+        if self.source_model:
+            actions_per_package_type = self.source_model.get_actions()
+            number_of_actions = 0
+            for type_ in actions_per_package_type:
+                actions = actions_per_package_type[type_]
+                for key in actions:
+                    data = actions[key]
+                    number_of_actions += len(data)
+            self.sig_actions_updated.emit(number_of_actions)
 
     def open_url(self, url):
         """

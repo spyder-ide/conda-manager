@@ -375,7 +375,11 @@ class _CondaAPI(QObject):
 #                                    callback=lambda o, e: o['envs'])
         envs = os.listdir(os.sep.join([self.ROOT_PREFIX, 'envs']))
         envs = [os.sep.join([self.ROOT_PREFIX, 'envs', i]) for i in envs]
-        return envs
+
+        valid_envs = [e for e in envs if os.path.isdir(e) and
+                      self.environment_exists(prefix=e)]
+
+        return valid_envs
 
     def get_prefix_envname(self, name):
         """

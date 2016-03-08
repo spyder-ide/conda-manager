@@ -16,6 +16,7 @@ from qtpy.QtCore import QObject, QThread, QTimer, Signal
 import binstar_client
 
 # Local imports
+from conda_manager.utils.py3compat import to_text_string
 from conda_manager.utils import sort_versions
 from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
@@ -138,7 +139,7 @@ class _ClientAPI(QObject):
                     data = raw_data
 
                 try:
-                    data = json.loads(data)
+                    data = json.loads(to_text_string(data))
                 except Exception as error:
                     logger.error(str(error))
                     data = {}

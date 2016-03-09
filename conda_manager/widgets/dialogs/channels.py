@@ -17,12 +17,14 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
-                            QListWidgetItem, QPushButton, QVBoxLayout)
+from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QPushButton,
+                            QVBoxLayout)
 
 # Local imports
 from conda_manager.api import ManagerAPI
 from conda_manager.widgets import ButtonCancel
+from conda_manager.widgets.dialogs import (ListWidgetChannels,
+                                           ListWidgetItemChannels)
 import qtawesome as qta
 
 _ = gettext.gettext
@@ -53,7 +55,7 @@ class DialogChannels(QDialog):
         self.api = ManagerAPI()
 
         # Widgets
-        self.list = QListWidget(self)
+        self.list = ListWidgetChannels(self)
         self.button_add = QPushButton('')
         self.button_delete = ButtonCancel('')
         self.button_ok = QPushButton(_('Update channels'))
@@ -145,7 +147,7 @@ class DialogChannels(QDialog):
 
     def setup(self):
         for channel in sorted(self._channels):
-            item = QListWidgetItem(channel, self.list)
+            item = ListWidgetItemChannels(channel, self.list)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
 
             if channel in self._active_channels:
@@ -160,7 +162,7 @@ class DialogChannels(QDialog):
         self.refresh()
 
     def add_channel(self):
-        item = QListWidgetItem('', self.list)
+        item = ListWidgetItemChannels('', self.list)
         item.setFlags(item.flags() | Qt.ItemIsEditable |
                       Qt.ItemIsUserCheckable)
         item.setCheckState(Qt.Unchecked)

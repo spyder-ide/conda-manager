@@ -8,6 +8,13 @@
 """
 """
 
-# Local imports
-from .actions import CondaPackageActionDialog  # analysis:ignore
-from .channels import DialogChannels           # analysis:ignore
+# Third party imports
+from qtpy.QtWidgets import QListWidget, QListWidgetItem
+
+
+class ListWidgetChannels(QListWidget):
+    pass
+
+
+class ListWidgetItemChannels(QListWidgetItem):
+    pass

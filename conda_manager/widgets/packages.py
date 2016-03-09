@@ -34,8 +34,9 @@ from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
 from conda_manager.widgets import LabelStatus, ButtonCancel
 from conda_manager.widgets.table import CondaPackagesTable
-from conda_manager.widgets.dialogs import (DialogChannels,
-                                           CondaPackageActionDialog)
+from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
+from conda_manager.widgets.dialogs.channels import DialogChannels
+from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
 
 
 _ = gettext.gettext
@@ -103,14 +104,16 @@ class CondaPackagesWidget(QWidget):
             self._active_channels = self._channels[:]
 
         # Widgets
+        self.cancel_dialog = ClosePackageManagerDialog
         self.bbox = QDialogButtonBox(Qt.Horizontal)
         self.button_cancel = ButtonCancel('Cancel')
         self.button_channels = QPushButton(_('Channels'))
         self.button_ok = QPushButton(_('Ok'))
-        self.button_update = QPushButton(_('Update package index'))
+        self.button_update = QPushButton(_('Update package index...'))
         self.button_apply = QPushButton(_('Apply'))
         self.button_clear = QPushButton(_('Clear'))
         self.combobox_filter = QComboBox(self)
+        self.label_combobox = QLabel('View by:')
         self.progress_bar = QProgressBar(self)
         self.status_bar = LabelStatus(self)
         self.table = CondaPackagesTable(self)
@@ -128,7 +131,7 @@ class CondaPackagesWidget(QWidget):
         self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
         self.button_ok.setVisible(False)
-        self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
+#        self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
 #        self.button_cancel.setFixedWidth(cancel_width)
         self.button_channels.setCheckable(True)
         self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
@@ -147,6 +150,7 @@ class CondaPackagesWidget(QWidget):
 
         # Layout
         top_layout = QHBoxLayout()
+        top_layout.addWidget(self.label_combobox)
         top_layout.addWidget(self.combobox_filter)
         top_layout.addWidget(self.button_channels)
         top_layout.addWidget(self.button_update)
@@ -156,11 +160,6 @@ class CondaPackagesWidget(QWidget):
 
         middle_layout = QVBoxLayout()
         middle_layout.addWidget(self.table)
-
-#        actions_layout = QHBoxLayout()
-#        actions_layout.addStretch()
-#        actions_layout.addWidget(self.button_apply)
-#        actions_layout.addWidget(self.button_clear)
 
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.status_bar)
@@ -208,17 +207,6 @@ class CondaPackagesWidget(QWidget):
 
     # --- Helpers/Callbacks
     # -------------------------------------------------------------------------
-    def update_style_sheet(self, style_sheet=None):
-        if style_sheet:
-            self.style_sheet = style_sheet
-            self.setStyleSheet(style_sheet)
-
-    def update_actions(self, number_of_actions):
-        """
-        """
-        self.button_apply.setVisible(bool(number_of_actions))
-        self.button_clear.setVisible(bool(number_of_actions))
-
     def _load_bundled_metadata(self):
         """
         """
@@ -787,19 +775,31 @@ class CondaPackagesWidget(QWidget):
         """
         logger.debug(str('process canceled by user.'))
         if self.busy:
-            answer = QMessageBox.question(
-                self,
-                'Stop Conda Manager?',
-                'Conda is still busy.\n\nDo you want to stop the process?',
-                buttons=QMessageBox.Yes | QMessageBox.No)
-
-            if answer == QMessageBox.Yes:
+            dlg = self.cancel_dialog()
+            reply = dlg.exec_()
+            if reply:
                 self.update_status(hide=False, message='Process cancelled')
                 self.api.conda_terminate()
                 self.api.download_terminate()
                 self.table.clear_actions()
         else:
             QDialog.reject(self)
+
+    def update_style_sheet(self, style_sheet=None, extra_dialogs={}):
+        if style_sheet:
+            self.style_sheet = style_sheet
+            self.setStyleSheet(style_sheet)
+
+        if extra_dialogs:
+            cancel_dialog = extra_dialogs.get('cancel_dialog', None)
+            if cancel_dialog:
+                self.cancel_dialog = cancel_dialog
+
+    def update_actions(self, number_of_actions):
+        """
+        """
+        self.button_apply.setVisible(bool(number_of_actions))
+        self.button_clear.setVisible(bool(number_of_actions))
 
 
 class CondaPackagesDialog(QDialog, CondaPackagesWidget):

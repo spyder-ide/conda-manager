@@ -9,7 +9,8 @@
 
 """
 
-from qtpy.QtWidgets import QFrame, QLabel, QPushButton
+# Third party imports
+from qtpy.QtWidgets import QLabel, QPushButton
 
 
 class ButtonCancel(QPushButton):

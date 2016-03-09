@@ -65,6 +65,8 @@ class _ManagerAPI(QObject):
         self.download_terminate = self._requests_download_api.terminate
 
         # These client methods return a worker
+        self.client_store_token = self._client_api.store_token
+        self.client_remove_token = self._client_api.remove_token
         self.client_login = self._client_api.login
         self.client_logout = self._client_api.logout
         self.client_load_repodata = self._client_api.load_repodata

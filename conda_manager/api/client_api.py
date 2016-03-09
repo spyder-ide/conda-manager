@@ -8,6 +8,7 @@
 # Standard library imports
 from collections import deque
 import bz2
+import logging
 import json
 import os
 
@@ -64,10 +65,8 @@ class _ClientAPI(QObject):
 
     def __init__(self):
         super(QObject, self).__init__()
-        self._anaconda_client_api = binstar_client.Binstar(
-            token=None, domain='https://api.anaconda.org')
-#        self._anaconda_client_api = binstar_client.utils.get_server_api(
-#            token=None, site='https://api.anaconda.org')
+        self._anaconda_client_api = binstar_client.utils.get_server_api(
+            token=None, log_level=logging.NOTSET)
         self._queue = deque()
         self._threads = []
         self._workers = []
@@ -139,7 +138,7 @@ class _ClientAPI(QObject):
                     data = raw_data
 
                 try:
-                    data = json.loads(to_text_string(data))
+                    data = json.loads(to_text_string(data, 'UTF-8'))
                 except Exception as error:
                     logger.error(str(error))
                     data = {}
@@ -276,8 +275,15 @@ class _ClientAPI(QObject):
         """
         Logout from anaconda cloud.
         """
-        logger.debug('')
+        logger.debug('Logout')
         method = self._anaconda_client_api.remove_authentication
+        return self._create_worker(method)
+
+    def authentication(self):
+        """
+        """
+#        logger.debug('')
+        method = self._anaconda_client_api.user
         return self._create_worker(method)
 
     def load_repodata(self, filepaths, extra_data={}, metadata={}):
@@ -299,12 +305,36 @@ class _ClientAPI(QObject):
         method = self._prepare_model_data
         return self._create_worker(method, packages, linked, pip)
 
-    def set_domain(self, domain, token=None):
+    def set_domain(self, domain='https://api.anaconda.org'):
         """
         """
         logger.debug(str((domain)))
-#        self._anaconda_client_api = binstar_client.utils.get_server_api(
-#            token=token, site='default')
+        config = binstar_client.utils.get_config()
+        config['url'] = domain
+        binstar_client.utils.set_config(config)
+
+        self._anaconda_client_api = binstar_client.utils.get_server_api(
+            token=None, log_level=logging.NOTSET)
+        try:
+            user = self._anaconda_client_api.user()
+        except Exception:
+            user = {}
+
+        return user
+
+    def store_token(self, token):
+        """
+        """
+        class args:
+            site = None
+        binstar_client.utils.store_token(token, args)
+
+    def remove_token(self):
+        """
+        """
+        class args:
+            site = None
+        binstar_client.utils.remove_token(args)
 
 
 CLIENT_API = None
@@ -325,7 +355,6 @@ def test():
     api = ClientAPI()
     api.login('goanpeca', 'asdasd', 'baby', '')
     api.login('bruce', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
     api.login('asdkljasdh', 'asdasd', 'baby', '')
     api.login('asdkljasdh', 'asdasd', 'baby', '')
     api.login('asdkljasdh', 'asdasd', 'baby', '')

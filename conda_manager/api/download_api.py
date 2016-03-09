@@ -186,16 +186,18 @@ class RequestsDownloadWorker(QObject):
     def start(self):
         """
         """
-        error, output = None, None
+        error = None
+        output = None
+
         try:
             output = self.method(*self.args, **self.kwargs)
-        except Exception as error:
+        except Exception as err:
+            error = err
             logger.debug(str((self.method.__name__,
                               self.method.__module__,
                               error)))
 
         self.sig_finished.emit(self, output, error)
-#        print('emited', self.method.__name__)
         self._is_finished = True
 
 

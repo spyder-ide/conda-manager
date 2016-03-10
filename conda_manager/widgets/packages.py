@@ -235,6 +235,7 @@ class CondaPackagesWidget(QWidget):
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
         """
+        print('pip starts')
         packages, apps = output
         worker = self.api.pip_list(prefix=self.prefix)
         worker.sig_finished.connect(self._pip_list_ready)
@@ -244,6 +245,7 @@ class CondaPackagesWidget(QWidget):
     def _pip_list_ready(self, worker, pip_packages, error):
         """
         """
+        print('pip ends')
         packages = worker.packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
         worker = self.api.client_prepare_packages_data(packages,
@@ -576,7 +578,7 @@ class CondaPackagesWidget(QWidget):
 
     # Public API
     # -------------------------------------------------------------------------
-    def setup(self):
+    def setup(self, check_updates=False):
         """
         Setup packages.
 
@@ -586,9 +588,15 @@ class CondaPackagesWidget(QWidget):
             return
 
         logger.debug('')
+
         self.update_status('Updating package index', True)
-        worker = self.api.update_metadata()
-        worker.sig_finished.connect(self._metadata_updated)
+
+        if check_updates:
+            worker = self.api.update_metadata()
+            worker.sig_finished.connect(self._metadata_updated)
+        else:
+            paths = self.api.repodata_files(channels=self._active_channels)
+            self._repodata_updated(paths)
 
     def prepare_model_data(self, packages, apps):
         """
@@ -690,11 +698,11 @@ class CondaPackagesWidget(QWidget):
             self._active_channels = active_channels
             self.sig_channels_updated.emit(tuple(channels),
                                            tuple(active_channels))
-            self.setup()
+            self.setup(check_updates=True)
 
     def update_package_index(self):
         """ """
-        self.setup()
+        self.setup(check_updates=True)
 
     def search_package(self, text):
         """ """

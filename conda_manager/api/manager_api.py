@@ -137,7 +137,8 @@ class _ManagerAPI(QObject):
             path = self._repo_url_to_path(repo)
             self._files_downloaded.append(path)
             self._repodata_files.append(path)
-            worker = self.download_requests(repo, path)
+#            worker = self.download_requests(repo, path)
+            worker = self.download_async(repo, path)
             worker.url = repo
             worker.path = path
             worker.sig_finished.connect(self._repodata_downloaded)
@@ -145,6 +146,8 @@ class _ManagerAPI(QObject):
     def _repodata_downloaded(self, worker, output, error):
         """
         """
+        self._files_downloaded.remove(worker.path)
+
         if worker.path in self._files_downloaded:
             self._files_downloaded.remove(worker.path)
 
@@ -153,7 +156,7 @@ class _ManagerAPI(QObject):
 
     # --- Public API
     # -------------------------------------------------------------------------
-    def repodata_files(self, data_directory, channels=None):
+    def repodata_files(self, channels=None):
         """
         Return the repodata paths based on `channels` and the `data_directory`.
 

@@ -71,7 +71,10 @@ class _ManagerAPI(QObject):
         self.client_logout = self._client_api.logout
         self.client_load_repodata = self._client_api.load_repodata
         self.client_prepare_packages_data = self._client_api.prepare_model_data
+        self.client_user = self._client_api.user
+        self.client_domain = self._client_api.domain
         self.client_set_domain = self._client_api.set_domain
+
 
     # --- Helper methods
     # -------------------------------------------------------------------------

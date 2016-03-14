@@ -315,12 +315,8 @@ class _ClientAPI(QObject):
 
         self._anaconda_client_api = binstar_client.utils.get_server_api(
             token=None, log_level=logging.NOTSET)
-        try:
-            user = self._anaconda_client_api.user()
-        except Exception:
-            user = {}
 
-        return user
+        return self.user()
 
     def store_token(self, token):
         """
@@ -335,6 +331,16 @@ class _ClientAPI(QObject):
         class args:
             site = None
         binstar_client.utils.remove_token(args)
+
+    def user(self):
+        try:
+            user = self._anaconda_client_api.user()
+        except Exception:
+            user = {}
+        return user
+
+    def domain(self):
+        return self._anaconda_client_api.domain
 
 
 CLIENT_API = None

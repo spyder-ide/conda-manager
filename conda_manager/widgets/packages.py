@@ -235,7 +235,6 @@ class CondaPackagesWidget(QWidget):
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
         """
-        print('pip starts')
         packages, apps = output
         worker = self.api.pip_list(prefix=self.prefix)
         worker.sig_finished.connect(self._pip_list_ready)
@@ -245,7 +244,6 @@ class CondaPackagesWidget(QWidget):
     def _pip_list_ready(self, worker, pip_packages, error):
         """
         """
-        print('pip ends')
         packages = worker.packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
         worker = self.api.client_prepare_packages_data(packages,
@@ -808,6 +806,27 @@ class CondaPackagesWidget(QWidget):
         """
         self.button_apply.setVisible(bool(number_of_actions))
         self.button_clear.setVisible(bool(number_of_actions))
+
+    def update_domains(self, anaconda_api_url=None, conda_url=None):
+        """
+        """
+        logger.info(str((anaconda_api_url, conda_url)))
+        update = False
+
+        if anaconda_api_url:
+            if self.conda_api_url != anaconda_api_url:
+                update = True
+
+            self.conda_api_url = anaconda_api_url
+            self.api.client_set_domain(anaconda_api_url)
+
+        if conda_url:
+            if self.conda_url != conda_url:
+                update = True
+            self.conda_url = conda_url
+
+        if update:
+            pass
 
 
 class CondaPackagesDialog(QDialog, CondaPackagesWidget):

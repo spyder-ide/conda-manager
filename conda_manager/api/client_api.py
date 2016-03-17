@@ -66,7 +66,7 @@ class _ClientAPI(QObject):
     def __init__(self):
         super(QObject, self).__init__()
         self._anaconda_client_api = binstar_client.utils.get_server_api(
-            token=None, log_level=logging.NOTSET)
+            log_level=logging.NOTSET)
         self._queue = deque()
         self._threads = []
         self._workers = []
@@ -169,11 +169,16 @@ class _ClientAPI(QObject):
 
                 all_packages[name]['versions'].add(version)
                 all_packages[name]['size'][version] = data['size']
-                all_packages[name]['type'][version] = data.get('type', None)
-                all_packages[name]['app_entry'][version] = data.get('app_entry',
-                                                                    None)
-                all_packages[name]['app_type'][version] = data.get('app_type',
-                                                                   None)
+
+                # Only the latest builds will have the correct metadata for
+                # apps, so only store apps that have the app metadata
+                if data.get('type', None):
+                    all_packages[name]['type'][version] = data.get(
+                        'type', None)
+                    all_packages[name]['app_entry'][version] = data.get(
+                        'app_entry', None)
+                    all_packages[name]['app_type'][version] = data.get(
+                        'app_type', None)
 
         all_apps = {}
         for name in all_packages:
@@ -181,9 +186,15 @@ class _ClientAPI(QObject):
             all_packages[name]['versions'] = versions
 
             for version in versions:
-                is_app = all_packages[name]['type'][version]
-                if is_app:
+                has_type = all_packages[name].get('type', None)
+                # Has type in this case implies being an app
+                if has_type:
                     all_apps[name] = all_packages[name]
+                    # Remove all versions that are not apps!
+                    versions = all_apps[name]['versions']
+                    types = all_apps[name]['type']
+                    app_versions = [v for v in versions if v in types]
+                    all_apps[name]['versions'] = app_versions
 
         return all_packages, all_apps
 

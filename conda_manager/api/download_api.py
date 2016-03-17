@@ -155,6 +155,7 @@ class _DownloadAPI(QObject):
             os.makedirs(folder)
 
         qurl = QUrl(url)
+        url = qurl.toString()
         request = QNetworkRequest(qurl)
         self._head_requests[url] = request
         self._data[url] = path

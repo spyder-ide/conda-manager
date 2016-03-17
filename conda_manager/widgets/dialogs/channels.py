@@ -186,10 +186,16 @@ class DialogChannels(QDialog):
             else:
                 url = "{0}/{1}".format(self._conda_url, channel)
 
-            worker = self.api.download_is_valid_url(url)
+            if url[-1] == '/':
+                url = url[:-1]
+            plat = self.api.conda_platform()
+            repodata_url = "{0}/{1}/{2}".format(url, plat, 'repodata.json')
+
+            worker = self.api.download_is_valid_url(repodata_url)
             worker.sig_finished.connect(self._url_validated)
             worker.item = item
             worker.url = url
+            worker.repodata_url = repodata_url
 
             self.list.itemChanged.disconnect()
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)

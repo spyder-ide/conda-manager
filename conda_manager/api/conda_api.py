@@ -481,11 +481,11 @@ class _CondaAPI(QObject):
             ref = name
             search = [os.path.join(d, name) for d in
                       self.info().communicate()[0]['envs_dirs']]
-            cmd_list = ['create', '--yes', '--quiet', '--name', name]
+            cmd_list.extend(['--name', name])
         elif prefix:
             ref = prefix
             search = [prefix]
-            cmd_list = ['create', '--yes', '--quiet', '--prefix', prefix]
+            cmd_list.extend(['--prefix', prefix])
         else:
             raise TypeError('must specify either an environment name or a '
                             'path for new environment')

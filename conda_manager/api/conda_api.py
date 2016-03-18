@@ -508,7 +508,7 @@ class _CondaAPI(QObject):
                 cmd_list.extend(['--channel'])
                 cmd_list.extend([channel])
 
-        return self._call_conda(cmd_list)
+        return self._call_and_parse(cmd_list)
 
     def install(self, name=None, prefix=None, pkgs=None, dep=True,
                 channels=None):
@@ -549,7 +549,7 @@ class _CondaAPI(QObject):
         if not dep:
             cmd_list.extend(['--no-deps'])
 
-        return self._call_conda(cmd_list)
+        return self._call_and_parse(cmd_list)
 
     def update(self, *pkgs, **kwargs):
         """

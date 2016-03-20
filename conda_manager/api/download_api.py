@@ -6,6 +6,7 @@ Download API.
 
 # Standard library imports
 from collections import deque
+import json
 import os
 import sys
 
@@ -16,6 +17,8 @@ import requests
 
 # Local imports
 from conda_manager.utils.logs import logger
+from conda_manager.api.conda_api import CondaAPI
+
 
 PY2 = sys.version[0] == '2'
 PY3 = sys.version[0] == '3'
@@ -164,6 +167,9 @@ class _DownloadAPI(QObject):
 
         return worker
 
+    def terminate(self):
+        pass
+
 
 class RequestsDownloadWorker(QObject):
     """
@@ -210,6 +216,7 @@ class _RequestsDownloadAPI(QObject):
 
     def __init__(self):
         super(QObject, self).__init__()
+        self._conda_api = CondaAPI()
         self._queue = deque()
         self._threads = []
         self._workers = []
@@ -314,6 +321,43 @@ class _RequestsDownloadAPI(QObject):
 
         return value
 
+    def _is_valid_channel(self, channel,
+                          conda_url='https://conda.anaconda.org'):
+        """
+        """
+        if channel.startswith('https://') or channel.startswith('http://'):
+            url = channel
+        else:
+            url = "{0}/{1}".format(conda_url, channel)
+
+        if url[-1] == '/':
+            url = url[:-1]
+
+        plat = self._conda_api.get_platform()
+        repodata_url = "{0}/{1}/{2}".format(url, plat, 'repodata.json')
+
+        try:
+            r = requests.head(repodata_url)
+            value = r.status_code in [200]
+        except Exception as error:
+            logger.error(str(error))
+            value = False
+
+        return value
+
+    def _is_valid_api_url(self, url):
+        """
+        """
+        # Check response is a JSON with ok: 1
+        data = {}
+        try:
+            r = requests.get(url)
+            data = json.loads(r.content)
+        except Exception as error:
+            logger.error(str(error))
+
+        return data.get('ok', 0) == 1
+
     def download(self, url, path=None, force=False):
         logger.debug(str((url, path, force)))
         method = self._download
@@ -329,6 +373,17 @@ class _RequestsDownloadAPI(QObject):
         logger.debug(str((url)))
         method = self._is_valid_url
         return self._create_worker(method, url)
+
+    def is_valid_api_url(self, url):
+        logger.debug(str((url)))
+        method = self._is_valid_api_url
+        return self._create_worker(method, url)
+
+    def is_valid_channel(self, channel,
+                         conda_url='https://conda.anaconda.org'):
+        logger.debug(str((channel, conda_url)))
+        method = self._is_valid_channel
+        return self._create_worker(method, channel, conda_url)
 
 
 DOWNLOAD_API = None
@@ -383,6 +438,11 @@ def test():
         worker = api.download(url, path=filepath, force=True)
         worker.sig_finished.connect(ready_print)
 
+    api = RequestsDownloadAPI()
+    print(api._is_valid_api_url('https://api.anaconda.org'))
+    print(api._is_valid_api_url('https://conda.anaconda.org'))
+    print(api._is_valid_channel('https://google.com'))
+    print(api._is_valid_channel('https://conda.anaconda.org/continuumcrew'))
     app.exec_()
 
 

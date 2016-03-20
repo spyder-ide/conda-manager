@@ -33,10 +33,11 @@ from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
 from conda_manager.widgets import LabelStatus, ButtonCancel
-from conda_manager.widgets.table import CondaPackagesTable
+from conda_manager.widgets.helperwidgets import LineEditSearch
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
 from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
+from conda_manager.widgets.table import CondaPackagesTable
 
 
 _ = gettext.gettext
@@ -57,6 +58,7 @@ class CondaPackagesWidget(QWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
+    sif_process_cancelled = Signal()
 
     def __init__(self,
                  parent,
@@ -117,8 +119,7 @@ class CondaPackagesWidget(QWidget):
         self.progress_bar = QProgressBar(self)
         self.status_bar = LabelStatus(self)
         self.table = CondaPackagesTable(self)
-        self.textbox_search = QLineEdit(self)
-        self.label_icon_search = QLabel()
+        self.textbox_search = LineEditSearch(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
                         self.button_ok, self.button_apply, self.button_clear]
@@ -145,8 +146,6 @@ class CondaPackagesWidget(QWidget):
         self.status_bar.setFixedHeight(max_height*1.5)
         self.textbox_search.setMaximumWidth(max_width)
         self.textbox_search.setPlaceholderText('Search Packages')
-        icon_search = qta.icon('fa.search')
-        self.label_icon_search.setPixmap(icon_search.pixmap(QSize(16, 16)))
 
         # Layout
         top_layout = QHBoxLayout()
@@ -155,7 +154,6 @@ class CondaPackagesWidget(QWidget):
         top_layout.addWidget(self.button_channels)
         top_layout.addWidget(self.button_update)
         top_layout.addWidget(self.textbox_search)
-        top_layout.addWidget(self.label_icon_search)
         top_layout.addStretch()
 
         middle_layout = QVBoxLayout()
@@ -786,14 +784,17 @@ class CondaPackagesWidget(QWidget):
             if reply:
                 self.update_status(hide=False, message='Process cancelled')
                 self.api.conda_terminate()
-                self.api.download_terminate()
+                self.api.download_requests_terminate()
+                self.api.conda_clear_lock()
                 self.table.clear_actions()
+                self.sig_process_cancelled.emit()
         else:
             QDialog.reject(self)
 
     def update_style_sheet(self, style_sheet=None, extra_dialogs={}):
         if style_sheet:
             self.style_sheet = style_sheet
+            self.textbox_search.setStyleSheet(style_sheet)
             self.setStyleSheet(style_sheet)
 
         if extra_dialogs:

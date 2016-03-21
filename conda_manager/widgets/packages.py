@@ -446,7 +446,7 @@ class CondaPackagesWidget(QWidget):
                                          buttons=QMessageBox.Ok |
                                          QMessageBox.Cancel)
 
-        if reply == QMessageBox.Ok:
+        if reply:
             # Pip remove
             for pkg in pip_remove:
                 status = (_('Removing pip package <b>') + pkg['name'] +

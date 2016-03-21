@@ -17,17 +17,24 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QPushButton,
-                            QVBoxLayout)
+from qtpy.QtGui import QIcon
+from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
+                            QListWidgetItem, QPushButton, QVBoxLayout)
 
 # Local imports
 from conda_manager.api import ManagerAPI
 from conda_manager.widgets import ButtonCancel
-from conda_manager.widgets.dialogs import (ListWidgetChannels,
-                                           ListWidgetItemChannels)
 import qtawesome as qta
 
 _ = gettext.gettext
+
+
+class ListWidgetChannels(QListWidget):
+    pass
+
+
+class ListWidgetItemChannels(QListWidgetItem):
+    pass
 
 
 class DialogChannels(QDialog):
@@ -56,13 +63,13 @@ class DialogChannels(QDialog):
 
         # Widgets
         self.list = ListWidgetChannels(self)
-        self.button_add = QPushButton('')
-        self.button_delete = ButtonCancel('')
+        self.button_add = QPushButton('Add')
+        self.button_delete = ButtonCancel('Remove')
         self.button_ok = QPushButton(_('Update channels'))
 
         # Widget setup
-        self.button_add.setIcon(qta.icon('fa.plus'))
-        self.button_delete.setIcon(qta.icon('fa.minus'))
+#        self.button_add.setIcon(qta.icon('fa.plus'))
+#        self.button_delete.setIcon(qta.icon('fa.minus'))
         self.setMinimumWidth(350)
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setWindowOpacity(0.96)
@@ -118,11 +125,16 @@ class DialogChannels(QDialog):
                           Qt.ItemIsSelectable)
             item.setCheckState(Qt.Checked)
             item.setData(Qt.DisplayRole, channel)
+            item.setData(Qt.DecorationRole, QIcon())
         else:
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
                           Qt.ItemIsSelectable | Qt.ItemIsEditable)
-            item.setData(Qt.DisplayRole, u'')
+            item.setData(Qt.DisplayRole, channel)
             item.setCheckState(Qt.Unchecked)
+            item.setIcon(qta.icon('fa.warning'))
+            item.setToolTip("The channel seems to be invalid.\n\n"
+                            "Please check you have entered the correct "
+                            "spelling\n and try again.")
             self.list.editItem(item)
 
         self.list.itemChanged.connect(self.edit_channel)
@@ -144,6 +156,7 @@ class DialogChannels(QDialog):
     def update_style_sheet(self, style_sheet=None):
         if style_sheet:
             self.setStyleSheet(style_sheet)
+            self.style_sheet = style_sheet
 
     def setup(self):
         for channel in sorted(self._channels):
@@ -160,6 +173,12 @@ class DialogChannels(QDialog):
 
         self.list.setCurrentRow(0)
         self.refresh()
+        self.set_tab_order()
+
+    def set_tab_order(self):
+        self.setTabOrder(self.button_add, self.button_delete)
+        self.setTabOrder(self.button_delete, self.list)
+        self.setTabOrder(self.list, self.button_ok)
 
     def add_channel(self):
         item = ListWidgetItemChannels('', self.list)

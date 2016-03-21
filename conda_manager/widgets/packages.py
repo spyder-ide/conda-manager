@@ -19,12 +19,10 @@ import os.path as osp
 import sys
 
 # Third party imports
-import qtawesome as qta
-from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtGui import QIcon
+from qtpy.QtCore import QEvent, QSize, Qt, Signal
 from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
                             QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                            QProgressBar, QLineEdit, QVBoxLayout, QWidget)
+                            QProgressBar, QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -33,13 +31,76 @@ from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
 from conda_manager.widgets import LabelStatus, ButtonCancel
-from conda_manager.widgets.table import CondaPackagesTable
+from conda_manager.widgets.helperwidgets import LineEditSearch
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
 from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
+from conda_manager.widgets.table import CondaPackagesTable
 
 
 _ = gettext.gettext
+
+
+class FirstRowWidget(QPushButton):
+    sig_enter_first = Signal()
+
+    def __init__(self, widget_before=None):
+        QPushButton.__init__(self)
+        self.widget_before = widget_before
+
+    def sizeHint(self):
+        return QSize(0, 0)
+
+    def focusInEvent(self, event):
+        self.sig_enter_first.emit()
+
+    def event(self, event):
+        if event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key in [Qt.Key_Tab]:
+                self.sig_enter_first.emit()
+                return True
+            else:
+                return QPushButton.event(self, event)
+        else:
+            return QPushButton.event(self, event)
+
+
+class LastRowWidget(QPushButton):
+    sig_enter_last = Signal()
+
+    def __init__(self, widgets_after=None):
+        QPushButton.__init__(self)
+        self.widgets_after = widgets_after
+
+    def focusInEvent(self, event):
+        self.sig_enter_last.emit()
+
+    def add_focus_widget(self, widget):
+        if widget in self.widgets_after:
+            return
+        else:
+            self.widgets_after[-1] = widget
+
+    def handle_tab(self):
+        for w in self.widgets_after:
+            if w.isVisible():
+                w.setFocus()
+                return
+
+    def event(self, event):
+        if event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key in [Qt.Key_Backtab]:
+                self.sig_enter_last.emit()
+                return True
+            else:
+                return QPushButton.event(self, event)
+        else:
+            return QPushButton.event(self, event)
+
+    def sizeHint(self):
+        return QSize(0, 0)
 
 
 class CondaPackagesWidget(QWidget):
@@ -57,6 +118,8 @@ class CondaPackagesWidget(QWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
+    sig_process_cancelled = Signal()
+    sig_next_focus = Signal()
 
     def __init__(self,
                  parent,
@@ -95,6 +158,7 @@ class CondaPackagesWidget(QWidget):
         self.root_prefix = self.api.ROOT_PREFIX
         self.style_sheet = None
         self.message = ''
+        self.apply_actions_dialog = None
 
         if channels:
             self._channels = channels
@@ -117,13 +181,21 @@ class CondaPackagesWidget(QWidget):
         self.progress_bar = QProgressBar(self)
         self.status_bar = LabelStatus(self)
         self.table = CondaPackagesTable(self)
-        self.textbox_search = QLineEdit(self)
-        self.label_icon_search = QLabel()
+        self.textbox_search = LineEditSearch(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
                         self.button_ok, self.button_apply, self.button_clear]
+        self.table_first_row = FirstRowWidget(
+            widget_before=self.textbox_search)
+        self.table_last_row = LastRowWidget(
+            widgets_after=[self.button_apply, self.button_clear,
+                           self.button_cancel, self.combobox_filter])
 
         # Widgets setup
+        for button in [self.button_cancel, self.button_apply,
+                       self.button_clear, self.button_ok, self.button_update,
+                       self.button_channels]:
+            button.setDefault(True)
         max_height = self.status_bar.fontMetrics().height()
         max_width = self.textbox_search.fontMetrics().width('M'*23)
         self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
@@ -131,8 +203,6 @@ class CondaPackagesWidget(QWidget):
         self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
         self.button_ok.setVisible(False)
-#        self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
-#        self.button_cancel.setFixedWidth(cancel_width)
         self.button_channels.setCheckable(True)
         self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
         self.combobox_filter.setMinimumWidth(120)
@@ -145,8 +215,6 @@ class CondaPackagesWidget(QWidget):
         self.status_bar.setFixedHeight(max_height*1.5)
         self.textbox_search.setMaximumWidth(max_width)
         self.textbox_search.setPlaceholderText('Search Packages')
-        icon_search = qta.icon('fa.search')
-        self.label_icon_search.setPixmap(icon_search.pixmap(QSize(16, 16)))
 
         # Layout
         top_layout = QHBoxLayout()
@@ -155,11 +223,12 @@ class CondaPackagesWidget(QWidget):
         top_layout.addWidget(self.button_channels)
         top_layout.addWidget(self.button_update)
         top_layout.addWidget(self.textbox_search)
-        top_layout.addWidget(self.label_icon_search)
         top_layout.addStretch()
 
         middle_layout = QVBoxLayout()
+        middle_layout.addWidget(self.table_first_row)
         middle_layout.addWidget(self.table)
+        middle_layout.addWidget(self.table_last_row)
 
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.status_bar)
@@ -179,7 +248,11 @@ class CondaPackagesWidget(QWidget):
         self.setTabOrder(self.combobox_filter, self.button_channels)
         self.setTabOrder(self.button_channels, self.button_update)
         self.setTabOrder(self.button_update, self.textbox_search)
-        self.setTabOrder(self.textbox_search, self.table)
+        self.setTabOrder(self.textbox_search, self.table_first_row)
+        self.setTabOrder(self.table, self.table_last_row)
+        self.setTabOrder(self.table_last_row, self.button_apply)
+        self.setTabOrder(self.button_apply, self.button_clear)
+        self.setTabOrder(self.button_clear, self.button_cancel)
 
         # Signals and slots
         self.api.sig_repodata_updated.connect(self._repodata_updated)
@@ -194,6 +267,11 @@ class CondaPackagesWidget(QWidget):
         self.table.sig_actions_updated.connect(self.update_actions)
         self.table.sig_pip_action_requested.connect(self._run_pip_action)
         self.table.sig_status_updated.connect(self.update_status)
+        self.table.sig_next_focus.connect(self.table_last_row.handle_tab)
+        self.table.sig_previous_focus.connect(
+            lambda: self.table_first_row.widget_before.setFocus())
+        self.table_first_row.sig_enter_first.connect(self.handle_tab_focus)
+        self.table_last_row.sig_enter_last.connect(self.handle_backtab_focus)
 
         # Setup
         self.api.client_set_domain(conda_api_url)
@@ -207,6 +285,19 @@ class CondaPackagesWidget(QWidget):
 
     # --- Helpers/Callbacks
     # -------------------------------------------------------------------------
+    def handle_tab_focus(self):
+        self.table.setFocus()
+        if self.table.proxy_model:
+            index = self.table.proxy_model.index(0, 0)
+            self.table.setCurrentIndex(index)
+
+    def handle_backtab_focus(self):
+        self.table.setFocus()
+        if self.table.proxy_model:
+            row = self.table.proxy_model.rowCount() - 1
+            index = self.table.proxy_model.index(row, 0)
+            self.table.setCurrentIndex(index)
+
     def _load_bundled_metadata(self):
         """
         """
@@ -224,13 +315,21 @@ class CondaPackagesWidget(QWidget):
     def _setup_packages(self, worker, data, error):
         """
         """
+        combobox_index = self.combobox_filter.currentIndex()
+        status = C.PACKAGE_STATUS[combobox_index]
+
         self.table.setup_model(worker.packages, data, self._metadata_links)
-        self.combobox_filter.setCurrentIndex(0)
-        self.filter_package(C.INSTALLED)
+        self.combobox_filter.setCurrentIndex(combobox_index)
+        self.filter_package(status)
+
+        if self._current_model_index:
+            self.table.setCurrentIndex(self._current_model_index)
+            self.table.verticalScrollBar().setValue(self._current_table_scroll)
 
         if error:
             self.update_status(error, False)
         self.sig_packages_ready.emit()
+        self.table.setFocus()
 
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
@@ -335,11 +434,17 @@ class CondaPackagesWidget(QWidget):
             message += ('<br>The following conda packages will be upgraded: '
                         '<ul>' + ''.join(temp) + '</ul>')
         message += '<br>'
-        reply = QMessageBox.question(self,
-                                     'Proceed with the following actions?',
-                                     message,
-                                     buttons=QMessageBox.Ok |
-                                     QMessageBox.Cancel)
+
+        if self.apply_actions_dialog:
+            dlg = self.apply_actions_dialog(message, parent=self)
+            dlg.update_style_sheet(style_sheet=self.style_sheet)
+            reply = dlg.exec_()
+        else:
+            reply = QMessageBox.question(self,
+                                         'Proceed with the following actions?',
+                                         message,
+                                         buttons=QMessageBox.Ok |
+                                         QMessageBox.Cancel)
 
         if reply == QMessageBox.Ok:
             # Pip remove
@@ -586,7 +691,8 @@ class CondaPackagesWidget(QWidget):
             return
 
         logger.debug('')
-
+        self._current_model_index = self.table.currentIndex()
+        self._current_table_scroll = self.table.verticalScrollBar().value()
         self.update_status('Updating package index', True)
 
         if check_updates:
@@ -617,6 +723,7 @@ class CondaPackagesWidget(QWidget):
         self.busy = hide
         for widget in self.widgets:
             widget.setDisabled(hide)
+        self.table.verticalScrollBar().setValue(self._current_table_scroll)
 
         self.button_apply.setVisible(False)
         self.button_clear.setVisible(False)
@@ -786,20 +893,29 @@ class CondaPackagesWidget(QWidget):
             if reply:
                 self.update_status(hide=False, message='Process cancelled')
                 self.api.conda_terminate()
-                self.api.download_terminate()
+                self.api.download_requests_terminate()
+                self.api.conda_clear_lock()
                 self.table.clear_actions()
+                self.sig_process_cancelled.emit()
         else:
             QDialog.reject(self)
 
-    def update_style_sheet(self, style_sheet=None, extra_dialogs={}):
+    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
+                           palette={}):
         if style_sheet:
             self.style_sheet = style_sheet
+            self.table.update_style_palette(palette=palette)
+            self.textbox_search.update_style_sheet(style_sheet)
             self.setStyleSheet(style_sheet)
 
         if extra_dialogs:
             cancel_dialog = extra_dialogs.get('cancel_dialog', None)
+            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
+                                                     None)
             if cancel_dialog:
                 self.cancel_dialog = cancel_dialog
+            if apply_actions_dialog:
+                self.apply_actions_dialog = apply_actions_dialog
 
     def update_actions(self, number_of_actions):
         """
@@ -839,6 +955,7 @@ class CondaPackagesDialog(QDialog, CondaPackagesWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
+    sig_next_focus = Signal()
 
     def __init__(self,
                  parent=None,

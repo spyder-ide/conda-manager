@@ -61,8 +61,9 @@ class _ManagerAPI(QObject):
         # These download methods return a worker
         self.download_requests = self._requests_download_api.download
         self.download_async = self._download_api.download
+        self.download_async_terminate = self._download_api.terminate
         self.download_is_valid_url = self._requests_download_api.is_valid_url
-        self.download_terminate = self._requests_download_api.terminate
+        self.download_requests_terminate = self._requests_download_api.terminate
 
         # These client methods return a worker
         self.client_store_token = self._client_api.store_token
@@ -211,6 +212,24 @@ class _ManagerAPI(QObject):
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
         worker = self.download_requests(metadata_url, filepath)
         return worker
+
+    def check_valid_channel(self, channel,
+                            conda_url='https://conda.anaconda.org'):
+        if channel.startswith('https://') or channel.startswith('http://'):
+            url = channel
+        else:
+            url = "{0}/{1}".format(conda_url, channel)
+
+        if url[-1] == '/':
+            url = url[:-1]
+        plat = self.conda_platform()
+        repodata_url = "{0}/{1}/{2}".format(url, plat, 'repodata.json')
+        worker = self.download_is_valid_url(repodata_url)
+        worker.url = url
+        return worker
+
+    def check_valid_api_url(self, url):
+        pass
 
 
 MANAGER_API = None

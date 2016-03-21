@@ -22,7 +22,9 @@ class LineEditSearch(QLineEdit):
         super(LineEditSearch, self).__init__(*args, **kwargs)
         self._empty = True
         self.button_icon = ButtonSearch()
+
         self.button_icon.setDefault(True)
+        self.button_icon.setFocusPolicy(Qt.NoFocus)
 
         layout = QHBoxLayout()
         layout.addWidget(self.button_icon, 0, Qt.AlignRight)
@@ -39,13 +41,17 @@ class LineEditSearch(QLineEdit):
 
     def update_box(self, text=None):
         if text:
-            self.button_icon.setFocusPolicy(Qt.TabFocus)
             self.button_icon.setIcon(qta.icon('fa.remove'))
         else:
-            self.button_icon.setFocusPolicy(Qt.NoFocus)
             self.button_icon.setIcon(qta.icon('fa.search'))
         self._empty = not bool(text)
         self.button_icon.setDisabled(self._empty)
+
+#        right = self.button_icon.width()
+#        top = self.contentsMargins().top()
+#        left = self.contentsMargins().left()
+#        bottom = self.contentsMargins().bottom()
+#        self.setContentsMargins(left, top, right, bottom)
 
     def clear_text(self):
         self.setText('')

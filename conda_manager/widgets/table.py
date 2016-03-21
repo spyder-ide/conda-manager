@@ -17,7 +17,7 @@ import gettext
 # Third party imports
 from qtpy import PYQT5
 from qtpy.QtCore import Qt, QPoint, QSize, QUrl, Signal
-from qtpy.QtGui import QDesktopServices, QIcon
+from qtpy.QtGui import QColor, QDesktopServices, QIcon, QPen, QBrush
 from qtpy.QtWidgets import (QAbstractItemView, QItemDelegate, QMenu,
                             QTableView)
 
@@ -35,6 +35,25 @@ HIDE_COLUMNS = [const.COL_STATUS, const.COL_URL, const.COL_LICENSE,
 
 
 class CustomDelegate(QItemDelegate):
+    def paint(self, painter, option, index):
+        QItemDelegate.paint(self, painter, option, index)
+        column = index.column()
+        row = index.row()
+        rect = option.rect
+
+        if (row == self.current_hover_row() or row == self.current_row() and
+                self.has_focus()):
+            brush = QBrush(Qt.SolidPattern)
+            brush.setColor(QColor(255, 255, 255, 100))
+            painter.fillRect(rect, brush)
+            if row == self.current_row() and column in [const.COL_START]:
+                pen = QPen()
+                pen.setWidth(10)
+                pen.setColor(QColor('#7cbb4c'))
+                painter.setPen(pen)
+                dy = QPoint(0, 5)
+                painter.drawLine(rect.bottomLeft()-dy, rect.topLeft()+dy)
+
     def sizeHint(self, style, model_index):
         column = model_index.column()
         if column in [const.COL_PACKAGE_TYPE] + const.ACTION_COLUMNS:
@@ -54,6 +73,9 @@ class CondaPackagesTable(QTableView):
     sig_conda_action_requested = Signal(str, int, str, object, object)
     sig_pip_action_requested = Signal(str, int)
     sig_actions_updated = Signal(int)
+    sig_next_focus = Signal()
+    sig_previous_focus = Signal()
+    
 
     def __init__(self, parent):
         super(CondaPackagesTable, self).__init__(parent)
@@ -63,6 +85,7 @@ class CondaPackagesTable(QTableView):
         self._delegate = CustomDelegate(self)
         self.row_count = None
         self._advanced_mode = True
+        self._current_hover_row = None
 
         # To manage icon states
         self._model_index_clicked = None
@@ -78,11 +101,18 @@ class CondaPackagesTable(QTableView):
         self.proxy_model = None
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
+#        self.setSelectionBehavior(QAbstractItemView.NoSelection)
+#        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setSelectionMode(QAbstractItemView.NoSelection)
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
+        self.setMouseTracking(True)
 
 #        self.setAlternatingRowColors(True)
+        self._delegate.current_row = self.current_row
+        self._delegate.current_hover_row = self.current_hover_row
+        self._delegate.update_index = self.update
+        self._delegate.has_focus = self.hasFocus
         self.setItemDelegate(self._delegate)
         self.setShowGrid(False)
         self.setWordWrap(True)
@@ -137,7 +167,6 @@ class CondaPackagesTable(QTableView):
         self.hide_columns()
         self.resize_rows()
         self.refresh_actions()
-#        self.resizeRowsToContents()
 
     def resize_rows(self):
         """ """
@@ -256,13 +285,54 @@ class CondaPackagesTable(QTableView):
         QTableView.resizeEvent(self, event)
         self.resize_rows()
 
+    def update_visible_rows(self):
+        current_index = self.currentIndex()
+        row = current_index.row()
+
+        for r in range(row - 50,  row + 50):
+            for co in const.COLUMNS:
+                index = self.proxy_model.index(r, co)
+                self.update(index)
+
+    def current_row(self):
+        return self.currentIndex().row()
+
+    def current_hover_row(self):
+        return self._current_hover_row
+
+    def mouseMoveEvent(self, event):
+        super(CondaPackagesTable, self).mouseMoveEvent(event)
+        pos = event.pos()
+        self._current_hover_row = self.rowAt(pos.y())
+
+    def leaveEvent(self, event):
+        super(CondaPackagesTable, self).leaveEvent(event)
+        self._current_hover_row = None
+
     def keyPressEvent(self, event):
         """Override Qt method"""
-        QTableView.keyPressEvent(self, event)
+        index = self.currentIndex()
         if event.key() in [Qt.Key_Enter, Qt.Key_Return]:
-            index = self.currentIndex()
             self.action_pressed(index)
             self.pressed_here = True
+        elif event.key() in [Qt.Key_Tab]:
+            new_row = index.row() + 1
+            if new_row == self.proxy_model.rowCount():
+                self.sig_next_focus.emit()
+            else:
+                new_index = self.proxy_model.index(new_row, 0)
+                self.setCurrentIndex(new_index)
+        elif event.key() in [Qt.Key_Backtab]:
+            new_row = index.row() - 1
+            if new_row < 0:
+                self.sig_previous_focus.emit()
+            else:
+                new_index = self.proxy_model.index(new_row, 0)
+                self.setCurrentIndex(new_index)
+        else:
+            QTableView.keyPressEvent(self, event)
+
+        self.update_visible_rows()
 
     def keyReleaseEvent(self, event):
         """Override Qt method"""
@@ -270,6 +340,7 @@ class CondaPackagesTable(QTableView):
         if event.key() in [Qt.Key_Enter, Qt.Key_Return] and self.pressed_here:
             self.action_released()
         self.pressed_here = False
+        self.update_visible_rows()
 
     def mousePressEvent(self, event):
         """Override Qt method"""
@@ -286,11 +357,13 @@ class CondaPackagesTable(QTableView):
         elif event.button() == Qt.RightButton:
             if column == const.COL_DESCRIPTION:
                 self.context_menu_requested(event)
+        self.update_visible_rows()
 
     def mouseReleaseEvent(self, event):
         """Override Qt method"""
         if event.button() == Qt.LeftButton:
             self.action_released()
+        self.update_visible_rows()
 
     def action_pressed(self, index):
         """ """

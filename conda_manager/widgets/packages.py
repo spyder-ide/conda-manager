@@ -19,12 +19,10 @@ import os.path as osp
 import sys
 
 # Third party imports
-import qtawesome as qta
-from qtpy.QtCore import QSize, Qt, Signal
-from qtpy.QtGui import QIcon
+from qtpy.QtCore import QEvent, QSize, Qt, Signal
 from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
                             QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                            QProgressBar, QLineEdit, QVBoxLayout, QWidget)
+                            QProgressBar, QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -43,6 +41,68 @@ from conda_manager.widgets.table import CondaPackagesTable
 _ = gettext.gettext
 
 
+class FirstRowWidget(QPushButton):
+    sig_enter_first = Signal()
+
+    def __init__(self, widget_before=None):
+        QPushButton.__init__(self)
+        self.widget_before = widget_before
+
+    def sizeHint(self):
+        return QSize(0, 0)
+
+    def focusInEvent(self, event):
+        self.sig_enter_first.emit()
+
+    def event(self, event):
+        if event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key in [Qt.Key_Tab]:
+                self.sig_enter_first.emit()
+                return True
+            else:
+                return QPushButton.event(self, event)
+        else:
+            return QPushButton.event(self, event)
+
+
+class LastRowWidget(QPushButton):
+    sig_enter_last = Signal()
+
+    def __init__(self, widgets_after=None):
+        QPushButton.__init__(self)
+        self.widgets_after = widgets_after
+
+    def focusInEvent(self, event):
+        self.sig_enter_last.emit()
+
+    def add_focus_widget(self, widget):
+        if widget in self.widgets_after:
+            return
+        else:
+            self.widgets_after[-1] = widget
+
+    def handle_tab(self):
+        for w in self.widgets_after:
+            if w.isVisible():
+                w.setFocus()
+                return
+
+    def event(self, event):
+        if event.type() == QEvent.KeyPress:
+            key = event.key()
+            if key in [Qt.Key_Backtab]:
+                self.sig_enter_last.emit()
+                return True
+            else:
+                return QPushButton.event(self, event)
+        else:
+            return QPushButton.event(self, event)
+
+    def sizeHint(self):
+        return QSize(0, 0)
+
+
 class CondaPackagesWidget(QWidget):
     """Conda Packages Widget."""
     # Location of updated repo.json files from continuum/binstar
@@ -58,7 +118,8 @@ class CondaPackagesWidget(QWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
-    sif_process_cancelled = Signal()
+    sig_process_cancelled = Signal()
+    sig_next_focus = Signal()
 
     def __init__(self,
                  parent,
@@ -123,6 +184,11 @@ class CondaPackagesWidget(QWidget):
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
                         self.button_ok, self.button_apply, self.button_clear]
+        self.table_first_row = FirstRowWidget(
+            widget_before=self.textbox_search)
+        self.table_last_row = LastRowWidget(
+            widgets_after=[self.button_apply, self.button_clear,
+                           self.button_cancel])
 
         # Widgets setup
         max_height = self.status_bar.fontMetrics().height()
@@ -157,7 +223,9 @@ class CondaPackagesWidget(QWidget):
         top_layout.addStretch()
 
         middle_layout = QVBoxLayout()
+        middle_layout.addWidget(self.table_first_row)
         middle_layout.addWidget(self.table)
+        middle_layout.addWidget(self.table_last_row)
 
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.status_bar)
@@ -177,7 +245,11 @@ class CondaPackagesWidget(QWidget):
         self.setTabOrder(self.combobox_filter, self.button_channels)
         self.setTabOrder(self.button_channels, self.button_update)
         self.setTabOrder(self.button_update, self.textbox_search)
-        self.setTabOrder(self.textbox_search, self.table)
+        self.setTabOrder(self.textbox_search, self.table_first_row)
+        self.setTabOrder(self.table, self.table_last_row)
+        self.setTabOrder(self.table_last_row, self.button_apply)
+        self.setTabOrder(self.button_apply, self.button_clear)
+        self.setTabOrder(self.button_clear, self.button_cancel)
 
         # Signals and slots
         self.api.sig_repodata_updated.connect(self._repodata_updated)
@@ -192,6 +264,11 @@ class CondaPackagesWidget(QWidget):
         self.table.sig_actions_updated.connect(self.update_actions)
         self.table.sig_pip_action_requested.connect(self._run_pip_action)
         self.table.sig_status_updated.connect(self.update_status)
+        self.table.sig_next_focus.connect(self.table_last_row.handle_tab)
+        self.table.sig_previous_focus.connect(
+            lambda: self.table_first_row.widget_before.setFocus())
+        self.table_first_row.sig_enter_first.connect(self.handle_tab_focus)
+        self.table_last_row.sig_enter_last.connect(self.handle_backtab_focus)
 
         # Setup
         self.api.client_set_domain(conda_api_url)
@@ -205,6 +282,19 @@ class CondaPackagesWidget(QWidget):
 
     # --- Helpers/Callbacks
     # -------------------------------------------------------------------------
+    def handle_tab_focus(self):
+        self.table.setFocus()
+        if self.table.proxy_model:
+            index = self.table.proxy_model.index(0, 0)
+            self.table.setCurrentIndex(index)
+
+    def handle_backtab_focus(self):
+        self.table.setFocus()
+        if self.table.proxy_model:
+            row = self.table.proxy_model.rowCount() - 1
+            index = self.table.proxy_model.index(row, 0)
+            self.table.setCurrentIndex(index)
+
     def _load_bundled_metadata(self):
         """
         """
@@ -840,6 +930,7 @@ class CondaPackagesDialog(QDialog, CondaPackagesWidget):
     sig_packages_ready = Signal()
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
+    sig_next_focus = Signal()
 
     def __init__(self,
                  parent=None,

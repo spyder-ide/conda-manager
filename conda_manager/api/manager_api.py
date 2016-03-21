@@ -51,6 +51,7 @@ class _ManagerAPI(QObject):
         self.pip_remove = self._conda_api.pip_remove
 
         # No workers are returned for these methods
+        self.conda_clear_lock = self._conda_api.clear_lock
         self.conda_environment_exists = self._conda_api.environment_exists
         self.conda_get_envs = self._conda_api.get_envs
         self.conda_linked = self._conda_api.linked

@@ -63,7 +63,7 @@ class CondaPackagesModel(QAbstractTableModel):
             'background.install': QColor(0, 128, 0, 50),
             'background.upgrade': QColor(0, 0, 128, 50),
             'background.downgrade': QColor(128, 0, 128, 50),
-            'foreground.not.instaled': palette.color(QPalette.Mid),
+            'foreground.not.installed': palette.color(QPalette.Mid),
             'foreground.upgrade': QColor(0, 0, 128, 255),
             }
 

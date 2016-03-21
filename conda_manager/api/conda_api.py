@@ -842,7 +842,7 @@ class _CondaAPI(QObject):
         """
         Clean any conda lock in the system.
         """
-        cmd_list = ['clean', '--lock']
+        cmd_list = ['clean', '--lock', '--json']
         return self._call_and_parse(cmd_list, abspath=abspath)
 
     def package_version(self, prefix=None, name=None, pkg=None):

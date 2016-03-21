@@ -58,6 +58,10 @@ class LineEditSearch(QLineEdit):
         self.setFocus()
         self.update_box()
 
+    def update_style_sheet(self, style_sheet=None):
+        if style_sheet is not None:
+            self.button_icon.setStyleSheet(style_sheet)
+
     def keyPressEvent(self, event):
         """
         Qt override.

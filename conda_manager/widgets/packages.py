@@ -158,6 +158,7 @@ class CondaPackagesWidget(QWidget):
         self.root_prefix = self.api.ROOT_PREFIX
         self.style_sheet = None
         self.message = ''
+        self.apply_actions_dialog = None
 
         if channels:
             self._channels = channels
@@ -188,9 +189,13 @@ class CondaPackagesWidget(QWidget):
             widget_before=self.textbox_search)
         self.table_last_row = LastRowWidget(
             widgets_after=[self.button_apply, self.button_clear,
-                           self.button_cancel])
+                           self.button_cancel, self.combobox_filter])
 
         # Widgets setup
+        for button in [self.button_cancel, self.button_apply,
+                       self.button_clear, self.button_ok, self.button_update,
+                       self.button_channels]:
+            button.setDefault(True)
         max_height = self.status_bar.fontMetrics().height()
         max_width = self.textbox_search.fontMetrics().width('M'*23)
         self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
@@ -198,8 +203,6 @@ class CondaPackagesWidget(QWidget):
         self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
         self.button_ok.setVisible(False)
-#        self.button_cancel.setIcon(QIcon.fromTheme("process-stop"))
-#        self.button_cancel.setFixedWidth(cancel_width)
         self.button_channels.setCheckable(True)
         self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
         self.combobox_filter.setMinimumWidth(120)
@@ -312,13 +315,21 @@ class CondaPackagesWidget(QWidget):
     def _setup_packages(self, worker, data, error):
         """
         """
+        combobox_index = self.combobox_filter.currentIndex()
+        status = C.PACKAGE_STATUS[combobox_index]
+
         self.table.setup_model(worker.packages, data, self._metadata_links)
-        self.combobox_filter.setCurrentIndex(0)
-        self.filter_package(C.INSTALLED)
+        self.combobox_filter.setCurrentIndex(combobox_index)
+        self.filter_package(status)
+
+        if self._current_model_index:
+            self.table.setCurrentIndex(self._current_model_index)
+            self.table.verticalScrollBar().setValue(self._current_table_scroll)
 
         if error:
             self.update_status(error, False)
         self.sig_packages_ready.emit()
+        self.table.setFocus()
 
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
@@ -423,11 +434,17 @@ class CondaPackagesWidget(QWidget):
             message += ('<br>The following conda packages will be upgraded: '
                         '<ul>' + ''.join(temp) + '</ul>')
         message += '<br>'
-        reply = QMessageBox.question(self,
-                                     'Proceed with the following actions?',
-                                     message,
-                                     buttons=QMessageBox.Ok |
-                                     QMessageBox.Cancel)
+
+        if self.apply_actions_dialog:
+            dlg = self.apply_actions_dialog(message, parent=self)
+            dlg.update_style_sheet(style_sheet=self.style_sheet)
+            reply = dlg.exec_()
+        else:
+            reply = QMessageBox.question(self,
+                                         'Proceed with the following actions?',
+                                         message,
+                                         buttons=QMessageBox.Ok |
+                                         QMessageBox.Cancel)
 
         if reply == QMessageBox.Ok:
             # Pip remove
@@ -674,7 +691,8 @@ class CondaPackagesWidget(QWidget):
             return
 
         logger.debug('')
-
+        self._current_model_index = self.table.currentIndex()
+        self._current_table_scroll = self.table.verticalScrollBar().value()
         self.update_status('Updating package index', True)
 
         if check_updates:
@@ -705,6 +723,7 @@ class CondaPackagesWidget(QWidget):
         self.busy = hide
         for widget in self.widgets:
             widget.setDisabled(hide)
+        self.table.verticalScrollBar().setValue(self._current_table_scroll)
 
         self.button_apply.setVisible(False)
         self.button_clear.setVisible(False)
@@ -881,16 +900,22 @@ class CondaPackagesWidget(QWidget):
         else:
             QDialog.reject(self)
 
-    def update_style_sheet(self, style_sheet=None, extra_dialogs={}):
+    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
+                           palette={}):
         if style_sheet:
             self.style_sheet = style_sheet
-            self.textbox_search.setStyleSheet(style_sheet)
+            self.table.update_style_palette(palette=palette)
+            self.textbox_search.update_style_sheet(style_sheet)
             self.setStyleSheet(style_sheet)
 
         if extra_dialogs:
             cancel_dialog = extra_dialogs.get('cancel_dialog', None)
+            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
+                                                     None)
             if cancel_dialog:
                 self.cancel_dialog = cancel_dialog
+            if apply_actions_dialog:
+                self.apply_actions_dialog = apply_actions_dialog
 
     def update_actions(self, number_of_actions):
         """

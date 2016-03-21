@@ -16,7 +16,7 @@ import gettext
 
 # Third party imports
 from qtpy import PYQT5
-from qtpy.QtCore import Qt, QPoint, QSize, QUrl, Signal
+from qtpy.QtCore import Qt, QPoint, QSize, QUrl, Signal, QEvent
 from qtpy.QtGui import QColor, QDesktopServices, QIcon, QPen, QBrush
 from qtpy.QtWidgets import (QAbstractItemView, QItemDelegate, QMenu,
                             QTableView)
@@ -28,6 +28,7 @@ from conda_manager.utils import get_image_path
 from conda_manager.utils import constants as const
 from conda_manager.utils.py3compat import to_text_string
 from conda_manager.utils.qthelpers import add_actions, create_action
+
 
 _ = gettext.gettext
 HIDE_COLUMNS = [const.COL_STATUS, const.COL_URL, const.COL_LICENSE,
@@ -41,8 +42,15 @@ class CustomDelegate(QItemDelegate):
         row = index.row()
         rect = option.rect
 
+        # Draw borders
+        pen = QPen()
+        pen.setWidth(1)
+        pen.setColor(QColor('#cdcdcd'))
+        painter.setPen(pen)
+        painter.drawLine(rect.topLeft(), rect.topRight())
+
         if (row == self.current_hover_row() or row == self.current_row() and
-                self.has_focus()):
+                (self.has_focus_or_context())):
             brush = QBrush(Qt.SolidPattern)
             brush.setColor(QColor(255, 255, 255, 100))
             painter.fillRect(rect, brush)
@@ -51,8 +59,9 @@ class CustomDelegate(QItemDelegate):
                 pen.setWidth(10)
                 pen.setColor(QColor('#7cbb4c'))
                 painter.setPen(pen)
-                dy = QPoint(0, 5)
-                painter.drawLine(rect.bottomLeft()-dy, rect.topLeft()+dy)
+                dyt = QPoint(0, 5)
+                dyb = QPoint(0, 4)
+                painter.drawLine(rect.bottomLeft()-dyb, rect.topLeft()+dyt)
 
     def sizeHint(self, style, model_index):
         column = model_index.column()
@@ -75,7 +84,6 @@ class CondaPackagesTable(QTableView):
     sig_actions_updated = Signal(int)
     sig_next_focus = Signal()
     sig_previous_focus = Signal()
-    
 
     def __init__(self, parent):
         super(CondaPackagesTable, self).__init__(parent)
@@ -86,6 +94,8 @@ class CondaPackagesTable(QTableView):
         self.row_count = None
         self._advanced_mode = True
         self._current_hover_row = None
+        self._menu = None
+        self._palette = {}
 
         # To manage icon states
         self._model_index_clicked = None
@@ -112,7 +122,7 @@ class CondaPackagesTable(QTableView):
         self._delegate.current_row = self.current_row
         self._delegate.current_hover_row = self.current_hover_row
         self._delegate.update_index = self.update
-        self._delegate.has_focus = self.hasFocus
+        self._delegate.has_focus_or_context = self.has_focus_or_context
         self.setItemDelegate(self._delegate)
         self.setShowGrid(False)
         self.setWordWrap(True)
@@ -167,6 +177,10 @@ class CondaPackagesTable(QTableView):
         self.hide_columns()
         self.resize_rows()
         self.refresh_actions()
+        self.source_model.update_style_palette(self._palette)
+
+    def update_style_palette(self, palette={}):
+        self._palette = palette
 
     def resize_rows(self):
         """ """
@@ -293,12 +307,22 @@ class CondaPackagesTable(QTableView):
             for co in const.COLUMNS:
                 index = self.proxy_model.index(r, co)
                 self.update(index)
+        self.resize_rows()
 
     def current_row(self):
-        return self.currentIndex().row()
+
+        if self._menu and self._menu.isVisible():
+            return self.currentIndex().row()
+        elif self.hasFocus():
+            return self.currentIndex().row()
+        else:
+            return -1
 
     def current_hover_row(self):
         return self._current_hover_row
+
+    def has_focus_or_context(self):
+        return self.hasFocus() or (self._menu and self._menu.isVisible())
 
     def mouseMoveEvent(self, event):
         super(CondaPackagesTable, self).mouseMoveEvent(event)
@@ -310,19 +334,24 @@ class CondaPackagesTable(QTableView):
         self._current_hover_row = None
 
     def keyPressEvent(self, event):
-        """Override Qt method"""
+        """
+        Override Qt method.
+        """
         index = self.currentIndex()
-        if event.key() in [Qt.Key_Enter, Qt.Key_Return]:
-            self.action_pressed(index)
+        key = event.key()
+        if key in [Qt.Key_Enter, Qt.Key_Return]:
+            # self.action_pressed(index)
+            self.setCurrentIndex(self.proxy_model.index(index.row(),
+                                                        const.COL_ACTION))
             self.pressed_here = True
-        elif event.key() in [Qt.Key_Tab]:
+        elif key in [Qt.Key_Tab]:
             new_row = index.row() + 1
             if new_row == self.proxy_model.rowCount():
                 self.sig_next_focus.emit()
             else:
                 new_index = self.proxy_model.index(new_row, 0)
                 self.setCurrentIndex(new_index)
-        elif event.key() in [Qt.Key_Backtab]:
+        elif key in [Qt.Key_Backtab]:
             new_row = index.row() - 1
             if new_row < 0:
                 self.sig_previous_focus.emit()
@@ -337,8 +366,15 @@ class CondaPackagesTable(QTableView):
     def keyReleaseEvent(self, event):
         """Override Qt method"""
         QTableView.keyReleaseEvent(self, event)
-        if event.key() in [Qt.Key_Enter, Qt.Key_Return] and self.pressed_here:
-            self.action_released()
+        key = event.key()
+        index = self.currentIndex()
+        if key in [Qt.Key_Enter, Qt.Key_Return] and self.pressed_here:
+            self.context_menu_requested(event)
+#            self.action_released()
+        elif key in [Qt.Key_Menu]:
+            self.setCurrentIndex(self.proxy_model.index(index.row(),
+                                                        const.COL_ACTION))
+            self.context_menu_requested(event, right_click=True)
         self.pressed_here = False
         self.update_visible_rows()
 
@@ -348,15 +384,13 @@ class CondaPackagesTable(QTableView):
         self.current_index = self.currentIndex()
         column = self.current_index.column()
 
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and column == const.COL_ACTION:
             pos = QPoint(event.x(), event.y())
             index = self.indexAt(pos)
             self.action_pressed(index)
-            if column != const.COL_DESCRIPTION:
-                self.context_menu_requested(event)
+            self.context_menu_requested(event)
         elif event.button() == Qt.RightButton:
-            if column == const.COL_DESCRIPTION:
-                self.context_menu_requested(event)
+            self.context_menu_requested(event, right_click=True)
         self.update_visible_rows()
 
     def mouseReleaseEvent(self, event):
@@ -366,7 +400,9 @@ class CondaPackagesTable(QTableView):
         self.update_visible_rows()
 
     def action_pressed(self, index):
-        """ """
+        """
+        DEPRECATED
+        """
         column = index.column()
 
         if self.proxy_model is not None:
@@ -395,7 +431,9 @@ class CondaPackagesTable(QTableView):
                 self.valid = False
 
     def action_released(self):
-        """ """
+        """
+        DEPRECATED
+        """
         model = self.source_model
         model_index = self._model_index_clicked
 
@@ -442,23 +480,25 @@ class CondaPackagesTable(QTableView):
         self.source_model.set_action_status(model_index, status, version)
         self.refresh_actions()
 
-    def context_menu_requested(self, event):
+    def context_menu_requested(self, event, right_click=False):
         """
         Custom context menu.
         """
         if self.proxy_model is None:
             return
 
-        index = self.current_index
+        self._menu = QMenu(self)
+        index = self.currentIndex()
         model_index = self.proxy_model.mapToSource(index)
-        row = self.source_model.row(model_index.row())
+        row_data = self.source_model.row(model_index.row())
         column = model_index.column()
-        name = row[const.COL_NAME]
-        package_type = row[const.COL_PACKAGE_TYPE]
+        name = row_data[const.COL_NAME]
+        # package_type = row_data[const.COL_PACKAGE_TYPE]
         versions = self.source_model.get_package_versions(name)
         current_version = self.source_model.get_package_version(name)
 
-        if column in [const.COL_ACTION, const.COL_VERSION, const.COL_NAME]:
+#        if column in [const.COL_ACTION, const.COL_VERSION, const.COL_NAME]:
+        if column in [const.COL_ACTION] and not right_click:
             is_installable = self.source_model.is_installable(model_index)
             is_removable = self.source_model.is_removable(model_index)
             is_upgradable = self.source_model.is_upgradable(model_index)
@@ -490,22 +530,36 @@ class CondaPackagesTable(QTableView):
                                                          const.ACTION_REMOVE,
                                                          current_version))
 
-            name = self.source_model.row(model_index.row())[const.COL_NAME]
             version_actions = []
             for version in reversed(versions):
                 def trigger(model_index=model_index,
                             action=const.ACTION_INSTALL,
                             version=version):
                     return lambda: self.set_action_status(model_index,
-                                                          action,
-                                                          version)
-                if version != current_version:
+                                                          status=action,
+                                                          version=version)
+                if version == current_version:
+                    version_action = create_action(
+                        self,
+                        version,
+                        icon=QIcon(),
+                        triggered=trigger(model_index,
+                                          const.ACTION_INSTALL,
+                                          version))
+                    if not is_installable:
+                        version_action.setCheckable(True)
+                        version_action.setChecked(True)
+                        version_action.setDisabled(True)
+                elif version != current_version:
                     if ((version in versions and versions.index(version)) >
                             (current_version in versions and
                              versions.index(current_version))):
                         upgrade_or_downgrade_action = const.ACTION_UPGRADE
                     else:
                         upgrade_or_downgrade_action = const.ACTION_DOWNGRADE
+
+                    if is_installable:
+                        upgrade_or_downgrade_action = const.ACTION_INSTALL
 
                     version_action = create_action(
                         self,
@@ -514,14 +568,6 @@ class CondaPackagesTable(QTableView):
                         triggered=trigger(model_index,
                                           upgrade_or_downgrade_action,
                                           version))
-                else:
-                    version_action = create_action(
-                        self,
-                        version,
-                        icon=QIcon())
-                    version_action.setCheckable(True)
-                    version_action.setChecked(True)
-#                    version_action.setDisabled(True)
 
                 version_actions.append(version_action)
 
@@ -530,8 +576,8 @@ class CondaPackagesTable(QTableView):
             add_actions(install_versions_menu, version_actions)
             actions = [action_unmark, action_install, action_upgrade,
                        action_remove]
-            if len(version_actions) > 1:
-                actions += [None, install_versions_menu]
+            actions += [None, install_versions_menu]
+            install_versions_menu.setEnabled(len(version_actions) > 1)
 
             if action_status is const.ACTION_NONE:
                 action_unmark.setDisabled(True)
@@ -546,14 +592,8 @@ class CondaPackagesTable(QTableView):
                 action_remove.setDisabled(True)
                 install_versions_menu.setDisabled(True)
 
-        elif column in [const.COL_VERSION]:
-            actions = []
-            if package_type == const.CONDA_PACKAGE:
-                for version in reversed(versions):
-                    actions.append(create_action(self, version,
-                                                 icon=QIcon()))
-        else:
-            license_ = row[const.COL_LICENSE]
+        elif right_click:
+            license_ = row_data[const.COL_LICENSE]
 
             metadata = self.metadata_links.get(name, {})
             pypi = metadata.get('pypi', '')
@@ -604,23 +644,29 @@ class CondaPackagesTable(QTableView):
                                              icon=q_dev, triggered=lambda:
                                              self.open_url(dev)))
         if len(actions) > 1:
-            self._menu = QMenu(self)
+            # self._menu = QMenu(self)
             add_actions(self._menu, actions)
 
-#            delta_x = self._menu.sizeHint().width()
-            delta_x = 0
+            if event.type() == QEvent.KeyRelease:
+                rect = self.visualRect(index)
+                global_pos = self.viewport().mapToGlobal(rect.bottomRight())
+            else:
+                pos = QPoint(event.x(), event.y())
+                global_pos = self.viewport().mapToGlobal(pos)
 
-            pos = QPoint(event.x() - delta_x, event.y())
-            self._menu.popup(self.viewport().mapToGlobal(pos))
+            self._menu.popup(global_pos)
 
     def get_actions(self):
         if self.source_model:
             return self.source_model.get_actions()
 
     def clear_actions(self):
+        index = self.currentIndex()
         if self.source_model:
             self.source_model.clear_actions()
             self.refresh_actions()
+        self.setFocus()
+        self.setCurrentIndex(index)
 
     def refresh_actions(self):
         if self.source_model:
@@ -635,7 +681,7 @@ class CondaPackagesTable(QTableView):
 
     def open_url(self, url):
         """
-        Open link from action in default operating system  browser.
+        Open link from action in default operating system browser.
         """
         if url is None:
             return

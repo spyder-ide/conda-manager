@@ -10,11 +10,3 @@
 
 # Third party imports
 from qtpy.QtWidgets import QListWidget, QListWidgetItem
-
-
-class ListWidgetChannels(QListWidget):
-    pass
-
-
-class ListWidgetItemChannels(QListWidgetItem):
-    pass

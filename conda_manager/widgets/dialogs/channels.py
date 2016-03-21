@@ -132,9 +132,7 @@ class DialogChannels(QDialog):
             item.setData(Qt.DisplayRole, channel)
             item.setCheckState(Qt.Unchecked)
             item.setIcon(qta.icon('fa.warning'))
-            item.setToolTip("The channel seems to be invalid.\n\n"
-                            "Please check you have entered the correct "
-                            "spelling\n and try again.")
+            item.setToolTip("The channel seems to be invalid.")
             self.list.editItem(item)
 
         self.list.itemChanged.connect(self.edit_channel)

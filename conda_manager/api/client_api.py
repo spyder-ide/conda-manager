@@ -17,6 +17,7 @@ from qtpy.QtCore import QObject, QThread, QTimer, Signal
 import binstar_client
 
 # Local imports
+from conda_manager.api.conda_api import CondaAPI
 from conda_manager.utils.py3compat import to_text_string
 from conda_manager.utils import sort_versions
 from conda_manager.utils import constants as C
@@ -71,6 +72,7 @@ class _ClientAPI(QObject):
         self._threads = []
         self._workers = []
         self._timer = QTimer()
+        self._conda_api = CondaAPI()
 
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._clean)
@@ -183,15 +185,15 @@ class _ClientAPI(QObject):
         all_apps = {}
         for name in all_packages:
             versions = sort_versions(list(all_packages[name]['versions']))
-            all_packages[name]['versions'] = versions
+            all_packages[name]['versions'] = versions[:]
 
             for version in versions:
                 has_type = all_packages[name].get('type', None)
                 # Has type in this case implies being an app
                 if has_type:
-                    all_apps[name] = all_packages[name]
+                    all_apps[name] = all_packages[name].copy()
                     # Remove all versions that are not apps!
-                    versions = all_apps[name]['versions']
+                    versions = all_apps[name]['versions'][:]
                     types = all_apps[name]['type']
                     app_versions = [v for v in versions if v in types]
                     all_apps[name]['versions'] = app_versions

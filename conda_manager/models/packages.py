@@ -257,6 +257,9 @@ class CondaPackagesModel(QAbstractTableModel):
                     return to_qvariant(_('Conda package'))
                 elif type_ == C.PIP_PACKAGE:
                     return to_qvariant(_('Python package'))
+            elif column == C.COL_VERSION:
+                if is_upgradable:
+                    return to_qvariant(_('Update available'))
         elif role == Qt.ForegroundRole:
             palette = QPalette()
             if column in [C.COL_NAME, C.COL_DESCRIPTION]:

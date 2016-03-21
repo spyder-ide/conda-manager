@@ -369,21 +369,31 @@ class _RequestsDownloadAPI(QObject):
         self._thread = []
         self._workers = []
 
-    def is_valid_url(self, url):
+    def is_valid_url(self, url, non_blocking=True):
         logger.debug(str((url)))
-        method = self._is_valid_url
-        return self._create_worker(method, url)
+        if non_blocking:
+            method = self._is_valid_url
+            return self._create_worker(method, url)
+        else:
+            return self._is_valid_url(url)
 
-    def is_valid_api_url(self, url):
+    def is_valid_api_url(self, url, non_blocking=True):
         logger.debug(str((url)))
-        method = self._is_valid_api_url
-        return self._create_worker(method, url)
+        if non_blocking:
+            method = self._is_valid_api_url
+            return self._create_worker(method, url)
+        else:
+            return self._is_valid_api_url(url=url)
 
     def is_valid_channel(self, channel,
-                         conda_url='https://conda.anaconda.org'):
+                         conda_url='https://conda.anaconda.org',
+                         non_blocking=True):
         logger.debug(str((channel, conda_url)))
-        method = self._is_valid_channel
-        return self._create_worker(method, channel, conda_url)
+        if non_blocking:
+            method = self._is_valid_channel
+            return self._create_worker(method, channel, conda_url)
+        else:
+            return self._is_valid_channel(channel, conda_url=conda_url)
 
 
 DOWNLOAD_API = None

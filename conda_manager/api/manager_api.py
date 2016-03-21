@@ -64,6 +64,8 @@ class _ManagerAPI(QObject):
         self.download_async = self._download_api.download
         self.download_async_terminate = self._download_api.terminate
         self.download_is_valid_url = self._requests_download_api.is_valid_url
+        self.download_is_valid_api_url = self._requests_download_api.is_valid_api_url
+        self.download_is_valid_channel = self._requests_download_api.is_valid_channel
         self.download_requests_terminate = self._requests_download_api.terminate
 
         # These client methods return a worker

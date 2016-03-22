@@ -303,11 +303,12 @@ class CondaPackagesTable(QTableView):
         current_index = self.currentIndex()
         row = current_index.row()
 
-        for r in range(row - 50,  row + 50):
-            for co in const.COLUMNS:
-                index = self.proxy_model.index(r, co)
-                self.update(index)
-        self.resize_rows()
+        if self.proxy_model:
+            for r in range(row - 50,  row + 50):
+                for co in const.COLUMNS:
+                    index = self.proxy_model.index(r, co)
+                    self.update(index)
+            self.resize_rows()
 
     def current_row(self):
 
@@ -346,7 +347,7 @@ class CondaPackagesTable(QTableView):
             self.pressed_here = True
         elif key in [Qt.Key_Tab]:
             new_row = index.row() + 1
-            if new_row == self.proxy_model.rowCount():
+            if not self.proxy_model or new_row == self.proxy_model.rowCount():
                 self.sig_next_focus.emit()
             else:
                 new_index = self.proxy_model.index(new_row, 0)

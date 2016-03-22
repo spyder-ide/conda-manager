@@ -10,47 +10,61 @@
 
 # Standard library imports
 import gettext
-import json
 
 # Third party imports
 from qtpy.compat import to_qvariant
-from qtpy.QtCore import (QAbstractTableModel, QObject, Qt, Signal,
-                         QModelIndex, QSize)
-from qtpy.QtGui import QPalette
+from qtpy.QtCore import (QAbstractTableModel, QModelIndex, QSize, Qt)
+from qtpy.QtGui import QPalette, QColor
 
 # Local imports
-from conda_manager.utils import conda_api_q, get_icon, sort_versions
+from conda_manager.utils import get_icon, sort_versions
 from conda_manager.utils import constants as C
+
 
 _ = gettext.gettext
 
 
 class CondaPackagesModel(QAbstractTableModel):
-    """Abstract Model to handle the packages in a conda environment"""
-    def __init__(self, parent, packages_names, packages_versions,
-                 packages_sizes, row_data):
+    """
+    Abstract Model to handle the packages in a conda environment.
+    """
+    def __init__(self, parent, packages, data):
         super(CondaPackagesModel, self).__init__(parent)
         self._parent = parent
-        self._packages_names = packages_names
-        self._packages_versions = packages_versions
-        self._packages_sizes = packages_sizes
-        self._rows = row_data
+        self._packages = packages
+        self._rows = data
+        self._name_to_index = {r[C.COL_NAME]: i for i, r in enumerate(data)}
 
-        self._icons = {
-            'upgrade.active': get_icon('conda_upgrade_active.png'),
-            'upgrade.inactive': get_icon('conda_upgrade_inactive.png'),
-            'upgrade.pressed': get_icon('conda_upgrade_pressed.png'),
-            'downgrade.active': get_icon('conda_downgrade_active.png'),
-            'downgrade.inactive': get_icon('conda_downgrade_inactive.png'),
-            'downgrade.pressed': get_icon('conda_downgrade_pressed.png'),
-            'add.active': get_icon('conda_add_active.png'),
-            'add.inactive': get_icon('conda_add_inactive.png'),
-            'add.pressed': get_icon('conda_add_pressed.png'),
-            'remove.active': get_icon('conda_remove_active.png'),
-            'remove.inactive': get_icon('conda_remove_inactive.png'),
-            'remove.pressed': get_icon('conda_remove_pressed.png'),
-            'python': get_icon('python.png'),
-            'anaconda': get_icon('anaconda.png'),
+        palette = QPalette()
+        self._palette = {
+            'icon.upgrade.active': get_icon('conda_upgrade_active.png'),
+            'icon.upgrade.inactive': get_icon('conda_upgrade_inactive.png'),
+            'icon.upgrade.pressed': get_icon('conda_upgrade_pressed.png'),
+            'icon.downgrade.active': get_icon('conda_downgrade_active.png'),
+            'icon.downgrade.inactive': get_icon('conda_downgrade_inactive.png'),
+            'icon.downgrade.pressed': get_icon('conda_downgrade_pressed.png'),
+            'icon.add.active': get_icon('conda_add_active.png'),
+            'icon.add.inactive': get_icon('conda_add_inactive.png'),
+            'icon.add.pressed': get_icon('conda_add_pressed.png'),
+            'icon.remove.active': get_icon('conda_remove_active.png'),
+            'icon.remove.inactive': get_icon('conda_remove_inactive.png'),
+            'icon.remove.pressed': get_icon('conda_remove_pressed.png'),
+            'icon.action.not_installed': get_icon('conda_action_not_installed.png'),
+            'icon.action.installed': get_icon('conda_action_installed.png'),
+            'icon.action.installed_upgradable': get_icon('conda_action_installed_upgradable.png'),
+            'icon.action.remove': get_icon('conda_action_remove.png'),
+            'icon.action.add': get_icon('conda_action_add.png'),
+            'icon.action.upgrade': get_icon('conda_action_upgrade.png'),
+            'icon.action.downgrade': get_icon('conda_action_downgrade.png'),
+            'icon.upgrade.arrow': get_icon('conda_action_upgrade.png'),
+            'icon.python': get_icon('python.png'),
+            'icon.anaconda': get_icon('anaconda.png'),
+            'background.remove': QColor(128, 0, 0, 50),
+            'background.install': QColor(0, 128, 0, 50),
+            'background.upgrade': QColor(0, 0, 128, 50),
+            'background.downgrade': QColor(128, 0, 128, 50),
+            'foreground.not.installed': palette.color(QPalette.Mid),
+            'foreground.upgrade': QColor(0, 0, 128, 255),
             }
 
     def _update_cell(self, row, column):
@@ -58,19 +72,21 @@ class CondaPackagesModel(QAbstractTableModel):
         end = self.index(row, column)
         self.dataChanged.emit(start, end)
 
+    def update_style_palette(self, palette={}):
+        if palette:
+            self._palette.update(palette)
+
     def flags(self, index):
         """Override Qt method"""
-        if not index.isValid():
-            return Qt.ItemIsEnabled
-
         column = index.column()
-        if column in (C.COL_PACKAGE_TYPE, C.COL_NAME, C.COL_DESCRIPTION,
-                      C.COL_VERSION):
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column in C.ACTION_COLUMNS:
-            return Qt.ItemFlags(Qt.ItemIsEnabled)
-        elif column == C.COL_END:
-            return Qt.ItemFlags(Qt.NoItemFlags)
+
+        if index.isValid():
+            if column in [C.COL_START, C.COL_END]:
+                # return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                return Qt.ItemFlags(Qt.ItemIsEnabled)
+            else:
+                # return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                return Qt.ItemFlags(Qt.ItemIsEnabled)
         else:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
 
@@ -82,12 +98,40 @@ class CondaPackagesModel(QAbstractTableModel):
         row = index.row()
         column = index.column()
 
-        # Carefull here with the order, this has to be adjusted manually
-        # For look purposes the first column is empty
+        P = self._palette
+
         if self._rows[row] == row:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = [0, u'', u'', '-', -1, u'', u'', False, False, False, False]
+            action = C.ACTION_NONE
+            type_ = u''
+            name = u''
+            description = u''
+            version = u'-'
+            status = -1
+            # url = u''
+            # license_ = u''
+            i = False
+            r = False
+            u = False
+            d = False
+            # action_version = None
         else:
-            [__, type_, name, description, version, status, url, license_, i, r, u, d] = self._rows[row]
+            action = self._rows[row][C.COL_ACTION]
+            type_ = self._rows[row][C.COL_PACKAGE_TYPE]
+            name = self._rows[row][C.COL_NAME]
+            description = self._rows[row][C.COL_DESCRIPTION]
+            version = self._rows[row][C.COL_VERSION]
+            status = self._rows[row][C.COL_STATUS]
+            # url = self._rows[row][C.COL_URL]
+            # license_ = self._rows[row][C.COL_LICENSE]
+            i = self._rows[row][C.COL_INSTALL]
+            r = self._rows[row][C.COL_REMOVE]
+            u = self._rows[row][C.COL_UPGRADE]
+            d = self._rows[row][C.COL_DOWNGRADE]
+            # action_version = self._rows[row][C.COL_ACTION_VERSION]
+
+        is_upgradable = self.is_upgradable(self.index(row, C.COL_VERSION))
+#        if is_upgradable:
+#            version += C.UPGRADE_SYMBOL
 
         if role == Qt.DisplayRole:
             if column == C.COL_PACKAGE_TYPE:
@@ -100,65 +144,98 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(status)
             elif column == C.COL_DESCRIPTION:
                 return to_qvariant(description)
+            elif column == C.COL_ACTION:
+                return to_qvariant(action)
+        elif role == Qt.BackgroundRole:
+            if action == C.ACTION_REMOVE:
+                return to_qvariant(P['background.remove'])
+            elif action == C.ACTION_INSTALL:
+                return to_qvariant(P['background.install'])
+            elif action == C.ACTION_UPGRADE:
+                return to_qvariant(P['background.upgrade'])
+            elif action == C.ACTION_DOWNGRADE:
+                return to_qvariant(P['background.downgrade'])
         elif role == Qt.TextAlignmentRole:
             if column in [C.COL_NAME, C.COL_DESCRIPTION]:
+                return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
+            elif column in [C.COL_VERSION] and is_upgradable:
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
             else:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
-            if column == C.COL_PACKAGE_TYPE:
+            if column == C.COL_ACTION:
+                if action == C.ACTION_NONE:
+                    if status == C.NOT_INSTALLED:
+                        return to_qvariant(P['icon.action.not_installed'])
+                    elif status in [C.UPGRADABLE, C.MIXGRADABLE]:
+                        return to_qvariant(P['icon.action.installed'])
+                    elif status in [C.INSTALLED, C.DOWNGRADABLE,
+                                    C.MIXGRADABLE]:
+                        return to_qvariant(P['icon.action.installed'])
+                elif action == C.ACTION_INSTALL:
+                    return to_qvariant(P['icon.action.add'])
+                elif action == C.ACTION_REMOVE:
+                    return to_qvariant(P['icon.action.remove'])
+                elif action == C.ACTION_UPGRADE:
+                    return to_qvariant(P['icon.action.upgrade'])
+                elif action == C.ACTION_DOWNGRADE:
+                    return to_qvariant(P['icon.action.downgrade'])
+                else:
+                    return to_qvariant()
+            elif column == C.COL_PACKAGE_TYPE:
                 if type_ == C.CONDA_PACKAGE:
-                    return to_qvariant(self._icons['anaconda'])
+                    return to_qvariant(P['icon.anaconda'])
                 elif type_ == C.PIP_PACKAGE:
-                    return to_qvariant(self._icons['python'])
+                    return to_qvariant(P['icon.python'])
                 else:
                     return to_qvariant()
             elif column == C.COL_INSTALL:
                 if status == C.NOT_INSTALLED:
                     if i:
-                        return to_qvariant(self._icons['add.pressed'])
+                        return to_qvariant(P['icon.add.pressed'])
                     else:
-                        return to_qvariant(self._icons['add.active'])
+                        return to_qvariant(P['icon.add.active'])
                 elif (status == C.INSTALLED or
                       status == C.UPGRADABLE or
                       status == C.DOWNGRADABLE or
                       status == C.MIXGRADABLE):
                     if r:
-                        return to_qvariant(self._icons['remove.pressed'])
+                        return to_qvariant(P['icon.remove.pressed'])
                     else:
-                        return to_qvariant(self._icons['remove.active'])
+                        return to_qvariant(P['icon.remove.active'])
                 else:
-                    return to_qvariant(self._icons['add.inactive'])
-
+                    return to_qvariant(P['icon.add.inactive'])
             elif column == C.COL_REMOVE:
                 if (status == C.INSTALLED or
                     status == C.UPGRADABLE or
                     status == C.DOWNGRADABLE or
                    status == C.MIXGRADABLE):
                     if r:
-                        return to_qvariant(self._icons['remove.pressed'])
+                        return to_qvariant(P['icon.remove.pressed'])
                     else:
-                        return to_qvariant(self._icons['remove.active'])
+                        return to_qvariant(P['icon.remove.active'])
                 else:
-                    return to_qvariant(self._icons['remove.inactive'])
+                    return to_qvariant(P['icon.remove.inactive'])
             elif column == C.COL_UPGRADE:
                 if status == C.UPGRADABLE or \
                   status == C.MIXGRADABLE:
                     if u:
-                        return to_qvariant(self._icons['upgrade.pressed'])
+                        return to_qvariant(P['icon.upgrade.pressed'])
                     else:
-                        return to_qvariant(self._icons['upgrade.active'])
+                        return to_qvariant(P['icon.upgrade.active'])
                 else:
-                    return to_qvariant(self._icons['upgrade.inactive'])
+                    return to_qvariant(P['icon.upgrade.inactive'])
             elif column == C.COL_DOWNGRADE:
                 if status == C.DOWNGRADABLE or \
                   status == C.MIXGRADABLE:
                     if d:
-                        return to_qvariant(self._icons['downgrade.pressed'])
+                        return to_qvariant(P['icon.downgrade.pressed'])
                     else:
-                        return to_qvariant(self._icons['downgrade.active'])
+                        return to_qvariant(P['icon.downgrade.active'])
                 else:
-                    return to_qvariant(self._icons['downgrade.inactive'])
+                    return to_qvariant(P['icon.downgrade.inactive'])
+            elif column == C.COL_VERSION and is_upgradable:
+                    return to_qvariant(P['icon.upgrade.arrow'])
         elif role == Qt.ToolTipRole:
             if column == C.COL_INSTALL and status == C.NOT_INSTALLED:
                 return to_qvariant(_('Install package'))
@@ -180,16 +257,23 @@ class CondaPackagesModel(QAbstractTableModel):
                     return to_qvariant(_('Conda package'))
                 elif type_ == C.PIP_PACKAGE:
                     return to_qvariant(_('Python package'))
+            elif column == C.COL_VERSION:
+                if is_upgradable:
+                    return to_qvariant(_('Update available'))
         elif role == Qt.ForegroundRole:
             palette = QPalette()
-            if column in [C.COL_NAME, C.COL_DESCRIPTION, C.COL_VERSION]:
+            if column in [C.COL_NAME, C.COL_DESCRIPTION]:
                 if status in [C.INSTALLED, C.UPGRADABLE, C.DOWNGRADABLE,
                               C.MIXGRADABLE]:
                     color = palette.color(QPalette.WindowText)
                     return to_qvariant(color)
-                elif status in [C.NOT_INSTALLED, C.NOT_INSTALLABLE]:
+                elif status in [C.NOT_INSTALLED]:
                     color = palette.color(QPalette.Mid)
+                    color = P['foreground.not.installed']
                     return to_qvariant(color)
+            elif column in [C.COL_VERSION]:
+                if is_upgradable:
+                    return to_qvariant(P['foreground.upgrade'])
 
         elif role == Qt.SizeHintRole:
             if column in [C.ACTION_COLUMNS] + [C.COL_PACKAGE_TYPE]:
@@ -227,20 +311,12 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(_("Description"))
             elif section == C.COL_STATUS:
                 return to_qvariant(_("Status"))
-#            elif section == C.COL_INSTALL:
-#                return to_qvariant(_("I/R"))
-#            elif section == C.COL_REMOVE:
-#                return to_qvariant(_("R"))
-#            elif section == C.COL_UPGRADE:
-#                return to_qvariant(_("U"))
-#            elif section == C.COL_DOWNGRADE:
-#                return to_qvariant(_("D"))
             else:
                 return to_qvariant()
 
     def rowCount(self, index=QModelIndex()):
         """Override Qt method"""
-        return len(self._packages_names)
+        return len(self._rows)
 
     def columnCount(self, index=QModelIndex()):
         """Override Qt method"""
@@ -294,308 +370,77 @@ class CondaPackagesModel(QAbstractTableModel):
         return status == C.DOWNGRADABLE or \
             status == C.MIXGRADABLE
 
-    def get_package_versions(self, name, versiononly=True):
+    def action_status(self, model_index):
+        """ """
+        row = model_index.row()
+        action_status = self._rows[row][C.COL_ACTION]
+        return action_status
+
+    def set_action_status(self, model_index, status, version=None):
+        """
+        """
+        row = model_index.row()
+        self._rows[row][C.COL_ACTION] = status
+        self._rows[row][C.COL_ACTION_VERSION] = version
+        self._update_cell(row, model_index.column())
+
+    def clear_actions(self):
+        """
+        """
+        for i, row in enumerate(self._rows):
+            self._rows[i][C.COL_ACTION] = C.ACTION_NONE
+            self._rows[i][C.COL_ACTION_VERSION] = None
+            self._update_cell(i, C.COL_ACTION)
+            self._update_cell(i, C.COL_ACTION_VERSION)
+
+    def get_actions(self):
+        """
+        """
+        dic = {C.CONDA_PACKAGE: {C.ACTION_INSTALL: [],
+                                 C.ACTION_REMOVE: [],
+                                 C.ACTION_UPGRADE: [],
+                                 C.ACTION_DOWNGRADE: [],
+                                 },
+               C.PIP_PACKAGE: {C.ACTION_REMOVE: [],
+                               }
+               }
+
+        for i, row in enumerate(self._rows):
+            action = self._rows[i][C.COL_ACTION]
+            name = self._rows[i][C.COL_NAME]
+            type_ = self._rows[i][C.COL_PACKAGE_TYPE]
+            action_version = self._rows[i][C.COL_ACTION_VERSION]
+            current_version = self.get_package_version(name)
+
+            if action != C.ACTION_NONE:
+                version_from = current_version
+                version_to = action_version
+                dic[type_][action].append({'name': name,
+                                           'version_from': version_from,
+                                           'version_to': version_to,
+                                           })
+        return dic
+
+    def get_package_versions(self, name):
         """
         Gives all the compatible package canonical name
 
         name : str
-            name of the package
-        versiononly : bool
-            if `True`, returns version number only, otherwise canonical name
+            Name of the package
         """
-        versions = self._packages_versions
-        if name in versions:
-            if versiononly:
-                ver = versions[name]
-                temp = []
-                for ve in ver:
-                    n, v, b = conda_api_q.CondaProcess.split_canonical_name(ve)
-                    temp.append(v)
-                return sort_versions(list(set(temp)))
-            else:
-                return versions[name]
-        else:
-            return []
+        package_data = self._packages.get(name)
+        versions = []
+
+        if package_data:
+            versions = sort_versions(list(package_data.get('versions', [])))
+
+        return versions
 
     def get_package_version(self, name):
         """  """
-        packages = self._packages_names
-        if name in packages:
-            rownum = packages.index(name)
-            return self.row(rownum)[C.COL_VERSION]
+        if name in self._name_to_index:
+            index = self._name_to_index[name]
+            version = self.row(index)[C.COL_VERSION]
+            return version.replace(C.UPGRADE_SYMBOL, '')
         else:
             return u''
-
-
-class PackagesWorker(QObject):
-    """
-    Helper class to preprocess the repodata.json file(s) information into
-    an usefull format for the CondaPackagesModel class without blocking the UI
-    in case the number of packages or channels grows too large.
-    """
-    sig_ready = Signal()
-    sig_status_updated = Signal(str, bool, list)
-
-    def __init__(self, parent, repo_files, prefix, root_prefix, pip_packages):
-        QObject.__init__(self)
-        self._parent = parent
-        self._repo_files = repo_files
-        self._prefix = prefix
-        self._root_prefix = root_prefix
-        self._pip_packages_names = {}
-
-        for p in pip_packages:
-            n, v, b = conda_api_q.CondaProcess.split_canonical_name(p)
-            local = ''
-            if '(' in n:
-                name = n.split('-(')
-                n = name[0]
-                local = name[-1].replace(')', '')
-            self._pip_packages_names[n] = {}
-            self._pip_packages_names[n]['version'] = v
-            self._pip_packages_names[n]['local'] = local
-            self._pip_packages_names[n]['build'] = b
-
-        self.packages_names = None
-        self.row_data = None
-        self.packages_versions = None
-        self._packages = None
-
-        # Define helper function locally
-        self._get_package_metadata = parent.get_package_metadata
-
-    def _prepare_model(self):
-        """ """
-        if self._repo_files:
-            self._load_packages()
-            self._setup_data()
-
-    def _load_packages(self):
-        """ """
-        self.sig_status_updated.emit(_('Loading conda packages...'), True,
-                                     [0, 0])
-        grouped_usable_packages = {}
-        packages_all = []
-
-        for repo_file in self._repo_files:
-            repo_file = repo_file.replace('.bz2', '')
-            with open(repo_file, 'r') as f:
-                data = json.load(f)
-
-            # info = data['info']
-            packages = data['packages']
-
-            if packages is not None:
-                packages_all.append(packages)
-                for key in packages:
-                    val = packages[key]
-                    name = val['name'].lower()
-                    if name not in grouped_usable_packages:
-                        grouped_usable_packages[name] = []
-
-        # Add linked packages
-        cp = conda_api_q.CondaProcess
-        canonical_names = sorted(list(cp.linked(self._prefix)))
-        for canonical_name in canonical_names:
-            n, v, b = cp.split_canonical_name(canonical_name)
-            name = n.lower()
-            grouped_usable_packages[name] = []
-
-        # Add from repo
-        for packages in packages_all:
-            for key in packages:
-                val = packages[key]
-                name = val['name'].lower()
-                grouped_usable_packages[name].append([key, val])
-
-        # Add pip packages
-        for name in self._pip_packages_names:
-            grouped_usable_packages[name] = []
-
-        self._packages = grouped_usable_packages
-
-    def _setup_data(self):
-        """ """
-        self._packages_names = []
-        self._rows = []
-        self._packages_versions = {}  # the canonical name of versions compat
-
-        self._packages_linked = {}
-        self._packages_versions_number = {}
-        self._packages_versions_all = {}  # the canonical name of all versions
-        self._packages_sizes_all = {}
-        self._packages_upgradable = {}
-        self._packages_downgradable = {}
-        self._packages_installable = {}
-        self._packages_licenses_all = {}
-        self._conda_api = conda_api_q.CondaProcess
-
-        cp = self._conda_api
-        # TODO: Do we want to exclude some packages? If we plan to continue
-        # with the projects in spyder idea, we might as well hide spyder
-        # from the possible instalable apps...
-        # exclude_names = ['emptydummypackage']  # FIXME: packages to exclude?
-
-        # First do the list of linked packages so in case there is no json
-        # We can show at least that
-        self._packages_linked = {}
-
-        # FIXME: move this logic outside...?
-        canonical_names = sorted(list(cp.linked(self._prefix)))
-
-        # This has to do with the versions of the selected environment, NOT
-        # with the python version running!
-        pyver, numpyver, pybuild, numpybuild = None, None, None, None
-        for canonical_name in canonical_names:
-            n, v, b = cp.split_canonical_name(canonical_name)
-            self._packages_linked[n] = [n, v, b, canonical_name]
-            if n == 'python':
-                pyver = v
-                pybuild = b
-            elif n == 'numpy':
-                numpyver = v
-                numpybuild = b
-
-        if self._packages == {}:
-            self._packages_names = sorted([l for l in self._packages_linked])
-            self._rows = list(range(len(self._packages_names)))
-            for n in self._packages_linked:
-                val = self._packages_linked[n]
-                v = val[-1]
-                self._packages[n] = [[v, v]]
-        else:
-            self._packages_names = sorted([key for key in
-                                           self._packages])
-            self._rows = list(range(len(self._packages_names)))
-            for n in self._packages:
-                self._packages_licenses_all[n] = {}
-
-            for n in self._packages:
-                self._packages_sizes_all[n] = {}
-
-        pybuild = 'py' + ''.join(pyver.split('.')[:-1]) + '_'  # + pybuild
-        if numpyver is None and numpybuild is None:
-            numpybuild = ''
-        else:
-            numpybuild = 'np' + ''.join(numpyver.split('.'))[:-1]
-
-        for n in self._packages_names:
-            self._packages_versions_all[n] = \
-                sort_versions([s[0] for s in self._packages[n]],
-                              reverse=True)
-            for s in self._packages[n]:
-                val = s[1]
-                if 'version' in val:
-                    ver = val['version']
-                    if 'license' in val:
-                        lic = val['license']
-                        self._packages_licenses_all[n][ver] = lic
-                    if 'size' in val:
-                        size = val['size']
-                        self._packages_sizes_all[n][ver] = size
-
-
-        # Now clean versions depending on the build version of python and numpy
-        # FIXME: there is an issue here... at this moment a package with same
-        # version but only differing in the build number will get added
-        # Now it assumes that there is a python installed in the root
-        for name in self._packages_versions_all:
-            tempver_cano = []
-            tempver_num = []
-            for ver in self._packages_versions_all[name]:
-                n, v, b = cp.split_canonical_name(ver)
-
-                if 'np' in b and 'py' in b:
-                    if numpybuild + pybuild in b:
-                        tempver_cano.append(ver)
-                        tempver_num.append(v)
-                elif 'py' in b:
-                    if pybuild in b:
-                        tempver_cano.append(ver)
-                        tempver_num.append(v)
-                elif 'np' in b:
-                    if numpybuild in b:
-                        tempver_cano.append(ver)
-                        tempver_num.append(v)
-                else:
-                    tempver_cano.append(ver)
-                    tempver_num.append(v)
-
-            self._packages_versions[name] = sort_versions(tempver_cano,
-                                                          reverse=True)
-            self._packages_versions_number[name] = sort_versions(tempver_num,
-                                                                 reverse=True)
-
-        # FIXME: Check what to do with different builds??
-        # For the moment here a set is used to remove duplicate versions
-        for n in self._packages_linked:
-            vals = self._packages_linked[n]
-            canonical_name = vals[-1]
-            current_ver = vals[1]
-
-            # Fix error when package installed from other channels besides
-            # the standard ones
-            if n in self._packages_versions_number:
-                vers = self._packages_versions_number[n]
-                vers = sort_versions(list(set(vers)), reverse=True)
-
-                # If no other version is available just give a dummy version
-                if not vers:
-                    vers = [-1]
-                self._packages_upgradable[n] = not current_ver == vers[0]
-                self._packages_downgradable[n] = not current_ver == vers[-1]
-
-        for row, name in enumerate(self._packages_names):
-            if name in self._packages_linked:
-                version = self._packages_linked[name][1]
-                if self._packages[name] == []:
-                    # Package not in actual channels
-                    status = C.INSTALLED
-                elif (self._packages_upgradable[name] and
-                        self._packages_downgradable[name]):
-                    status = C.MIXGRADABLE
-                elif self._packages_upgradable[name]:
-                    status = C.UPGRADABLE
-                elif self._packages_downgradable[name]:
-                    status = C.DOWNGRADABLE
-                else:
-                    status = C.INSTALLED
-            else:
-                vers = self._packages_versions_number[name]
-                vers = sort_versions(list(set(vers)), reverse=True)
-                version = '-'
-
-                if len(vers) == 0:
-                    status = C.NOT_INSTALLABLE
-                else:
-                    status = C.NOT_INSTALLED
-
-            metadata = self._get_package_metadata(name)
-            description = metadata['description']
-            url = metadata['url']
-
-            if version in self._packages_licenses_all[name]:
-                if self._packages_licenses_all[name][version]:
-                    license_ = self._packages_licenses_all[name][version]
-                else:
-                    license_ = u''
-            else:
-                license_ = u''
-
-            # TODO: Temporal fix to include pip packages
-            if name in self._pip_packages_names:
-                type_ = C.PIP_PACKAGE
-                status = C.INSTALLED
-                version = self._pip_packages_names[name]['version']
-            else:
-                type_ = C.CONDA_PACKAGE
-
-            # For look purposes the first column is empty
-            self._rows[row] = [0, type_, name, description, version, status, url,
-                               license_, False, False, False, False]
-
-        self.row_data = self._rows
-        self.packages_names = self._packages_names
-        self.packages_versions = self._packages_versions
-        self.packages_sizes = self._packages_sizes_all
-        self.sig_ready.emit()

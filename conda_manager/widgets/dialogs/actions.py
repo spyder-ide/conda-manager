@@ -22,10 +22,9 @@ from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 
 # Local imports
 from conda_manager.models.dependencies import CondaDependenciesModel
-from conda_manager.utils import conda_api_q, sort_versions
-from conda_manager.utils import constants as const
+from conda_manager.utils import constants as C
 from conda_manager.utils.py3compat import to_text_string
-
+from conda_manager.api import ManagerAPI
 
 _ = gettext.gettext
 
@@ -42,7 +41,7 @@ class CondaPackageActionDialog(QDialog):
         self._dependencies_dic = {}
         self._active_channels = active_channels
         self._packages_sizes = packages_sizes
-        self._conda_process = conda_api_q.CondaProcess(self)
+        self.api = ManagerAPI()
 
         # Widgets
         self.label = QLabel(self)
@@ -65,44 +64,46 @@ class CondaPackageActionDialog(QDialog):
         dialog_size = QSize(300, 90)
 
         # Helper variable values
-        action_title = {const.ACTION_UPGRADE: _("Upgrade package"),
-                        const.ACTION_DOWNGRADE: _("Downgrade package"),
-                        const.ACTION_REMOVE: _("Remove package"),
-                        const.ACTION_INSTALL: _("Install package")}
-
-        # Versions might have duplicates from different builds
-        versions = sort_versions(list(set(versions)), reverse=True)
+        action_title = {C.ACTION_UPGRADE: _("Upgrade package"),
+                        C.ACTION_DOWNGRADE: _("Downgrade package"),
+                        C.ACTION_REMOVE: _("Remove package"),
+                        C.ACTION_INSTALL: _("Install package")}
 
         # FIXME: There is a bug, a package installed by anaconda has version
         # astropy 0.4 and the linked list 0.4 but the available versions
         # in the json file do not include 0.4 but 0.4rc1... so...
         # temporal fix is to check if inside list otherwise show full list
-        if action == const.ACTION_UPGRADE:
+        if action == C.ACTION_UPGRADE:
             if version in versions:
                 index = versions.index(version)
-                versions = versions[:index]
+                combo_versions = versions[index+1:]
             else:
                 versions = versions
-        elif action == const.ACTION_DOWNGRADE:
+        elif action == C.ACTION_DOWNGRADE:
             if version in versions:
                 index = versions.index(version)
-                versions = versions[index+1:]
+                combo_versions = versions[:index]
             else:
                 versions = versions
-        elif action == const.ACTION_REMOVE:
-            versions = [version]
+        elif action == C.ACTION_REMOVE:
+            combo_versions = [version]
             self.combobox_version.setEnabled(False)
+        elif action == C.ACTION_INSTALL:
+            combo_versions = versions
+
+        # Reverse order for combobox
+        combo_versions = list(reversed(combo_versions))
 
         if len(versions) == 1:
-            if action == const.ACTION_REMOVE:
+            if action == C.ACTION_REMOVE:
                 labeltext = _('Package version to remove:')
             else:
                 labeltext = _('Package version available:')
-            self.label_version.setText(versions[0])
+            self.label_version.setText(combo_versions[0])
             self.widget_version = self.label_version
         else:
             labeltext = _("Select package version:")
-            self.combobox_version.addItems(versions)
+            self.combobox_version.addItems(combo_versions)
             self.widget_version = self.combobox_version
 
         self.label.setText(labeltext)
@@ -120,8 +121,8 @@ class CondaPackageActionDialog(QDialog):
                         self.table_dependencies]
 
         # Create a Table
-        if action in [const.ACTION_INSTALL, const.ACTION_UPGRADE,
-                      const.ACTION_DOWNGRADE]:
+        if action in [C.ACTION_INSTALL, C.ACTION_UPGRADE,
+                      C.ACTION_DOWNGRADE]:
             table = QTableView(self)
             dialog_size = QSize(dialog_size.width() + 40, 300)
             self.table_dependencies = table
@@ -153,12 +154,12 @@ class CondaPackageActionDialog(QDialog):
         self.combobox_version.currentIndexChanged.connect(
             self._changed_version)
         self.checkbox.stateChanged.connect(self._changed_checkbox)
-        self._conda_process.sig_finished.connect(self._on_process_finished)
 
     def _changed_version(self, version, dependencies=True):
         """ """
         self._set_gui_disabled(True)
-        install_dependencies = (self.checkbox.checkState() == 2)
+        version = self.combobox_version.currentText()
+        install_dependencies = (self.checkbox.checkState() == Qt.Checked)
         self._version_text = to_text_string(version)
         self._get_dependencies(install_dependencies)
 
@@ -166,11 +167,11 @@ class CondaPackageActionDialog(QDialog):
         """ """
         package_name = [self._name + '=' + self._version_text]
 
-        # Temporal fix
-        self._conda_process.dependencies(prefix=self._prefix,
-                                         pkgs=package_name,
-                                         dep=dependencies,
-                                         channels=self._active_channels)
+        worker = self.api.conda_dependencies(prefix=self._prefix,
+                                             pkgs=package_name,
+                                             dep=dependencies,
+                                             channels=self._active_channels)
+        worker.sig_finished.connect(self._on_process_finished)
 
     def _changed_checkbox(self, state):
         """ """
@@ -179,10 +180,10 @@ class CondaPackageActionDialog(QDialog):
         else:
             self._changed_version(self._version_text, dependencies=False)
 
-    def _on_process_finished(self, boo):
+    def _on_process_finished(self, worker, output, error):
         """ """
         if self.isVisible():
-            dic = self._conda_process.output
+            dic = output
             self.dependencies_dic = dic
             self._set_dependencies_table()
             self._set_gui_disabled(False)
@@ -194,7 +195,6 @@ class CondaPackageActionDialog(QDialog):
         table.setModel(CondaDependenciesModel(self, dic, self._packages_sizes))
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-
 
     def _set_gui_disabled(self, value):
         """ """
@@ -209,3 +209,7 @@ class CondaPackageActionDialog(QDialog):
 
         for widget in self.widgets:
             widget.setDisabled(value)
+
+    def reject(self):
+        self.api.conda_terminate()
+        super(CondaPackageActionDialog, self).reject()

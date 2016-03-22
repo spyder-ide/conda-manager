@@ -22,7 +22,7 @@ from conda_manager._version import __version__
 from conda_manager.utils import get_icon
 from conda_manager.utils.py3compat import PY3
 from conda_manager.utils.qthelpers import add_actions, create_action
-from conda_manager.widgets import CondaPackagesWidget
+from conda_manager.widgets.packages import CondaPackagesWidget
 
 _ = gettext.gettext
 
@@ -41,7 +41,6 @@ class MainWindow(QMainWindow):
         self.menulist = []
 
         # Widgets
-#        self.env_manager = QLabel()
         self.packages = CondaPackagesWidget(self)
 
         # Widget setup

@@ -15,18 +15,25 @@ requirements:
     - python
     - setuptools
   run:
+    - anaconda-client
     - python
-    - requests
-    - qtpy
+    - pyyaml
     - qtawesome
-
+    - qtpy
+    - requests
 test:
   imports:
     - conda_manager
 
   requires:
-    - pyqt
+    - anaconda-client
+    - python
+    - pyyaml
+    - qtawesome
     - qtpy
+    - requests
+    - qt
+    - pyqt
 
 about:
   home: https://github.com/spyder-ide/conda-manager

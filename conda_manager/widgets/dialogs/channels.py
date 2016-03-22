@@ -11,92 +11,154 @@
 
 # Standard library imports
 from __future__ import (absolute_import, division, print_function,
-                        unicode_literals, with_statement)
+                        with_statement)
 import gettext
-import requests
 import sys
 
 # Third party imports
-from qtpy.QtCore import Qt, QObject, Signal, QThread
-from qtpy.QtWidgets import (QDialog, QHBoxLayout, QListWidget, QListWidgetItem,
-                            QPushButton, QVBoxLayout)
+from qtpy.QtCore import QSize, Qt, Signal
+from qtpy.QtGui import QIcon
+from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
+                            QListWidgetItem, QPushButton, QVBoxLayout)
 
+# Local imports
+from conda_manager.api import ManagerAPI
+from conda_manager.widgets import ButtonCancel
+import qtawesome as qta
 
 _ = gettext.gettext
 
 
-class ChannelsDialog(QDialog):
-    """
-    A dialog to add delete and select active channels to search for pacakges.
-    """
-    sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
+class ListWidgetChannels(QListWidget):
+    pass
 
-    def __init__(self,
-                 parent=None,
-                 channels=None,
-                 active_channels=None,
-                 conda_url=None,
-                 ):
 
-        # Check arguments: active channels, must be witbhin channels
-        for ch in active_channels:
-            if ch not in channels:
+class ListWidgetItemChannels(QListWidgetItem):
+    pass
+
+
+class DialogChannels(QDialog):
+    """
+    A dialog to add delete and select active channels to search for packages.
+    """
+    sig_channels_updated = Signal(object, object)  # channels, active_channels
+
+    def __init__(self, parent=None, channels=None, active_channels=None,
+                 conda_url=None, flat=True):
+
+        # Check arguments: active channels, must be within channels
+        for channel in active_channels:
+            if channel not in channels:
                 raise Exception("'active_channels' must be also within "
                                 "'channels'")
 
-        super(ChannelsDialog, self).__init__(parent)
+        super(DialogChannels, self).__init__(parent)
         self._parent = parent
         self._channels = channels
         self._active_channels = active_channels
         self._conda_url = conda_url
         self._edited_channel_text = ''
         self._temp_channels = channels
-        self._thread = QThread(self)
+        self.api = ManagerAPI()
 
         # Widgets
-        self.list = QListWidget(self)
-        self.button_add = QPushButton(_('Add'))
-        self.button_delete = QPushButton(_('Delete'))
+        self.list = ListWidgetChannels(self)
+        self.button_add = QPushButton('Add')
+        self.button_delete = ButtonCancel('Remove')
+        self.button_ok = QPushButton(_('Update channels'))
 
         # Widget setup
+#        self.button_add.setIcon(qta.icon('fa.plus'))
+#        self.button_delete.setIcon(qta.icon('fa.minus'))
+        self.setMinimumWidth(350)
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setWindowOpacity(0.96)
         self.setModal(False)
-        self.setStyleSheet('''ChannelsDialog {border-style: outset;
-                                              border-width: 1px;
-                                              border-color: beige;
-                                              border-radius: 4px;}''')
 
         # Layout
         layout = QVBoxLayout()
-        layout.addWidget(self.list)
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        button_layout.addWidget(self.button_delete)
         button_layout.addWidget(self.button_add)
+        button_layout.addWidget(self.button_delete)
+
+        ok_layout = QHBoxLayout()
+        ok_layout.addStretch()
+        ok_layout.addWidget(self.button_ok)
 
         layout.addLayout(button_layout)
+        layout.addWidget(self.list)
+        layout.addLayout(ok_layout)
         self.setLayout(layout)
 
         # Signals
         self.button_add.clicked.connect(self.add_channel)
         self.button_delete.clicked.connect(self.delete_channel)
+        self.button_ok.clicked.connect(self.update_channels)
 
         self.setup()
 
         self.list.itemChanged.connect(self.edit_channel)
         self.button_add.setFocus()
 
-    def refresh(self):
-        if self.list.count() == 1:
-            self.button_delete.setDisabled(True)
+        if flat:
+            self.list.setFrameStyle(QFrame.NoFrame)
+            self.list.setFrameShape(QFrame.NoFrame)
+
+    def _height(self):
+        """
+        Get the height for the row in the widget based on OS font metrics.
+        """
+        return self.fontMetrics().height()*2
+
+    def _url_validated(self, worker, valid, error):
+        item = worker.item
+        channel = item.data(Qt.DisplayRole).strip().lower()
+        channel = worker.url
+
+        if valid:
+            temp = list(self._temp_channels)
+            temp.append(channel)
+            self._temp_channels = tuple(temp)
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
+                          Qt.ItemIsSelectable)
+            item.setCheckState(Qt.Checked)
+            item.setData(Qt.DisplayRole, channel)
+            item.setData(Qt.DecorationRole, QIcon())
         else:
-            self.button_delete.setDisabled(False)
+            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
+                          Qt.ItemIsSelectable | Qt.ItemIsEditable)
+            item.setData(Qt.DisplayRole, channel)
+            item.setCheckState(Qt.Unchecked)
+            item.setIcon(qta.icon('fa.warning'))
+            item.setToolTip("The channel seems to be invalid.")
+            self.list.editItem(item)
+
+        self.list.itemChanged.connect(self.edit_channel)
+        self.button_add.setDisabled(False)
+        self.button_delete.setDisabled(False)
+
+    def keyPressEvent(self, event):
+        """
+        Qt override.
+        """
+        key = event.key()
+        if key in [Qt.Key_Return, Qt.Key_Enter]:
+            self.update_channels()
+        elif key in [Qt.Key_Escape]:
+            self.reject()
+
+    # --- Public API
+    # -------------------------------------------------------------------------
+    def update_style_sheet(self, style_sheet=None):
+        if style_sheet:
+            self.setStyleSheet(style_sheet)
+            self.style_sheet = style_sheet
 
     def setup(self):
         for channel in sorted(self._channels):
-            item = QListWidgetItem(channel, self.list)
+            item = ListWidgetItemChannels(channel, self.list)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
 
             if channel in self._active_channels:
@@ -105,16 +167,24 @@ class ChannelsDialog(QDialog):
                 item.setCheckState(Qt.Unchecked)
 
             self.list.addItem(item)
+            item.setSizeHint(QSize(item.sizeHint().width(), self._height()))
 
         self.list.setCurrentRow(0)
         self.refresh()
+        self.set_tab_order()
+
+    def set_tab_order(self):
+        self.setTabOrder(self.button_add, self.button_delete)
+        self.setTabOrder(self.button_delete, self.list)
+        self.setTabOrder(self.list, self.button_ok)
 
     def add_channel(self):
-        item = QListWidgetItem('', self.list)
+        item = ListWidgetItemChannels('', self.list)
         item.setFlags(item.flags() | Qt.ItemIsEditable |
                       Qt.ItemIsUserCheckable)
         item.setCheckState(Qt.Unchecked)
         self.list.addItem(item)
+        item.setSizeHint(QSize(item.sizeHint().width(), self._height()))
         self.list.setCurrentRow(self.list.count()-1)
         self.list.editItem(item)
         self.refresh()
@@ -133,42 +203,25 @@ class ChannelsDialog(QDialog):
             else:
                 url = "{0}/{1}".format(self._conda_url, channel)
 
-            # To avoid blocking the GUI
-            self._worker = RequestWorker(item, url)
-            self._worker.sig_finished.connect(self.handle_request)
-            self._worker.sig_finished.connect(self._thread.quit)
-            self._worker.moveToThread(self._thread)
-            self._thread.started.connect(self._worker.start)
-            self._thread.start()
+            if url[-1] == '/':
+                url = url[:-1]
+            plat = self.api.conda_platform()
+            repodata_url = "{0}/{1}/{2}".format(url, plat, 'repodata.json')
+
+            worker = self.api.download_is_valid_url(repodata_url)
+            worker.sig_finished.connect(self._url_validated)
+            worker.item = item
+            worker.url = url
+            worker.repodata_url = repodata_url
+
             self.list.itemChanged.disconnect()
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
             self.button_add.setDisabled(True)
             self.button_delete.setDisabled(True)
 
-    def handle_request(self, request, item):
-        """ """
-        channel = item.data(Qt.DisplayRole).strip().lower()
-
-        if request.status_code == 200:
-            temp = list(self._temp_channels)
-            temp.append(channel)
-            self._temp_channels = tuple(temp)
-            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
-                          Qt.ItemIsSelectable)
-            item.setCheckState(Qt.Checked)
-            item.setData(Qt.DisplayRole, channel)
-        else:
-            item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled |
-                          Qt.ItemIsSelectable | Qt.ItemIsEditable)
-            item.setData(Qt.DisplayRole, u'')
-            item.setCheckState(Qt.Unchecked)
-            self.list.editItem(item)
-
-        self.list.itemChanged.connect(self.edit_channel)
-        self.button_add.setDisabled(False)
-        self.button_delete.setDisabled(False)
-
     def delete_channel(self):
+        """
+        """
         index = self.list.currentIndex().row()
 
         if self.list.count() > 1:
@@ -179,6 +232,8 @@ class ChannelsDialog(QDialog):
             self.button_delete.setDisabled(True)
 
     def update_channels(self):
+        """
+        """
         temp_active_channels = []
         channels = []
 
@@ -192,42 +247,30 @@ class ChannelsDialog(QDialog):
                 if item.checkState() == Qt.Checked:
                     temp_active_channels.append(item.data(Qt.DisplayRole))
 
-        self.sig_channels_updated.emit(tuple(channels),
-                                       tuple(temp_active_channels))
-        self.accept()
-
-    def closeEvent(self, event):
-        if self._thread.isFinished() or not self._thread.isRunning():
-            self.update_channels()
-        event.ignore()
-
-    def keyPressEvent(self, event):
-        key = event.key()
-        if key in [Qt.Key_Return, Qt.Key_Enter]:
-            self.update_channels()
-        elif key in [Qt.Key_Escape]:
+        if (sorted(channels) != sorted(self._channels) or
+                sorted(temp_active_channels) != sorted(self._active_channels)):
+            self.sig_channels_updated.emit(tuple(channels),
+                                           tuple(temp_active_channels))
+            self.accept()
+        else:
             self.reject()
 
-
-class RequestWorker(QObject):
-    sig_finished = Signal(object, object)
-
-    def __init__(self, item, url):
-        QObject.__init__(self)
-        self._item = item
-        self._url = url
-
-    def start(self):
-        r = requests.head(self._url)
-        self.sig_finished.emit(r, self._item)
+    def refresh(self):
+        """
+        Updated enabled/disabled status based on teh amount of items.
+        """
+        if self.list.count() == 1:
+            self.button_delete.setDisabled(True)
+        else:
+            self.button_delete.setDisabled(False)
 
 
 def test_widget():
     from spyderlib.utils.qthelpers import qapplication
     app = qapplication()
-    widget = ChannelsDialog(
+    widget = DialogChannels(
         None,
-        ['spyder-ide', 'https://conda.anaconda.org/malev'],
+        ['http://repo.continuum.io/free', 'https://conda.anaconda.org/malev'],
         ['https://conda.anaconda.org/malev'],
         'https://conda.anaconda.org',
         )

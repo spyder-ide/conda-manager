@@ -14,7 +14,7 @@ import sys
 
 # Local imports
 from conda_manager.utils.qthelpers import qapplication
-from conda_manager.app import MainWindow
+from conda_manager.widgets.main_window import MainWindow
 
 
 def main():

@@ -9,7 +9,13 @@
 
 """
 
-# Local imports
-from conda_manager.widgets.search import SearchLineEdit         # analysis:ignore
-from conda_manager.widgets.table import CondaPackagesTable      # analysis:ignore
-from conda_manager.widgets.packages import CondaPackagesWidget  # analysis:ignore
+# Third party imports
+from qtpy.QtWidgets import QLabel, QPushButton
+
+
+class ButtonCancel(QPushButton):
+    pass
+
+
+class LabelStatus(QLabel):
+    pass

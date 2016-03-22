@@ -9,6 +9,6 @@
 """
 
 # Local imports
-from conda_manager.models.dependencies import CondaDependenciesModel          # analysis:ignore
-from conda_manager.models.filter import MultiColumnSortFilterProxy            # analysis:ignore
-from conda_manager.models.packages import CondaPackagesModel, PackagesWorker  # analysis:ignore
+from conda_manager.models.dependencies import CondaDependenciesModel  # analysis:ignore
+from conda_manager.models.filter import MultiColumnSortFilterProxy    # analysis:ignore
+from conda_manager.models.packages import CondaPackagesModel          # analysis:ignore

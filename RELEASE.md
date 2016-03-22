@@ -27,7 +27,7 @@
 
 * For a pre-release
 
-`PRERELEASE=True conda build conda.recipe`
+`PRERELEASE=True conda build conda.recipe -c spyder-ide`
 
 * Upload to Spyder channel
 

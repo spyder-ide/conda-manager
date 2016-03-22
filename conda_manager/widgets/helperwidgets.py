@@ -8,7 +8,7 @@ Helper widgets.
 from __future__ import absolute_import, division, print_function
 
 # Third party imports
-from qtpy.QtCore import Qt
+from qtpy.QtCore import QSize, Qt
 from qtpy.QtWidgets import QHBoxLayout, QLineEdit,  QPushButton
 import qtawesome as qta
 
@@ -29,6 +29,7 @@ class LineEditSearch(QLineEdit):
         layout = QHBoxLayout()
         layout.addWidget(self.button_icon, 0, Qt.AlignRight)
         layout.setSpacing(0)
+        layout.addSpacing(2)
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
@@ -37,7 +38,13 @@ class LineEditSearch(QLineEdit):
         self.button_icon.clicked.connect(self.clear_text)
 
         self.update_box(None)
+        self.set_icon_size(24, 24)
         self.setTabOrder(self, self.button_icon)
+
+    def set_icon_size(self, width, height):
+        self.button_icon.setMaximumSize(QSize(width, height))
+        self.setStyleSheet('LineEditSearch '
+                           '{{padding-right: {0}px;}}'.format(width))
 
     def update_box(self, text=None):
         if text:

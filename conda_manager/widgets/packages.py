@@ -20,9 +20,9 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QEvent, QSize, Qt, Signal
-from qtpy.QtWidgets import (QComboBox, QDialogButtonBox, QDialog,
-                            QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                            QProgressBar, QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QHBoxLayout,
+                            QMessageBox, QProgressBar, QPushButton,
+                            QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -31,10 +31,10 @@ from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
 from conda_manager.widgets import LabelStatus, ButtonCancel
-from conda_manager.widgets.helperwidgets import LineEditSearch
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
 from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
+from conda_manager.widgets.helperwidgets import LineEditSearch
 from conda_manager.widgets.table import CondaPackagesTable
 
 
@@ -42,6 +42,10 @@ _ = gettext.gettext
 
 
 class FirstRowWidget(QPushButton):
+    """
+    Widget located before pacakges table to handle focus in and tab focus
+    on the table correctly.
+    """
     sig_enter_first = Signal()
 
     def __init__(self, widget_before=None):
@@ -67,6 +71,10 @@ class FirstRowWidget(QPushButton):
 
 
 class LastRowWidget(QPushButton):
+    """
+    Widget located after pacakges table to handle focus out and backtab focus
+    on the table correctly.
+    """
     sig_enter_last = Signal()
 
     def __init__(self, widgets_after=None):
@@ -104,7 +112,10 @@ class LastRowWidget(QPushButton):
 
 
 class CondaPackagesWidget(QWidget):
-    """Conda Packages Widget."""
+    """
+    Conda Packages Widget.
+    """
+
     # Location of updated repo.json files from continuum/binstar
     CONDA_CONF_PATH = get_conf_path('repo')
 
@@ -144,6 +155,7 @@ class CondaPackagesWidget(QWidget):
             data_directory = self.CONDA_CONF_PATH
 
         self._parent = parent
+        self._current_action_name = ''
         self._hide_widgets = False
         self._metadata = {}        # From repo.continuum
         self._metadata_links = {}  # Bundled metadata
@@ -152,8 +164,8 @@ class CondaPackagesWidget(QWidget):
         self.data_directory = data_directory
         self.conda_url = conda_url
         self.conda_api_url = conda_api_url
-        self._current_action_name = ''
         self.name = name
+        self.package_blacklist = []
         self.prefix = prefix
         self.root_prefix = self.api.ROOT_PREFIX
         self.style_sheet = None
@@ -177,7 +189,6 @@ class CondaPackagesWidget(QWidget):
         self.button_apply = QPushButton(_('Apply'))
         self.button_clear = QPushButton(_('Clear'))
         self.combobox_filter = QComboBox(self)
-        self.label_combobox = QLabel('View by:')
         self.progress_bar = QProgressBar(self)
         self.status_bar = LabelStatus(self)
         self.table = CondaPackagesTable(self)
@@ -218,7 +229,6 @@ class CondaPackagesWidget(QWidget):
 
         # Layout
         top_layout = QHBoxLayout()
-        top_layout.addWidget(self.label_combobox)
         top_layout.addWidget(self.combobox_filter)
         top_layout.addWidget(self.button_channels)
         top_layout.addWidget(self.button_update)
@@ -241,7 +251,6 @@ class CondaPackagesWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.addLayout(top_layout)
         layout.addLayout(middle_layout)
-#        layout.addLayout(actions_layout)
         layout.addLayout(bottom_layout)
         self.setLayout(layout)
 
@@ -257,8 +266,8 @@ class CondaPackagesWidget(QWidget):
         # Signals and slots
         self.api.sig_repodata_updated.connect(self._repodata_updated)
         self.combobox_filter.currentIndexChanged.connect(self.filter_package)
-        self.button_apply.clicked.connect(self._handle_multiple_actions)
-        self.button_clear.clicked.connect(self.table.clear_actions)
+        self.button_apply.clicked.connect(self.apply_multiple_actions)
+        self.button_clear.clicked.connect(self.clear_actions)
         self.button_cancel.clicked.connect(self.cancel_process)
         self.button_channels.clicked.connect(self.show_channels_dialog)
         self.button_update.clicked.connect(self.update_package_index)
@@ -270,8 +279,8 @@ class CondaPackagesWidget(QWidget):
         self.table.sig_next_focus.connect(self.table_last_row.handle_tab)
         self.table.sig_previous_focus.connect(
             lambda: self.table_first_row.widget_before.setFocus())
-        self.table_first_row.sig_enter_first.connect(self.handle_tab_focus)
-        self.table_last_row.sig_enter_last.connect(self.handle_backtab_focus)
+        self.table_first_row.sig_enter_first.connect(self._handle_tab_focus)
+        self.table_last_row.sig_enter_last.connect(self._handle_backtab_focus)
 
         # Setup
         self.api.client_set_domain(conda_api_url)
@@ -283,21 +292,23 @@ class CondaPackagesWidget(QWidget):
             self.set_environment(name=name, prefix=prefix)
             self.setup()
 
-    # --- Helpers/Callbacks
+    # --- Helpers
     # -------------------------------------------------------------------------
-    def handle_tab_focus(self):
+    def _handle_tab_focus(self):
         self.table.setFocus()
         if self.table.proxy_model:
             index = self.table.proxy_model.index(0, 0)
             self.table.setCurrentIndex(index)
 
-    def handle_backtab_focus(self):
+    def _handle_backtab_focus(self):
         self.table.setFocus()
         if self.table.proxy_model:
             row = self.table.proxy_model.rowCount() - 1
             index = self.table.proxy_model.index(row, 0)
             self.table.setCurrentIndex(index)
 
+    # --- Callbacks
+    # -------------------------------------------------------------------------
     def _load_bundled_metadata(self):
         """
         """
@@ -318,7 +329,17 @@ class CondaPackagesWidget(QWidget):
         combobox_index = self.combobox_filter.currentIndex()
         status = C.PACKAGE_STATUS[combobox_index]
 
-        self.table.setup_model(worker.packages, data, self._metadata_links)
+        packages = worker.packages
+
+        # Remove blacklisted packages
+        for package in self.package_blacklist:
+            if package in packages:
+                packages.pop(package)
+            for i, row in enumerate(data):
+                if package == data[i][C.COL_NAME]:
+                    data.pop(i)
+
+        self.table.setup_model(packages, data, self._metadata_links)
         self.combobox_filter.setCurrentIndex(combobox_index)
         self.filter_package(status)
 
@@ -372,153 +393,6 @@ class CondaPackagesWidget(QWidget):
 
     # ---
     # -------------------------------------------------------------------------
-    def _handle_multiple_actions(self):
-        """
-        """
-        logger.debug('')
-
-        prefix = self.prefix
-
-        if prefix == self.root_prefix:
-            name = 'root'
-        elif self.api.conda_environment_exists(prefix=prefix):
-            name = osp.basename(prefix)
-        else:
-            name = prefix
-
-        actions = self.table.get_actions()
-
-        if actions is None:
-            return
-
-        self._multiple_process = deque()
-
-        pip_actions = actions[C.PIP_PACKAGE]
-        conda_actions = actions[C.CONDA_PACKAGE]
-
-        pip_remove = pip_actions.get(C.ACTION_REMOVE, [])
-        conda_remove = conda_actions.get(C.ACTION_REMOVE, [])
-        conda_install = conda_actions.get(C.ACTION_INSTALL, [])
-        conda_upgrade = conda_actions.get(C.ACTION_UPGRADE, [])
-        conda_downgrade = conda_actions.get(C.ACTION_DOWNGRADE, [])
-
-        message = ''
-        template_1 = '<li><b>{0}={1}</b></li>'
-        template_2 = '<li><b>{0}: {1} -> {2}</b></li>'
-
-        if pip_remove:
-            temp = [template_1.format(i['name'], i['version_to']) for i in
-                    pip_remove]
-            message += ('The following pip packages will be removed: '
-                        '<ul>' + ''.join(temp) + '</ul>')
-        if conda_remove:
-            temp = [template_1.format(i['name'], i['version_to']) for i in
-                    conda_remove]
-            message += ('<br>The following conda packages will be removed: '
-                        '<ul>' + ''.join(temp) + '</ul>')
-        if conda_install:
-            temp = [template_1.format(i['name'], i['version_to']) for i in
-                    conda_install]
-            message += ('<br>The following conda packages will be installed: '
-                        '<ul>' + ''.join(temp) + '</ul>')
-        if conda_downgrade:
-            temp = [template_2.format(
-                    i['name'], i['version_from'], i['version_to']) for i in
-                    conda_downgrade]
-            message += ('<br>The following conda packages will be downgraded: '
-                        '<ul>' + ''.join(temp) + '</ul>')
-        if conda_upgrade:
-            temp = [template_2.format(
-                    i['name'], i['version_from'], i['version_to']) for i in
-                    conda_upgrade]
-            message += ('<br>The following conda packages will be upgraded: '
-                        '<ul>' + ''.join(temp) + '</ul>')
-        message += '<br>'
-
-        if self.apply_actions_dialog:
-            dlg = self.apply_actions_dialog(message, parent=self)
-            dlg.update_style_sheet(style_sheet=self.style_sheet)
-            reply = dlg.exec_()
-        else:
-            reply = QMessageBox.question(self,
-                                         'Proceed with the following actions?',
-                                         message,
-                                         buttons=QMessageBox.Ok |
-                                         QMessageBox.Cancel)
-
-        if reply:
-            # Pip remove
-            for pkg in pip_remove:
-                status = (_('Removing pip package <b>') + pkg['name'] +
-                          '</b>' + _(' from <i>') + name + '</i>')
-                pkgs = [pkg['name']]
-
-                def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.pip_remove(prefix=prefix,
-                                                       pkgs=pkgs)
-
-                self._multiple_process.append([status, trigger()])
-
-            # Process conda actions
-            if conda_remove:
-                status = (_('Removing conda packages <b>') +
-                          '</b>' + _(' from <i>') + name + '</i>')
-                pkgs = [i['name'] for i in conda_remove]
-
-                def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_remove(pkgs=pkgs,
-                                                         prefix=prefix)
-                self._multiple_process.append([status, trigger()])
-
-            if conda_install:
-                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
-                        conda_install]
-
-                status = (_('Installing conda packages <b>') +
-                          '</b>' + _(' on <i>') + name + '</i>')
-
-                def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(
-                        prefix=prefix,
-                        pkgs=pkgs,
-                        channels=self._active_channels)
-                self._multiple_process.append([status, trigger()])
-
-            # Conda downgrade
-            if conda_downgrade:
-                status = (_('Downgrading conda packages <b>') +
-                          '</b>' + _(' on <i>') + name + '</i>')
-
-                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
-                        conda_downgrade]
-
-                def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(
-                        prefix=prefix,
-                        pkgs=pkgs,
-                        channels=self._active_channels)
-
-                self._multiple_process.append([status, trigger()])
-
-            # Conda update
-            if conda_upgrade:
-                status = (_('Upgrading conda packages <b>') +
-                          '</b>' + _(' on <i>') + name + '</i>')
-
-                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
-                        conda_upgrade]
-
-                def trigger(prefix=prefix, pkgs=pkgs):
-                    return lambda: self.api.conda_install(
-                        prefix=prefix,
-                        pkgs=pkgs,
-                        channels=self._active_channels)
-
-                self._multiple_process.append([status, trigger()])
-
-            self._multiple_process
-            self._run_multiple_actions()
-
     def _run_multiple_actions(self, worker=None, output=None, error=None):
         """
         """
@@ -681,16 +555,55 @@ class CondaPackagesWidget(QWidget):
 
     # Public API
     # -------------------------------------------------------------------------
-    def setup(self, check_updates=False):
+    def prepare_model_data(self, packages, apps):
+        """
+        """
+        logger.debug('')
+        self._prepare_model_data(output=(packages, apps))
+
+    # These should be private methods....
+    def enable_widgets(self):
+        """ """
+        self.table.hide_columns()
+
+    def disable_widgets(self):
+        """ """
+        self.table.hide_action_columns()
+
+    def accept_channels_dialog(self):
+        self.button_channels.setFocus()
+        self.button_channels.toggle()
+
+    def update_actions(self, number_of_actions):
+        """
+        """
+        self.button_apply.setVisible(bool(number_of_actions))
+        self.button_clear.setVisible(bool(number_of_actions))
+
+    # --- Non UI API
+    # -------------------------------------------------------------------------
+    def setup(self, check_updates=False, blacklist=[]):
         """
         Setup packages.
 
-        Downloads repodata, loads repodata, prepares and updates model data.
+        Main triger method to download repodata, load repodata, prepare and
+        updating the data model.
+
+        Parameters
+        ----------
+        check_updates : bool
+            If `True`, checks that the latest repodata is available on the
+            listed channels. If `False`, the data will be loaded from the
+            downloaded files without checking for newer versions.
+        blacklist: list of str
+            List of conda package names to be excluded from the actual package
+            manager view.
         """
         if self.busy:
             return
 
         logger.debug('')
+        self.package_blacklist = [p.lower() for p in blacklist]
         self._current_model_index = self.table.currentIndex()
         self._current_table_scroll = self.table.verticalScrollBar().value()
         self.update_status('Updating package index', True)
@@ -702,11 +615,276 @@ class CondaPackagesWidget(QWidget):
             paths = self.api.repodata_files(channels=self._active_channels)
             self._repodata_updated(paths)
 
-    def prepare_model_data(self, packages, apps):
+    def update_domains(self, anaconda_api_url=None, conda_url=None):
+        """
+        """
+        logger.info(str((anaconda_api_url, conda_url)))
+        update = False
+
+        if anaconda_api_url:
+            if self.conda_api_url != anaconda_api_url:
+                update = True
+
+            self.conda_api_url = anaconda_api_url
+            self.api.client_set_domain(anaconda_api_url)
+
+        if conda_url:
+            if self.conda_url != conda_url:
+                update = True
+            self.conda_url = conda_url
+
+        if update:
+            pass
+
+    def set_environment(self, name=None, prefix=None):
+        """ """
+        logger.debug(str((name, prefix)))
+
+        if prefix and self.api.conda_environment_exists(prefix=prefix):
+            self.prefix = prefix
+        elif name and self.api.conda_environment_exists(name=name):
+            self.prefix = self.get_prefix_envname(name)
+        else:
+            self.prefix = self.root_prefix
+
+    def update_channels(self, channels, active_channels):
+        """
+        """
+        logger.debug(str((channels, active_channels)))
+
+        if sorted(self._active_channels) != sorted(active_channels) or \
+                sorted(self._channels) != sorted(channels):
+            self._channels = channels
+            self._active_channels = active_channels
+            self.sig_channels_updated.emit(tuple(channels),
+                                           tuple(active_channels))
+            self.setup(check_updates=True)
+
+    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
+                           palette={}):
+        if style_sheet:
+            self.style_sheet = style_sheet
+            self.table.update_style_palette(palette=palette)
+            self.textbox_search.update_style_sheet(style_sheet)
+            self.setStyleSheet(style_sheet)
+
+        if extra_dialogs:
+            cancel_dialog = extra_dialogs.get('cancel_dialog', None)
+            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
+                                                     None)
+            if cancel_dialog:
+                self.cancel_dialog = cancel_dialog
+            if apply_actions_dialog:
+                self.apply_actions_dialog = apply_actions_dialog
+
+    # --- UI API
+    # -------------------------------------------------------------------------
+    def filter_package(self, value):
+        """ """
+        self.table.filter_status_changed(value)
+
+    def show_channels_dialog(self):
+        """
+        Show the channels dialog.
+        """
+        button_channels = self.button_channels
+        self.dlg = DialogChannels(self,
+                                  channels=self._channels,
+                                  active_channels=self._active_channels,
+                                  conda_url=self.conda_url)
+        self.dlg.update_style_sheet(style_sheet=self.style_sheet)
+        button_channels.setDisabled(True)
+        self.dlg.sig_channels_updated.connect(self.update_channels)
+        self.dlg.rejected.connect(lambda: button_channels.setEnabled(True))
+        self.dlg.rejected.connect(button_channels.toggle)
+        self.dlg.rejected.connect(button_channels.setFocus)
+        self.dlg.accepted.connect(self.accept_channels_dialog)
+        self.dlg.show()
+
+        geo_tl = button_channels.geometry().topLeft()
+        tl = button_channels.parentWidget().mapToGlobal(geo_tl)
+        x = tl.x() + 2
+        y = tl.y() + button_channels.height()
+        self.dlg.move(x, y)
+        self.dlg.button_add.setFocus()
+
+    def update_package_index(self):
+        """ """
+        self.setup(check_updates=True)
+
+    def search_package(self, text):
+        """ """
+        self.table.search_string_changed(text)
+
+    def apply_multiple_actions(self):
         """
         """
         logger.debug('')
-        self._prepare_model_data(output=(packages, apps))
+
+        prefix = self.prefix
+
+        if prefix == self.root_prefix:
+            name = 'root'
+        elif self.api.conda_environment_exists(prefix=prefix):
+            name = osp.basename(prefix)
+        else:
+            name = prefix
+
+        actions = self.table.get_actions()
+
+        if actions is None:
+            return
+
+        self._multiple_process = deque()
+
+        pip_actions = actions[C.PIP_PACKAGE]
+        conda_actions = actions[C.CONDA_PACKAGE]
+
+        pip_remove = pip_actions.get(C.ACTION_REMOVE, [])
+        conda_remove = conda_actions.get(C.ACTION_REMOVE, [])
+        conda_install = conda_actions.get(C.ACTION_INSTALL, [])
+        conda_upgrade = conda_actions.get(C.ACTION_UPGRADE, [])
+        conda_downgrade = conda_actions.get(C.ACTION_DOWNGRADE, [])
+
+        message = ''
+        template_1 = '<li><b>{0}={1}</b></li>'
+        template_2 = '<li><b>{0}: {1} -> {2}</b></li>'
+
+        if pip_remove:
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    pip_remove]
+            message += ('The following pip packages will be removed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_remove:
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    conda_remove]
+            message += ('<br>The following conda packages will be removed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_install:
+            temp = [template_1.format(i['name'], i['version_to']) for i in
+                    conda_install]
+            message += ('<br>The following conda packages will be installed: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_downgrade:
+            temp = [template_2.format(
+                    i['name'], i['version_from'], i['version_to']) for i in
+                    conda_downgrade]
+            message += ('<br>The following conda packages will be downgraded: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        if conda_upgrade:
+            temp = [template_2.format(
+                    i['name'], i['version_from'], i['version_to']) for i in
+                    conda_upgrade]
+            message += ('<br>The following conda packages will be upgraded: '
+                        '<ul>' + ''.join(temp) + '</ul>')
+        message += '<br>'
+
+        if self.apply_actions_dialog:
+            dlg = self.apply_actions_dialog(message, parent=self)
+            dlg.update_style_sheet(style_sheet=self.style_sheet)
+            reply = dlg.exec_()
+        else:
+            reply = QMessageBox.question(self,
+                                         'Proceed with the following actions?',
+                                         message,
+                                         buttons=QMessageBox.Ok |
+                                         QMessageBox.Cancel)
+
+        if reply:
+            # Pip remove
+            for pkg in pip_remove:
+                status = (_('Removing pip package <b>') + pkg['name'] +
+                          '</b>' + _(' from <i>') + name + '</i>')
+                pkgs = [pkg['name']]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.pip_remove(prefix=prefix,
+                                                       pkgs=pkgs)
+
+                self._multiple_process.append([status, trigger()])
+
+            # Process conda actions
+            if conda_remove:
+                status = (_('Removing conda packages <b>') +
+                          '</b>' + _(' from <i>') + name + '</i>')
+                pkgs = [i['name'] for i in conda_remove]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_remove(pkgs=pkgs,
+                                                         prefix=prefix)
+                self._multiple_process.append([status, trigger()])
+
+            if conda_install:
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_install]
+
+                status = (_('Installing conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
+                self._multiple_process.append([status, trigger()])
+
+            # Conda downgrade
+            if conda_downgrade:
+                status = (_('Downgrading conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_downgrade]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
+
+                self._multiple_process.append([status, trigger()])
+
+            # Conda update
+            if conda_upgrade:
+                status = (_('Upgrading conda packages <b>') +
+                          '</b>' + _(' on <i>') + name + '</i>')
+
+                pkgs = ['{0}={1}'.format(i['name'], i['version_to']) for i in
+                        conda_upgrade]
+
+                def trigger(prefix=prefix, pkgs=pkgs):
+                    return lambda: self.api.conda_install(
+                        prefix=prefix,
+                        pkgs=pkgs,
+                        channels=self._active_channels)
+
+                self._multiple_process.append([status, trigger()])
+
+            self._multiple_process
+            self._run_multiple_actions()
+
+    def clear_actions(self):
+        """
+        """
+        self.table.clear_actions()
+
+    def cancel_process(self):
+        """
+        Allow user to cancel an ongoing process.
+        """
+        logger.debug(str('process canceled by user.'))
+        if self.busy:
+            dlg = self.cancel_dialog()
+            reply = dlg.exec_()
+            if reply:
+                self.update_status(hide=False, message='Process cancelled')
+                self.api.conda_terminate()
+                self.api.download_requests_terminate()
+                self.api.conda_clear_lock()
+                self.table.clear_actions()
+                self.sig_process_cancelled.emit()
+        else:
+            QDialog.reject(self)
 
     def update_status(self, message=None, hide=True, progress=None,
                       env=False):
@@ -763,71 +941,8 @@ class CondaPackagesWidget(QWidget):
             self.progress_bar.setMinimum(0)
             self.progress_bar.setMaximum(0)
 
-    def show_channels_dialog(self):
-        """
-        Show the channels dialog.
-        """
-        button_channels = self.button_channels
-        self.dlg = DialogChannels(self,
-                                  channels=self._channels,
-                                  active_channels=self._active_channels,
-                                  conda_url=self.conda_url)
-        self.dlg.update_style_sheet(style_sheet=self.style_sheet)
-        button_channels.setDisabled(True)
-        self.dlg.sig_channels_updated.connect(self.update_channels)
-        self.dlg.rejected.connect(lambda: button_channels.setEnabled(True))
-        self.dlg.rejected.connect(button_channels.toggle)
-        self.dlg.rejected.connect(button_channels.setFocus)
-        self.dlg.accepted.connect(self.accept_channels_dialog)
-        self.dlg.show()
-
-        geo_tl = button_channels.geometry().topLeft()
-        tl = button_channels.parentWidget().mapToGlobal(geo_tl)
-        x = tl.x() + 2
-        y = tl.y() + button_channels.height()
-        self.dlg.move(x, y)
-        self.dlg.button_add.setFocus()
-
-    def accept_channels_dialog(self):
-        self.button_channels.setFocus()
-        self.button_channels.toggle()
-
-    def update_channels(self, channels, active_channels):
-        """
-        """
-        logger.debug(str((channels, active_channels)))
-
-        if sorted(self._active_channels) != sorted(active_channels) or \
-                sorted(self._channels) != sorted(channels):
-            self._channels = channels
-            self._active_channels = active_channels
-            self.sig_channels_updated.emit(tuple(channels),
-                                           tuple(active_channels))
-            self.setup(check_updates=True)
-
-    def update_package_index(self):
-        """ """
-        self.setup(check_updates=True)
-
-    def search_package(self, text):
-        """ """
-        self.table.search_string_changed(text)
-
-    def filter_package(self, value):
-        """ """
-        self.table.filter_status_changed(value)
-
-    def set_environment(self, name=None, prefix=None):
-        """ """
-        logger.debug(str((name, prefix)))
-
-        if prefix and self.api.conda_environment_exists(prefix=prefix):
-            self.prefix = prefix
-        elif name and self.api.conda_environment_exists(name=name):
-            self.prefix = self.get_prefix_envname(name)
-        else:
-            self.prefix = self.root_prefix
-
+    # --- Conda helpers
+    # -------------------------------------------------------------------------
     def get_environment_prefix(self):
         """
         Returns the active environment prefix.
@@ -863,6 +978,8 @@ class CondaPackagesWidget(QWidget):
         """ """
         return self.table.source_model.get_package_versions(name)
 
+    # --- Conda actions
+    # -------------------------------------------------------------------------
     def create_environment(self, name=None, prefix=None, packages=['python']):
         """ """
         # If environment exists already? GUI should take care of this
@@ -873,76 +990,6 @@ class CondaPackagesWidget(QWidget):
         dic['dep'] = True  # Not really needed but for the moment!
         dic['action'] = C.CREATE
         self._run_conda_process(C.CREATE, dic)
-
-    def enable_widgets(self):
-        """ """
-        self.table.hide_columns()
-
-    def disable_widgets(self):
-        """ """
-        self.table.hide_action_columns()
-
-    def cancel_process(self):
-        """
-        Allow user to cancel an ongoing process.
-        """
-        logger.debug(str('process canceled by user.'))
-        if self.busy:
-            dlg = self.cancel_dialog()
-            reply = dlg.exec_()
-            if reply:
-                self.update_status(hide=False, message='Process cancelled')
-                self.api.conda_terminate()
-                self.api.download_requests_terminate()
-                self.api.conda_clear_lock()
-                self.table.clear_actions()
-                self.sig_process_cancelled.emit()
-        else:
-            QDialog.reject(self)
-
-    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
-                           palette={}):
-        if style_sheet:
-            self.style_sheet = style_sheet
-            self.table.update_style_palette(palette=palette)
-            self.textbox_search.update_style_sheet(style_sheet)
-            self.setStyleSheet(style_sheet)
-
-        if extra_dialogs:
-            cancel_dialog = extra_dialogs.get('cancel_dialog', None)
-            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
-                                                     None)
-            if cancel_dialog:
-                self.cancel_dialog = cancel_dialog
-            if apply_actions_dialog:
-                self.apply_actions_dialog = apply_actions_dialog
-
-    def update_actions(self, number_of_actions):
-        """
-        """
-        self.button_apply.setVisible(bool(number_of_actions))
-        self.button_clear.setVisible(bool(number_of_actions))
-
-    def update_domains(self, anaconda_api_url=None, conda_url=None):
-        """
-        """
-        logger.info(str((anaconda_api_url, conda_url)))
-        update = False
-
-        if anaconda_api_url:
-            if self.conda_api_url != anaconda_api_url:
-                update = True
-
-            self.conda_api_url = anaconda_api_url
-            self.api.client_set_domain(anaconda_api_url)
-
-        if conda_url:
-            if self.conda_url != conda_url:
-                update = True
-            self.conda_url = conda_url
-
-        if update:
-            pass
 
 
 class CondaPackagesDialog(QDialog, CondaPackagesWidget):

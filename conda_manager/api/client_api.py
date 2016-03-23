@@ -315,8 +315,9 @@ class _ClientAPI(QObject):
         """
         """
         logger.debug('')
-        method = self._prepare_model_data
-        return self._create_worker(method, packages, linked, pip)
+        return self._prepare_model_data(packages, linked, pip)
+#        method = self._prepare_model_data
+#        return self._create_worker(method, packages, linked, pip)
 
     def set_domain(self, domain='https://api.anaconda.org'):
         """

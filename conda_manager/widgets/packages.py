@@ -47,7 +47,6 @@ from conda_manager.widgets.table import TableCondaPackages
 _ = gettext.gettext
 
 
-
 class FirstRowWidget(QPushButton):
     """
     Widget located before pacakges table to handle focus in and tab focus
@@ -148,7 +147,8 @@ class CondaPackagesWidget(QWidget):
                  conda_url='https://conda.anaconda.org',
                  conda_api_url='https://api.anaconda.org',
                  setup=True,
-                 data_directory=None):
+                 data_directory=None,
+                 extra_metadata={}):
 
         super(CondaPackagesWidget, self).__init__(parent)
 
@@ -164,8 +164,8 @@ class CondaPackagesWidget(QWidget):
         self._parent = parent
         self._current_action_name = ''
         self._hide_widgets = False
-        self._metadata = {}        # From repo.continuum
-        self._metadata_links = {}  # Bundled metadata
+        self._metadata = extra_metadata  # From repo.continuum
+        self._metadata_links = {}        # Bundled metadata
         self.api = ManagerAPI()
         self.busy = False
         self.data_directory = data_directory
@@ -396,11 +396,35 @@ class CondaPackagesWidget(QWidget):
 
         packages = worker.packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
-        worker = self.api.client_prepare_packages_data(packages,
-                                                       linked_packages,
-                                                       pip_packages)
-        worker.packages = packages
-        worker.sig_finished.connect(self._setup_packages)
+        data = self.api.client_prepare_packages_data(packages,
+                                                     linked_packages,
+                                                     pip_packages)
+
+        print(data)
+
+        combobox_index = self.combobox_filter.currentIndex()
+        status = C.PACKAGE_STATUS[combobox_index]
+
+        # Remove blacklisted packages
+        for package in self.package_blacklist:
+            if package in packages:
+                packages.pop(package)
+            for i, row in enumerate(data):
+                if package == data[i][C.COL_NAME]:
+                    data.pop(i)
+
+        self.table.setup_model(packages, data, self._metadata_links)
+        self.combobox_filter.setCurrentIndex(combobox_index)
+        self.filter_package(status)
+
+        if self._current_model_index:
+            self.table.setCurrentIndex(self._current_model_index)
+            self.table.verticalScrollBar().setValue(self._current_table_scroll)
+
+        if error:
+            self.update_status(error, False)
+        self.sig_packages_ready.emit()
+        self.table.setFocus()
 
     def _repodata_updated(self, paths):
         """
@@ -680,7 +704,9 @@ class CondaPackagesWidget(QWidget):
             pass
 
     def set_environment(self, name=None, prefix=None):
-        """ """
+        """
+        This does not update the package manager!
+        """
         logger.debug(str((name, prefix)))
 
         if prefix and self.api.conda_environment_exists(prefix=prefix):
@@ -1046,6 +1072,7 @@ class CondaPackagesDialog(QDialog, CondaPackagesWidget):
     sig_environment_created = Signal()
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
     sig_next_focus = Signal()
+    sig_process_cancelled = Signal()
 
     def __init__(self,
                  parent=None,

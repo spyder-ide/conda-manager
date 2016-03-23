@@ -65,7 +65,8 @@ class CustomDelegate(QItemDelegate):
 
     def sizeHint(self, style, model_index):
         column = model_index.column()
-        if column in [const.COL_PACKAGE_TYPE] + const.ACTION_COLUMNS:
+        if column in [const.COL_PACKAGE_TYPE] + [const.ACTION_COLUMNS +
+                                                 const.COL_PACKAGE_TYPE]:
             return QSize(24, 24)
         else:
             return QItemDelegate.sizeHint(self, style, model_index)

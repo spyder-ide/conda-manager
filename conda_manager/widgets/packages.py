@@ -235,6 +235,10 @@ class CondaPackagesWidget(QWidget):
         self.status_bar.setFixedHeight(max_height*1.5)
         self.textbox_search.setMaximumWidth(max_width)
         self.textbox_search.setPlaceholderText('Search Packages')
+        self.table_first_row.setMaximumHeight(0)
+        self.table_last_row.setMaximumHeight(0)
+        self.table_last_row.setVisible(False)
+        self.table_first_row.setVisible(False)
 
         # Layout
         top_layout = QHBoxLayout()

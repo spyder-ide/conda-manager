@@ -170,12 +170,11 @@ class ProcessWorker(QObject):
             try:
                 result = json.loads(stdout), result[-1]
             except ValueError as error:
-                result = None, error
+                result = stdout, error
 
             if 'error' in result[0]:
                 error = '{0}: {1}'.format(" ".join(self._cmd_list),
                                           result[0]['error'])
-#                raise CondaError(error)
                 result = result[0], error
 
         if self._callback:

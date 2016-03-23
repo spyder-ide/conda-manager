@@ -400,8 +400,6 @@ class CondaPackagesWidget(QWidget):
                                                      linked_packages,
                                                      pip_packages)
 
-        print(data)
-
         combobox_index = self.combobox_filter.currentIndex()
         status = C.PACKAGE_STATUS[combobox_index]
 
@@ -768,13 +766,13 @@ class CondaPackagesWidget(QWidget):
         self.dlg.rejected.connect(button_channels.toggle)
         self.dlg.rejected.connect(button_channels.setFocus)
         self.dlg.accepted.connect(self.accept_channels_dialog)
-        self.dlg.show()
 
         geo_tl = button_channels.geometry().topLeft()
         tl = button_channels.parentWidget().mapToGlobal(geo_tl)
         x = tl.x() + 2
         y = tl.y() + button_channels.height()
         self.dlg.move(x, y)
+        self.dlg.show()
         self.dlg.button_add.setFocus()
 
     def update_package_index(self):

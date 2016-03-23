@@ -1,5 +1,7 @@
 # To release a new version of **conda-manager** on PyPI:
 
+* git pull upstream
+
 * Update `_version.py` (set release version, remove 'dev0')
 
 * git add and git commit

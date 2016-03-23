@@ -20,9 +20,8 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QEvent, QSize, Qt, Signal
-from qtpy.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QHBoxLayout,
-                            QMessageBox, QProgressBar, QPushButton,
-                            QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout,
+                            QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -30,15 +29,23 @@ from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
-from conda_manager.widgets import LabelStatus, ButtonCancel
+from conda_manager.widgets import (ButtonPackageApply, ButtonPackageCancel,
+                                   ButtonPackageChannels, ButtonPackageClear,
+                                   ButtonPackageOk, ButtonPackageUpdate,
+                                   DropdownPackageFilter, FramePackageBottom,
+                                   FramePackageTop, LabelPackageStatus,
+                                   ProgressBarPackage,
+                                   )
+
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
 from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
 from conda_manager.widgets.helperwidgets import LineEditSearch
-from conda_manager.widgets.table import CondaPackagesTable
+from conda_manager.widgets.table import TableCondaPackages
 
 
 _ = gettext.gettext
+
 
 
 class FirstRowWidget(QPushButton):
@@ -182,16 +189,18 @@ class CondaPackagesWidget(QWidget):
         # Widgets
         self.cancel_dialog = ClosePackageManagerDialog
         self.bbox = QDialogButtonBox(Qt.Horizontal)
-        self.button_cancel = ButtonCancel('Cancel')
-        self.button_channels = QPushButton(_('Channels'))
-        self.button_ok = QPushButton(_('Ok'))
-        self.button_update = QPushButton(_('Update package index...'))
-        self.button_apply = QPushButton(_('Apply'))
-        self.button_clear = QPushButton(_('Clear'))
-        self.combobox_filter = QComboBox(self)
-        self.progress_bar = QProgressBar(self)
-        self.status_bar = LabelStatus(self)
-        self.table = CondaPackagesTable(self)
+        self.button_cancel = ButtonPackageCancel('Cancel')
+        self.button_channels = ButtonPackageChannels(_('Channels'))
+        self.button_ok = ButtonPackageOk(_('Ok'))
+        self.button_update = ButtonPackageUpdate(_('Update package index...'))
+        self.button_apply = ButtonPackageApply(_('Apply'))
+        self.button_clear = ButtonPackageClear(_('Clear'))
+        self.combobox_filter = DropdownPackageFilter(self)
+        self.frame_top = FramePackageTop()
+        self.frame_bottom = FramePackageTop()
+        self.progress_bar = ProgressBarPackage(self)
+        self.status_bar = LabelPackageStatus(self)
+        self.table = TableCondaPackages(self)
         self.textbox_search = LineEditSearch(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
@@ -234,6 +243,8 @@ class CondaPackagesWidget(QWidget):
         top_layout.addWidget(self.button_update)
         top_layout.addWidget(self.textbox_search)
         top_layout.addStretch()
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame_top.setLayout(top_layout)
 
         middle_layout = QVBoxLayout()
         middle_layout.addWidget(self.table_first_row)
@@ -247,11 +258,13 @@ class CondaPackagesWidget(QWidget):
         bottom_layout.addWidget(self.button_cancel)
         bottom_layout.addWidget(self.button_apply)
         bottom_layout.addWidget(self.button_clear)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame_bottom.setLayout(bottom_layout)
 
         layout = QVBoxLayout(self)
-        layout.addLayout(top_layout)
+        layout.addWidget(self.frame_top)
         layout.addLayout(middle_layout)
-        layout.addLayout(bottom_layout)
+        layout.addWidget(self.frame_bottom)
         self.setLayout(layout)
 
         self.setTabOrder(self.combobox_filter, self.button_channels)
@@ -312,6 +325,8 @@ class CondaPackagesWidget(QWidget):
     def _load_bundled_metadata(self):
         """
         """
+        logger.debug('')
+
         parser = cp.ConfigParser()
         db_file = CondaPackagesWidget.DATABASE_FILE
         with open(osp.join(self.DATA_PATH, db_file)) as f:
@@ -326,6 +341,11 @@ class CondaPackagesWidget(QWidget):
     def _setup_packages(self, worker, data, error):
         """
         """
+        if error:
+            logger.error(error)
+        else:
+            logger.debug('')
+
         combobox_index = self.combobox_filter.currentIndex()
         status = C.PACKAGE_STATUS[combobox_index]
 
@@ -355,6 +375,11 @@ class CondaPackagesWidget(QWidget):
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
         """
+        if error:
+            logger.error(error)
+        else:
+            logger.debug('')
+
         packages, apps = output
         worker = self.api.pip_list(prefix=self.prefix)
         worker.sig_finished.connect(self._pip_list_ready)
@@ -364,6 +389,11 @@ class CondaPackagesWidget(QWidget):
     def _pip_list_ready(self, worker, pip_packages, error):
         """
         """
+        if error:
+            logger.error(error)
+        else:
+            logger.debug('')
+
         packages = worker.packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
         worker = self.api.client_prepare_packages_data(packages,
@@ -383,6 +413,11 @@ class CondaPackagesWidget(QWidget):
     def _metadata_updated(self, worker, path, error):
         """
         """
+        if error:
+            logger.error(error)
+        else:
+            logger.debug('')
+
         with open(path, 'r') as f:
             data = f.read()
         try:
@@ -457,6 +492,7 @@ class CondaPackagesWidget(QWidget):
 
     def _run_pip_action(self, package_name, action):
         """
+        DEPRECATED
         """
         prefix = self.prefix
 
@@ -485,7 +521,9 @@ class CondaPackagesWidget(QWidget):
 
     def _run_conda_action(self, package_name, action, version, versions,
                           packages_sizes):
-        """ """
+        """
+        DEPRECATED
+        """
         prefix = self.prefix
         dlg = CondaPackageActionDialog(self, prefix, package_name, action,
                                        version, versions, packages_sizes,
@@ -511,7 +549,9 @@ class CondaPackagesWidget(QWidget):
             self._run_conda_process(action, dic)
 
     def _run_conda_process(self, action, dic):
-        """ """
+        """
+        DEPRECTAED
+        """
         prefix = self.prefix
 
         if prefix == self.root_prefix:
@@ -599,10 +639,13 @@ class CondaPackagesWidget(QWidget):
             List of conda package names to be excluded from the actual package
             manager view.
         """
-        if self.busy:
-            return
 
-        logger.debug('')
+        if self.busy:
+            logger.debug('Busy...')
+            return
+        else:
+            logger.debug('')
+
         self.package_blacklist = [p.lower() for p in blacklist]
         self._current_model_index = self.table.currentIndex()
         self._current_table_scroll = self.table.verticalScrollBar().value()
@@ -618,7 +661,7 @@ class CondaPackagesWidget(QWidget):
     def update_domains(self, anaconda_api_url=None, conda_url=None):
         """
         """
-        logger.info(str((anaconda_api_url, conda_url)))
+        logger.debug(str((anaconda_api_url, conda_url)))
         update = False
 
         if anaconda_api_url:

@@ -19,11 +19,13 @@ import sys
 from qtpy.QtCore import QSize, Qt, Signal
 from qtpy.QtGui import QIcon
 from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
-                            QListWidgetItem, QPushButton, QVBoxLayout)
+                            QListWidgetItem, QVBoxLayout)
 
 # Local imports
 from conda_manager.api import ManagerAPI
-from conda_manager.widgets import ButtonCancel
+from conda_manager.widgets import (ButtonPackageChannelAdd,
+                                   ButtonPackageChannelRemove,
+                                   ButtonPackageChannelUpdate)
 import qtawesome as qta
 
 _ = gettext.gettext
@@ -63,9 +65,9 @@ class DialogChannels(QDialog):
 
         # Widgets
         self.list = ListWidgetChannels(self)
-        self.button_add = QPushButton('Add')
-        self.button_delete = ButtonCancel('Remove')
-        self.button_ok = QPushButton(_('Update channels'))
+        self.button_add = ButtonPackageChannelAdd('Add')
+        self.button_delete = ButtonPackageChannelRemove('Remove')
+        self.button_ok = ButtonPackageChannelUpdate(_('Update channels'))
 
         # Widget setup
 #        self.button_add.setIcon(qta.icon('fa.plus'))

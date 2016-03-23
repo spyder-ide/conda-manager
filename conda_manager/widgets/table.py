@@ -71,7 +71,7 @@ class CustomDelegate(QItemDelegate):
             return QItemDelegate.sizeHint(self, style, model_index)
 
 
-class CondaPackagesTable(QTableView):
+class TableCondaPackages(QTableView):
     """ """
     WIDTH_TYPE = 24
     WIDTH_NAME = 120
@@ -86,7 +86,7 @@ class CondaPackagesTable(QTableView):
     sig_previous_focus = Signal()
 
     def __init__(self, parent):
-        super(CondaPackagesTable, self).__init__(parent)
+        super(TableCondaPackages, self).__init__(parent)
         self._parent = parent
         self._searchbox = u''
         self._filterbox = const.ALL
@@ -326,12 +326,12 @@ class CondaPackagesTable(QTableView):
         return self.hasFocus() or (self._menu and self._menu.isVisible())
 
     def mouseMoveEvent(self, event):
-        super(CondaPackagesTable, self).mouseMoveEvent(event)
+        super(TableCondaPackages, self).mouseMoveEvent(event)
         pos = event.pos()
         self._current_hover_row = self.rowAt(pos.y())
 
     def leaveEvent(self, event):
-        super(CondaPackagesTable, self).leaveEvent(event)
+        super(TableCondaPackages, self).leaveEvent(event)
         self._current_hover_row = None
 
     def keyPressEvent(self, event):

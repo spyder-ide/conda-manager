@@ -10,12 +10,68 @@
 """
 
 # Third party imports
-from qtpy.QtWidgets import QLabel, QPushButton
+from qtpy.QtWidgets import QComboBox, QFrame, QLabel, QPushButton, QProgressBar
 
 
-class ButtonCancel(QPushButton):
+# --- Widgets used in CSS styling
+class ButtonBase(QPushButton):
+    def __init__(self, *args, **kwargs):
+        super(ButtonBase, self).__init__(*args, **kwargs)
+        self.setDefault(True)
+
+
+class ButtonPackageCancel(ButtonBase):
     pass
 
 
-class LabelStatus(QLabel):
+class ButtonPackageChannels(ButtonBase):
+    pass
+
+
+class ButtonPackageOk(ButtonBase):
+    pass
+
+
+class ButtonPackageUpdate(ButtonBase):
+    pass
+
+
+class ButtonPackageApply(ButtonBase):
+    pass
+
+
+class ButtonPackageClear(ButtonBase):
+    pass
+
+
+# Channel dialog widgets
+class ButtonPackageChannelAdd(ButtonBase):
+    pass
+
+
+class ButtonPackageChannelRemove(ButtonBase):
+    pass
+
+
+class ButtonPackageChannelUpdate(ButtonBase):
+    pass
+
+
+class DropdownPackageFilter(QComboBox):
+    pass
+
+
+class ProgressBarPackage(QProgressBar):
+    pass
+
+
+class LabelPackageStatus(QLabel):
+    pass
+
+
+class FramePackageTop(QFrame):
+    pass
+
+
+class FramePackageBottom(QFrame):
     pass

@@ -20,9 +20,8 @@ import sys
 
 # Third party imports
 from qtpy.QtCore import QEvent, QSize, Qt, Signal
-from qtpy.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QHBoxLayout,
-                            QMessageBox, QProgressBar, QPushButton,
-                            QVBoxLayout, QWidget)
+from qtpy.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout,
+                            QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -30,15 +29,23 @@ from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
-from conda_manager.widgets import LabelStatus, ButtonCancel
+from conda_manager.widgets import (ButtonPackageApply, ButtonPackageCancel,
+                                   ButtonPackageChannels, ButtonPackageClear,
+                                   ButtonPackageOk, ButtonPackageUpdate,
+                                   DropdownPackageFilter, FramePackageBottom,
+                                   FramePackageTop, LabelPackageStatus,
+                                   ProgressBarPackage,
+                                   )
+
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
 from conda_manager.widgets.dialogs.close import ClosePackageManagerDialog
 from conda_manager.widgets.helperwidgets import LineEditSearch
-from conda_manager.widgets.table import CondaPackagesTable
+from conda_manager.widgets.table import TableCondaPackages
 
 
 _ = gettext.gettext
+
 
 
 class FirstRowWidget(QPushButton):
@@ -182,16 +189,18 @@ class CondaPackagesWidget(QWidget):
         # Widgets
         self.cancel_dialog = ClosePackageManagerDialog
         self.bbox = QDialogButtonBox(Qt.Horizontal)
-        self.button_cancel = ButtonCancel('Cancel')
-        self.button_channels = QPushButton(_('Channels'))
-        self.button_ok = QPushButton(_('Ok'))
-        self.button_update = QPushButton(_('Update package index...'))
-        self.button_apply = QPushButton(_('Apply'))
-        self.button_clear = QPushButton(_('Clear'))
-        self.combobox_filter = QComboBox(self)
-        self.progress_bar = QProgressBar(self)
-        self.status_bar = LabelStatus(self)
-        self.table = CondaPackagesTable(self)
+        self.button_cancel = ButtonPackageCancel('Cancel')
+        self.button_channels = ButtonPackageChannels(_('Channels'))
+        self.button_ok = ButtonPackageOk(_('Ok'))
+        self.button_update = ButtonPackageUpdate(_('Update package index...'))
+        self.button_apply = ButtonPackageApply(_('Apply'))
+        self.button_clear = ButtonPackageClear(_('Clear'))
+        self.combobox_filter = DropdownPackageFilter(self)
+        self.frame_top = FramePackageTop()
+        self.frame_bottom = FramePackageTop()
+        self.progress_bar = ProgressBarPackage(self)
+        self.status_bar = LabelPackageStatus(self)
+        self.table = TableCondaPackages(self)
         self.textbox_search = LineEditSearch(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
@@ -234,6 +243,8 @@ class CondaPackagesWidget(QWidget):
         top_layout.addWidget(self.button_update)
         top_layout.addWidget(self.textbox_search)
         top_layout.addStretch()
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame_top.setLayout(top_layout)
 
         middle_layout = QVBoxLayout()
         middle_layout.addWidget(self.table_first_row)
@@ -247,11 +258,13 @@ class CondaPackagesWidget(QWidget):
         bottom_layout.addWidget(self.button_cancel)
         bottom_layout.addWidget(self.button_apply)
         bottom_layout.addWidget(self.button_clear)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame_bottom.setLayout(bottom_layout)
 
         layout = QVBoxLayout(self)
-        layout.addLayout(top_layout)
+        layout.addWidget(self.frame_top)
         layout.addLayout(middle_layout)
-        layout.addLayout(bottom_layout)
+        layout.addWidget(self.frame_bottom)
         self.setLayout(layout)
 
         self.setTabOrder(self.combobox_filter, self.button_channels)

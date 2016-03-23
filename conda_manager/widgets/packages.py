@@ -630,7 +630,7 @@ class CondaPackagesWidget(QWidget):
         if self.busy:
             logger.debug('Busy...')
             return
-        elsE:
+        else:
             logger.debug('')
 
         self.package_blacklist = [p.lower() for p in blacklist]

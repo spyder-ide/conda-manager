@@ -51,12 +51,18 @@ class ClientWorker(QObject):
         except Exception as err:
             logger.debug(str((self.method.__module__, self.method.__name__,
                               err)))
-            try:
-                error = err[0]
-            except Exception:
-                error = err.message
+            error = str(err)
+            error = error.replace('(', '')
+            error = error.replace(')', '')
+#            try:
+#                error = err[0]
+#            except Exception:
+#                try:
+#                    error = err.message
+#                except Exception as err2:
+#                    error = ''
 
-        self.sig_finished.emit(self, output, error)
+        self.sig_finished.emit(self, output, str(error))
         self._is_finished = True
 
 
@@ -200,10 +206,28 @@ class _ClientAPI(QObject):
 
         return all_packages, all_apps
 
-    def _prepare_model_data(self, packages, linked, pip):
+    def _prepare_model_data(self, packages, linked, pip=[],
+                            private_packages={}):
         """
         """
         data = []
+
+        if private_packages is not None:
+            for pkg in private_packages:
+                if pkg in packages:
+                    p_data = packages.get(pkg, None)
+                    versions = p_data.get('versions', '') if p_data else []
+                    private_versions = private_packages[pkg]['versions']
+                    all_versions = sort_versions(list(set(versions + private_versions)))
+    #                print(pkg, all_versions)
+                    packages[pkg]['versions'] = all_versions
+                else:
+                    private_versions = sort_versions(private_packages[pkg]['versions'])
+                    private_packages[pkg]['versions'] = private_versions
+                    packages[pkg] = private_packages[pkg]
+    #                print(pkg, private_versions)
+        else:
+            private_packages = {}
 
         linked_packages = {}
         for canonical_name in linked:
@@ -217,7 +241,11 @@ class _ClientAPI(QObject):
 
         packages_names = sorted(list(set(list(linked_packages.keys()) +
                                          list(pip_packages.keys()) +
-                                         list(packages.keys()))))
+                                         list(packages.keys()) +
+                                         list(private_packages.keys())
+                                         )
+                                     )
+                                )
 
         for name in packages_names:
             p_data = packages.get(name, None)
@@ -311,11 +339,13 @@ class _ClientAPI(QObject):
         return self._create_worker(method, filepaths, extra_data=extra_data,
                                    metadata=metadata)
 
-    def prepare_model_data(self, packages, linked, pip):
+    def prepare_model_data(self, packages, linked, pip=[],
+                           private_packages={}):
         """
         """
         logger.debug('')
-        return self._prepare_model_data(packages, linked, pip)
+        return self._prepare_model_data(packages, linked, pip=pip,
+                                        private_packages=private_packages)
 #        method = self._prepare_model_data
 #        return self._create_worker(method, packages, linked, pip)
 
@@ -356,6 +386,91 @@ class _ClientAPI(QObject):
     def domain(self):
         return self._anaconda_client_api.domain
 
+    def packages(self, login=None, platform=None, package_type=None,
+                 type_=None, access=None):
+        """
+        :param type_: only find packages that have this conda `type`
+           (i.e. 'app')
+        :param access: only find packages that have this access level
+           (e.g. 'private', 'authenticated', 'public')
+        """
+#        data = self._anaconda_client_api.user_packages(
+#            login=login,
+#            platform=platform,
+#            package_type=package_type,
+#            type_=type_,
+#            access=access)
+        logger.debug('')
+        method = self._anaconda_client_api.user_packages
+        return self._create_worker(method, login=login, platform=platform,
+                                   package_type=package_type,
+                                   type_=type_, access=access)
+
+    def _multi_packages(self, logins=None, platform=None, package_type=None,
+                        type_=None, access=None, new_client=True):
+        private_packages = {}
+
+        if not new_client:
+            return {}
+
+        for login in logins:
+#            print(login)
+            data = self._anaconda_client_api.user_packages(
+                login=login,
+                platform=platform,
+                package_type=package_type,
+                type_=type_,
+                access=access)
+            for item in data:
+                name = item.get('name', '')
+                public = item.get('public', True)
+                package_types = item.get('package_types', [])
+                latest_version = item.get('latest_version', '')
+                if name and not public and 'conda' in package_types:
+                    if name in private_packages:
+                        versions = private_packages.get('versions', []),
+                        new_versions = item.get('versions', []),
+                        vers = sort_versions(list(set(versions + new_versions )))
+                        private_packages[name]['versions'] = vers
+                        private_packages[name]['latest_version'] = vers[-1]
+                    else:
+                        private_packages[name] = {
+                            'versions': item.get('versions', []),
+                            'app_entry': {},
+                            'type': {},
+                            'size': {},
+                            'latest_version': latest_version,
+                            }
+
+        return private_packages
+
+    def multi_packages(self, logins=None, platform=None, package_type=None,
+                       type_=None, access=None):
+        """
+        Get all the private packages for a given set of usernames (logins)
+        """
+        logger.debug('')
+        method = self._multi_packages
+        new_client = True
+
+        try:
+            # Only the newer versions have extra keywords like `access`
+            self._anaconda_client_api.user_packages(access='private')
+        except Exception as error:
+            new_client = False
+
+        return self._create_worker(method, logins=logins,
+                                   platform=platform,
+                                   package_type=package_type,
+                                   type_=type_, access=access,
+                                   new_client=new_client)
+
+    def organizations(self, login=None):
+        """
+        List all the organizations a user has access to.
+        """
+        return self._anaconda_client_api.user(login=login)
+
 
 CLIENT_API = None
 
@@ -369,20 +484,29 @@ def ClientAPI():
     return CLIENT_API
 
 
+def print_output(worker, output, error):
+    print(output, error)
+
+
 def test():
-    from anaconda_ui.utils.qthelpers import qapplication
+    from anaconda_navigator.utils.qthelpers import qapplication
     app = qapplication()
     api = ClientAPI()
-    api.login('goanpeca', 'asdasd', 'baby', '')
-    api.login('bruce', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.logout()
+#    api.login('goanpeca', 'asdasd', 'baby', '')
+#    api.login('bruce', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+
+    api.set_domain(domain='https://api.beta.anaconda.org')
+    worker = api.multi_packages(logins=['goanpeca'])
+    worker.sig_finished.connect(print_output)
+    worker = api.organizations(login='goanpeca')
+
     app.exec_()
 
 

@@ -645,7 +645,7 @@ class TableCondaPackages(QTableView):
                 actions.append(create_action(self, _('Development'),
                                              icon=q_dev, triggered=lambda:
                                              self.open_url(dev)))
-        if len(actions) > 1:
+        if actions and len(actions) > 1:
             # self._menu = QMenu(self)
             add_actions(self._menu, actions)
 

@@ -457,14 +457,14 @@ class CondaPackagesWidget(QWidget):
     def _run_multiple_actions(self, worker=None, output=None, error=None):
         """
         """
-        conda_error = output.get('error')
-        conda_error_type = output.get('error_type')
+        if output:
+            conda_error = output.get('error')
+            conda_error_type = output.get('error_type')
 
-        if conda_error:
-            self.conda_errors.append(conda_error)
-
-        if conda_error_type:
-            self.conda_error_types.append(conda_error_type)
+            if conda_error:
+                self.conda_errors.append(conda_error)
+            if conda_error_type:
+                self.conda_error_types.append(conda_error_type)
 
         if self._multiple_process:
             status, func = self._multiple_process.popleft()

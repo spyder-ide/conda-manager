@@ -79,6 +79,7 @@ class _ManagerAPI(QObject):
         self.client_domain = self._client_api.domain
         self.client_set_domain = self._client_api.set_domain
         self.client_packages = self._client_api.packages
+        self.client_multi_packages = self._client_api.multi_packages
 
 
     # --- Helper methods

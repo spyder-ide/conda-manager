@@ -379,6 +379,14 @@ class CondaPackagesWidget(QWidget):
         self.sig_packages_ready.emit()
         self.table.setFocus()
 
+    def get_logged_user_list_channels(self):
+        channels = []
+        for ch in self._active_channels:
+            if self.conda_url in ch and 'repo.continuum' not in ch:
+                channel = ch.split('/')[-1]
+                channels.append(channel)
+        return channels
+
     def _prepare_model_data(self, worker=None, output=None, error=None):
         """
         """
@@ -390,7 +398,9 @@ class CondaPackagesWidget(QWidget):
         packages, apps = output
 #        worker = self.api.pip_list(prefix=self.prefix)
 #        worker.sig_finished.connect(self._pip_list_ready)
-        worker = self.api.client_packages(access='private')
+        logins = self.get_logged_user_list_channels()
+        worker = self.api.client_multi_packages(logins=logins,
+                                                access='private')
         worker.sig_finished.connect(self._user_private_packages_ready)
         worker.packages = packages
         worker.apps = apps
@@ -407,23 +417,22 @@ class CondaPackagesWidget(QWidget):
         worker.packages = packages
         worker.apps = apps
 
-        #print(output, error)
-        private_packages = {}
-        if output:
-            all_private_packages = output
-            for item in all_private_packages:
-                name = item.get('name', '')
-                public = item.get('public', True)
-                package_types = item.get('package_types', [])
-                latest_version = item.get('latest_version', '')
-                if name and not public and 'conda' in package_types:
-                    private_packages[name] = {'versions': item.get('versions', []),
-                                              'app_entry': {},
-                                              'type': {},
-                                              'size': {},
-                                              'latest_version': latest_version,
-                                              }
-        worker.private_packages = private_packages
+#        private_packages = {}
+#        if output:
+#            all_private_packages = output
+#            for item in all_private_packages:
+#                name = item.get('name', '')
+#                public = item.get('public', True)
+#                package_types = item.get('package_types', [])
+#                latest_version = item.get('latest_version', '')
+#                if name and not public and 'conda' in package_types:
+#                    private_packages[name] = {'versions': item.get('versions', []),
+#                                              'app_entry': {},
+#                                              'type': {},
+#                                              'size': {},
+#                                              'latest_version': latest_version,
+#                                              }
+        worker.private_packages = output
 
     def _pip_list_ready(self, worker, pip_packages, error):
         """

@@ -397,6 +397,48 @@ class _ClientAPI(QObject):
                                    package_type=package_type,
                                    type_=type_, access=access)
 
+    def _multi_packages(self, logins=None, platform=None, package_type=None,
+                        type_=None, access=None):
+        private_packages = {}
+        for login in logins:
+#            print(login)
+            data = self._anaconda_client_api.user_packages(
+                login=login,
+                platform=platform,
+                package_type=package_type,
+                type_=type_,
+                access=access)
+            for item in data:
+                name = item.get('name', '')
+                public = item.get('public', True)
+                package_types = item.get('package_types', [])
+                latest_version = item.get('latest_version', '')
+                if name and not public and 'conda' in package_types:
+                    if name in private_packages:
+                        versions = private_packages.get('versions', []),
+                        new_versions = item.get('versions', []),
+                        vers = sort_versions(list(set(versions + new_versions )))
+                        private_packages[name]['versions'] = vers
+                        private_packages[name]['latest_version'] = vers[-1]
+                    else:
+                        private_packages[name] = {
+                            'versions': item.get('versions', []),
+                            'app_entry': {},
+                            'type': {},
+                            'size': {},
+                            'latest_version': latest_version,
+                            }
+
+        return private_packages
+
+    def multi_packages(self, logins=None, platform=None, package_type=None,
+                       type_=None, access=None):
+        logger.debug('')
+        method = self._multi_packages
+        return self._create_worker(method, logins=logins, platform=platform,
+                                   package_type=package_type,
+                                   type_=type_, access=access)
+
 
 CLIENT_API = None
 
@@ -418,20 +460,22 @@ def test():
     from anaconda_navigator.utils.qthelpers import qapplication
     app = qapplication()
     api = ClientAPI()
-    api.login('goanpeca', 'asdasd', 'baby', '')
-    api.login('bruce', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
-    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('goanpeca', 'asdasd', 'baby', '')
+#    api.login('bruce', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+#    api.login('asdkljasdh', 'asdasd', 'baby', '')
+
+    api.set_domain(domain='https://api.beta.anaconda.org')
+    worker = api.multi_packages(['goanpeca'])
+    worker.sig_finished.connect(print_output)
+
     app.exec_()
 
-
-#    from binstar_client import Binstar
-#    api = Binstar(domain='https://beta.anaconda.org/api')
 
 if __name__ == '__main__':
     test()

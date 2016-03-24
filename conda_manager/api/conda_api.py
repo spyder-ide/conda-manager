@@ -19,6 +19,7 @@ import yaml
 from qtpy.QtCore import QByteArray, QObject, QProcess, QTimer, Signal
 
 # Local imports
+from conda_manager.utils.findpip import PIP_LIST_SCRIPT
 from conda_manager.utils.logs import logger
 
 
@@ -89,7 +90,8 @@ class ProcessWorker(QObject):
     sig_finished = Signal(object, object, object)
     sig_partial = Signal(object, object, object)
 
-    def __init__(self, cmd_list, parse=False, pip=False, callback=None):
+    def __init__(self, cmd_list, parse=False, pip=False, callback=None,
+                 extra_kwargs={}):
         super(ProcessWorker, self).__init__()
         self._result = None
         self._cmd_list = cmd_list
@@ -100,6 +102,7 @@ class ProcessWorker(QObject):
         self._fired = False
         self._communicate_first = False
         self._partial_stdout = None
+        self._extra_kwargs = extra_kwargs
 
         self._timer = QTimer()
         self._process = QProcess()
@@ -159,10 +162,10 @@ class ProcessWorker(QObject):
             if stderr.strip() and self._conda:
                 raise Exception('{0}:\n'
                                 'STDERR:\n{1}\nEND'
-                                ''.format(' '.join(self.cmd_list),
+                                ''.format(' '.join(self._cmd_list),
                                           stderr))
-            elif stderr.strip() and self._pip:
-                raise PipError(cmd_list)
+#            elif stderr.strip() and self._pip:
+#                raise PipError(self._cmd_list)
         else:
             result[-1] = ''
 
@@ -178,7 +181,8 @@ class ProcessWorker(QObject):
                 result = result[0], error
 
         if self._callback:
-            result = self._callback(result[0], result[-1]), result[-1]
+            result = self._callback(result[0], result[-1],
+                                    **self._extra_kwargs), result[-1]
 
         self._result = result
         self.sig_finished.emit(self, result[0], result[-1])
@@ -977,32 +981,53 @@ class _CondaAPI(QObject):
                             "required.")
 
         if name:
-            cmd_list = ['list', '--name', name]
-        if prefix:
-            cmd_list = ['list', '--prefix', prefix]
+            prefix = self.get_prefix_envname(name)
 
-        return self._call_conda(cmd_list, abspath=abspath,
-                                callback=self._pip_list)
+        pip_command = os.sep.join([prefix, 'bin', 'python'])
+        cmd_list = [pip_command, PIP_LIST_SCRIPT]
+        process_worker = ProcessWorker(cmd_list, pip=True, parse=True,
+                                       callback=self._pip_list,
+                                       extra_kwargs={'prefix': prefix})
+        process_worker.sig_finished.connect(self._start)
+        self._queue.append(process_worker)
+        self._start()
 
-    def _pip_list(self, stdout, stderr):
+        return process_worker
+
+#        if name:
+#            cmd_list = ['list', '--name', name]
+#        if prefix:
+#            cmd_list = ['list', '--prefix', prefix]
+
+#        return self._call_conda(cmd_list, abspath=abspath,
+#                                callback=self._pip_list)
+
+    def _pip_list(self, stdout, stderr, prefix=None):
         """
         """
-        result = []
-        lines = to_text_string(stdout).split('\n')
+        result = stdout  # A dict
+        linked = self.linked(prefix)
 
-        for line in lines:
+        pip_only = []
+
+        linked_names = [self.split_canonical_name(l)[0] for l in linked]
+
+        for pkg in result:
+            name = self.split_canonical_name(pkg)[0]
+            if name not in linked_names:
+                pip_only.append(pkg)
             # FIXME: NEED A MORE ROBUST WAY!
-            if '<pip>' in line and '#' not in line:
-                temp = line.split()[:-1] + ['pip']
-                temp = '-'.join(temp)
-                if '-(' in temp:
-                    start = temp.find('-(')
-                    end = temp.find(')')
-                    substring = temp[start:end+1]
-                    temp = temp.replace(substring, '')
-                result.append(temp)
+#            if '<pip>' in line and '#' not in line:
+#                temp = line.split()[:-1] + ['pip']
+#                temp = '-'.join(temp)
+#                if '-(' in temp:
+#                    start = temp.find('-(')
+#                    end = temp.find(')')
+#                    substring = temp[start:end+1]
+#                    temp = temp.replace(substring, '')
+#                result.append(temp)
 
-        return result
+        return pip_only
 
     def pip_remove(self, name=None, prefix=None, pkgs=None):
         """
@@ -1067,33 +1092,34 @@ COUNTER = 0
 def ready_print(worker, output, error):
     global COUNTER
     COUNTER += 1
-    print(COUNTER, worker, worker._cmd_list, output)
+    print(COUNTER, output, error)
 
 
 def test():
     """
     """
-    from anaconda_ui.utils.qthelpers import qapplication
+    from conda_manager.utils.qthelpers import qapplication
 
     app = qapplication()
     conda_api = CondaAPI()
-    print(conda_api.get_condarc_channels())
-    worker = conda_api.info()
+#    print(conda_api.get_condarc_channels())
+#    worker = conda_api.info()
+##    worker.sig_finished.connect(ready_print)
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.info()
+#    worker = conda_api.pip_search('spyder')
 #    worker.sig_finished.connect(ready_print)
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.info()
-    worker = conda_api.pip_search('spyder')
+    worker = conda_api.pip_list(name='py3')
     worker.sig_finished.connect(ready_print)
-    print(conda_api.pip_list(name='root'))
-    print(conda_api.package_version(name='root', pkg='spyder'))
+#    print(conda_api.package_version(name='root', pkg='spyder'))
 
     app.exec_()
 

@@ -418,6 +418,7 @@ class CondaPackagesWidget(QWidget):
         worker.packages = packages
         worker.apps = apps
 
+        print(output)
 #        private_packages = {}
 #        if output:
 #            all_private_packages = output

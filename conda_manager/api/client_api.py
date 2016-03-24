@@ -407,8 +407,12 @@ class _ClientAPI(QObject):
                                    type_=type_, access=access)
 
     def _multi_packages(self, logins=None, platform=None, package_type=None,
-                        type_=None, access=None):
+                        type_=None, access=None, new_client=True):
         private_packages = {}
+
+        if not new_client:
+            return {}
+
         for login in logins:
 #            print(login)
             data = self._anaconda_client_api.user_packages(
@@ -447,9 +451,19 @@ class _ClientAPI(QObject):
         """
         logger.debug('')
         method = self._multi_packages
-        return self._create_worker(method, logins=logins, platform=platform,
+        new_client = True
+
+        try:
+            # Only the newer versions have extra keywords like `access`
+            self._anaconda_client_api.user_packages(access='private')
+        except Exception as error:
+            new_client = False
+
+        return self._create_worker(method, logins=logins,
+                                   platform=platform,
                                    package_type=package_type,
-                                   type_=type_, access=access)
+                                   type_=type_, access=access,
+                                   new_client=new_client)
 
     def organizations(self, login=None):
         """

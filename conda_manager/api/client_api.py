@@ -11,6 +11,7 @@ import bz2
 import logging
 import json
 import os
+import time
 
 # Third party imports
 from qtpy.QtCore import QObject, QThread, QTimer, Signal
@@ -411,10 +412,10 @@ class _ClientAPI(QObject):
         private_packages = {}
 
         if not new_client:
-            return {}
+            time.sleep(0.3)
+            return private_packages
 
         for login in logins:
-#            print(login)
             data = self._anaconda_client_api.user_packages(
                 login=login,
                 platform=platform,

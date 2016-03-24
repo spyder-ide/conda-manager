@@ -169,7 +169,7 @@ class ProcessWorker(QObject):
         else:
             result[-1] = ''
 
-        if self._parse:
+        if self._parse and stdout:
             try:
                 result = json.loads(stdout), result[-1]
             except ValueError as error:

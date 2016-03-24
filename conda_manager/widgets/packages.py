@@ -459,7 +459,7 @@ class CondaPackagesWidget(QWidget):
         """
         logger.error(str(error))
 
-        if output:
+        if output and isinstance(output, dict):
             conda_error_type = output.get('error_type')
             conda_error = output.get('error')
 

@@ -137,6 +137,7 @@ class CondaPackagesWidget(QWidget):
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
     sig_process_cancelled = Signal()
     sig_next_focus = Signal()
+    sig_packages_busy = Signal()
 
     def __init__(self,
                  parent,
@@ -424,7 +425,7 @@ class CondaPackagesWidget(QWidget):
             self.table.verticalScrollBar().setValue(self._current_table_scroll)
 
         if error:
-            self.update_status(error, False)
+            self.update_status(str(error), False)
         self.sig_packages_ready.emit()
         self.table.setFocus()
 
@@ -677,6 +678,7 @@ class CondaPackagesWidget(QWidget):
             List of conda package names to be excluded from the actual package
             manager view.
         """
+        self.sig_packages_busy.emit()
 
         if self.busy:
             logger.debug('Busy...')

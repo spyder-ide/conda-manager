@@ -51,15 +51,15 @@ class ClientWorker(QObject):
         except Exception as err:
             logger.debug(str((self.method.__module__, self.method.__name__,
                               err)))
-            try:
-                error = err[0]
-            except Exception:
-                try:
-                    error = err.message
-                except Exception as error:
-                    error = ''
+#            try:
+#                error = err[0]
+#            except Exception:
+#                try:
+#                    error = err.message
+#                except Exception as err2:
+#                    error = ''
 
-        self.sig_finished.emit(self, output, error)
+        self.sig_finished.emit(self, output, str(error))
         self._is_finished = True
 
 
@@ -209,19 +209,20 @@ class _ClientAPI(QObject):
         """
         data = []
 
-        for pkg in private_packages:
-            if pkg in packages:
-                p_data = packages.get(pkg, None)
-                versions = p_data.get('versions', '') if p_data else []
-                private_versions = private_packages[pkg]['versions']
-                all_versions = sort_versions(list(set(versions + private_versions)))
-#                print(pkg, all_versions)
-                packages[pkg]['versions'] = all_versions
-            else:
-                private_versions = sort_versions(private_packages[pkg]['versions'])
-                private_packages[pkg]['versions'] = private_versions
-                packages[pkg] = private_packages[pkg]
-#                print(pkg, private_versions)
+        if private_packages is not None:
+            for pkg in private_packages:
+                if pkg in packages:
+                    p_data = packages.get(pkg, None)
+                    versions = p_data.get('versions', '') if p_data else []
+                    private_versions = private_packages[pkg]['versions']
+                    all_versions = sort_versions(list(set(versions + private_versions)))
+    #                print(pkg, all_versions)
+                    packages[pkg]['versions'] = all_versions
+                else:
+                    private_versions = sort_versions(private_packages[pkg]['versions'])
+                    private_packages[pkg]['versions'] = private_versions
+                    packages[pkg] = private_packages[pkg]
+    #                print(pkg, private_versions)
 
         linked_packages = {}
         for canonical_name in linked:

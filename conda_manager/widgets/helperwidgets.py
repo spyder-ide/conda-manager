@@ -38,7 +38,7 @@ class LineEditSearch(QLineEdit):
         self.button_icon.clicked.connect(self.clear_text)
 
         self.update_box(None)
-        self.set_icon_size(24, 24)
+        self.set_icon_size(16, 16)
         self.setTabOrder(self, self.button_icon)
 
     def set_icon_size(self, width, height):
@@ -46,11 +46,19 @@ class LineEditSearch(QLineEdit):
         self.setStyleSheet('LineEditSearch '
                            '{{padding-right: {0}px;}}'.format(width))
 
+    def setProperty(self, name, value):
+        super(LineEditSearch, self).setProperty(name, value)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+
     def update_box(self, text=None):
         if text:
             self.button_icon.setIcon(qta.icon('fa.remove'))
+            self.button_icon.setProperty('_remove', True)
         else:
             self.button_icon.setIcon(qta.icon('fa.search'))
+            self.button_icon.setProperty('_remove', False)
         self._empty = not bool(text)
         self.button_icon.setDisabled(self._empty)
 

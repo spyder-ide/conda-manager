@@ -457,6 +457,15 @@ class CondaPackagesWidget(QWidget):
     def _run_multiple_actions(self, worker=None, output=None, error=None):
         """
         """
+        conda_error = output.get('error')
+        conda_error_type = output.get('error_type')
+
+        if conda_error:
+            self.conda_errors.append(conda_error)
+
+        if conda_error_type:
+            self.conda_error_types.append(conda_error_type)
+
         if self._multiple_process:
             status, func = self._multiple_process.popleft()
             self.update_status(status)
@@ -465,6 +474,8 @@ class CondaPackagesWidget(QWidget):
             worker.sig_partial.connect(self._partial_output_ready)
         else:
             self.update_status('', hide=False)
+            print(self.conda_errors)
+            print(self.conda_errors_types)
             self.setup()
 
     def _pip_process_ready(self, worker, output, error):
@@ -792,6 +803,9 @@ class CondaPackagesWidget(QWidget):
         """
         logger.debug('')
 
+        self.conda_errors = []
+        self.conda_error_types = []
+
         prefix = self.prefix
 
         if prefix == self.root_prefix:
@@ -931,7 +945,6 @@ class CondaPackagesWidget(QWidget):
 
                 self._multiple_process.append([status, trigger()])
 
-            self._multiple_process
             self._run_multiple_actions()
 
     def clear_actions(self):

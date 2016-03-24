@@ -512,8 +512,8 @@ class CondaPackagesWidget(QWidget):
             if conda_error_type or conda_error:
                 self.conda_error.append((conda_error_type, conda_error))
                 logger.error((conda_error_type, conda_error))
-                print(self.conda_errors)
-                print(self.conda_errors_types)
+#                print(self.conda_errors)
+#                print(self.conda_errors_types)
 
         if self._multiple_process:
             status, func = self._multiple_process.popleft()

@@ -433,11 +433,20 @@ class _ClientAPI(QObject):
 
     def multi_packages(self, logins=None, platform=None, package_type=None,
                        type_=None, access=None):
+        """
+        Get all the private packages for a given set of usernames (logins)
+        """
         logger.debug('')
         method = self._multi_packages
         return self._create_worker(method, logins=logins, platform=platform,
                                    package_type=package_type,
                                    type_=type_, access=access)
+
+    def organizations(self, login=None):
+        """
+        List all the organizations a user has access to.
+        """
+        return self._anaconda_client_api.user(login=login)
 
 
 CLIENT_API = None
@@ -471,8 +480,9 @@ def test():
 #    api.login('asdkljasdh', 'asdasd', 'baby', '')
 
     api.set_domain(domain='https://api.beta.anaconda.org')
-    worker = api.multi_packages(['goanpeca'])
+    worker = api.multi_packages(logins=['goanpeca'])
     worker.sig_finished.connect(print_output)
+    worker = api.organizations(login='goanpeca')
 
     app.exec_()
 

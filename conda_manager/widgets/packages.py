@@ -181,6 +181,8 @@ class CondaPackagesWidget(QWidget):
         self.style_sheet = None
         self.message = ''
         self.apply_actions_dialog = None
+        self.conda_errors = []
+        self.message_box_error = None
 
         if channels:
             self._channels = channels
@@ -418,7 +420,7 @@ class CondaPackagesWidget(QWidget):
         worker.packages = packages
         worker.apps = apps
 
-        print(output)
+        #print(output)
 #        private_packages = {}
 #        if output:
 #            all_private_packages = output
@@ -508,14 +510,13 @@ class CondaPackagesWidget(QWidget):
         logger.error(str(error))
 
         if output and isinstance(output, dict):
-            conda_error_type = output.get('error_type')
-            conda_error = output.get('error')
+            conda_error_type = output.get('error_type', None)
+            conda_error = output.get('error', None)
 
             if conda_error_type or conda_error:
-                self.conda_error.append((conda_error_type, conda_error))
+                self.conda_errors.append((conda_error_type, conda_error))
                 logger.error((conda_error_type, conda_error))
-#                print(self.conda_errors)
-#                print(self.conda_errors_types)
+                print(self.conda_errors)
 
         if self._multiple_process:
             status, func = self._multiple_process.popleft()
@@ -524,6 +525,17 @@ class CondaPackagesWidget(QWidget):
             worker.sig_finished.connect(self._run_multiple_actions)
             worker.sig_partial.connect(self._partial_output_ready)
         else:
+            if self.conda_errors and self.message_box_error:
+                text = "The following errors occured:"
+                error = ''
+                for conda_error in self.conda_errors:
+                    error += str(conda_error[0]) + ':\n'
+                    error += str(conda_error[1]) + '\n\n'
+                dlg = self.message_box_error(text=text, error=error,
+                                             title='Conda process error')
+                dlg.setMinimumWidth(400)
+                dlg.exec_()
+
             self.update_status('', hide=False)
             self.setup()
 
@@ -828,10 +840,14 @@ class CondaPackagesWidget(QWidget):
             cancel_dialog = extra_dialogs.get('cancel_dialog', None)
             apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
                                                      None)
+            message_box_error = extra_dialogs.get('message_box_error',
+                                                  None)
             if cancel_dialog:
                 self.cancel_dialog = cancel_dialog
             if apply_actions_dialog:
                 self.apply_actions_dialog = apply_actions_dialog
+            if message_box_error:
+                self.message_box_error = message_box_error
 
     # --- UI API
     # -------------------------------------------------------------------------
@@ -878,7 +894,6 @@ class CondaPackagesWidget(QWidget):
         logger.debug('')
 
         self.conda_errors = []
-        self.conda_error_types = []
 
         prefix = self.prefix
 

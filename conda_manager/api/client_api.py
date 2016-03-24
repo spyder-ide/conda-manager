@@ -223,6 +223,8 @@ class _ClientAPI(QObject):
                     private_packages[pkg]['versions'] = private_versions
                     packages[pkg] = private_packages[pkg]
     #                print(pkg, private_versions)
+        else:
+            private_packages = {}
 
         linked_packages = {}
         for canonical_name in linked:

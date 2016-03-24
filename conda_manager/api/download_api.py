@@ -85,8 +85,11 @@ class _DownloadAPI(QObject):
         """
         """
         url = reply.url().toString()
-        path = self._data[url]
-        worker = self._workers[url]
+
+        if url in self._data:
+            path = self._data[url]
+        if url in self._workers:
+            worker = self._workers[url]
 
         if url in self._head_requests:
             req = self._head_requests.pop(url)

@@ -660,7 +660,7 @@ class CondaPackagesWidget(QWidget):
 
     # --- Non UI API
     # -------------------------------------------------------------------------
-    def setup(self, check_updates=False, blacklist=[]):
+    def setup(self, check_updates=False, blacklist=[], metadata={}):
         """
         Setup packages.
 
@@ -685,6 +685,10 @@ class CondaPackagesWidget(QWidget):
             logger.debug('')
 
         self.package_blacklist = [p.lower() for p in blacklist]
+
+        if metadata:
+            self._metadata = metadata
+
         self._current_model_index = self.table.currentIndex()
         self._current_table_scroll = self.table.verticalScrollBar().value()
         self.update_status('Updating package index', True)

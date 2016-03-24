@@ -52,7 +52,7 @@ class ClientWorker(QObject):
             logger.debug(str((self.method.__module__, self.method.__name__,
                               err)))
             error = str(err)
-            error = error.replace('u(', '')
+            error = error.replace('(', '')
             error = error.replace(')', '')
 #            try:
 #                error = err[0]

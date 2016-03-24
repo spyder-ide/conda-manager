@@ -54,7 +54,10 @@ class ClientWorker(QObject):
             try:
                 error = err[0]
             except Exception:
-                error = err.message
+                try:
+                    error = err.message
+                except Exception as error:
+                    error = ''
 
         self.sig_finished.emit(self, output, error)
         self._is_finished = True

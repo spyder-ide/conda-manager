@@ -51,6 +51,9 @@ class ClientWorker(QObject):
         except Exception as err:
             logger.debug(str((self.method.__module__, self.method.__name__,
                               err)))
+            error = str(err)
+            error = error.replace('u(', '')
+            error = error.replace(')', '')
 #            try:
 #                error = err[0]
 #            except Exception:

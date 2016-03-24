@@ -410,6 +410,7 @@ class CondaPackagesWidget(QWidget):
             logger.error(error)
         else:
             logger.debug('')
+
         packages = worker.packages
         apps = worker.apps
         worker = self.api.pip_list(prefix=self.prefix)

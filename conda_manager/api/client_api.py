@@ -200,10 +200,25 @@ class _ClientAPI(QObject):
 
         return all_packages, all_apps
 
-    def _prepare_model_data(self, packages, linked, pip):
+    def _prepare_model_data(self, packages, linked, pip=[],
+                            private_packages={}):
         """
         """
         data = []
+
+        for pkg in private_packages:
+            if pkg in packages:
+                p_data = packages.get(pkg, None)
+                versions = p_data.get('versions', '') if p_data else []
+                private_versions = private_packages[pkg]['versions']
+                all_versions = sort_versions(list(set(versions + private_versions)))
+#                print(pkg, all_versions)
+                packages[pkg]['versions'] = all_versions
+            else:
+                private_versions = sort_versions(private_packages[pkg]['versions'])
+                private_packages[pkg]['versions'] = private_versions
+                packages[pkg] = private_packages[pkg]
+#                print(pkg, private_versions)
 
         linked_packages = {}
         for canonical_name in linked:
@@ -217,7 +232,11 @@ class _ClientAPI(QObject):
 
         packages_names = sorted(list(set(list(linked_packages.keys()) +
                                          list(pip_packages.keys()) +
-                                         list(packages.keys()))))
+                                         list(packages.keys()) +
+                                         list(private_packages.keys())
+                                         )
+                                     )
+                                )
 
         for name in packages_names:
             p_data = packages.get(name, None)
@@ -311,11 +330,13 @@ class _ClientAPI(QObject):
         return self._create_worker(method, filepaths, extra_data=extra_data,
                                    metadata=metadata)
 
-    def prepare_model_data(self, packages, linked, pip):
+    def prepare_model_data(self, packages, linked, pip=[],
+                           private_packages={}):
         """
         """
         logger.debug('')
-        return self._prepare_model_data(packages, linked, pip)
+        return self._prepare_model_data(packages, linked, pip=pip,
+                                        private_packages=private_packages)
 #        method = self._prepare_model_data
 #        return self._create_worker(method, packages, linked, pip)
 
@@ -356,6 +377,26 @@ class _ClientAPI(QObject):
     def domain(self):
         return self._anaconda_client_api.domain
 
+    def packages(self, login=None, platform=None, package_type=None,
+                 type_=None, access=None):
+        """
+        :param type_: only find packages that have this conda `type`
+           (i.e. 'app')
+        :param access: only find packages that have this access level
+           (e.g. 'private', 'authenticated', 'public')
+        """
+#        data = self._anaconda_client_api.user_packages(
+#            login=login,
+#            platform=platform,
+#            package_type=package_type,
+#            type_=type_,
+#            access=access)
+        logger.debug('')
+        method = self._anaconda_client_api.user_packages
+        return self._create_worker(method, login=login, platform=platform,
+                                   package_type=package_type,
+                                   type_=type_, access=access)
+
 
 CLIENT_API = None
 
@@ -369,8 +410,12 @@ def ClientAPI():
     return CLIENT_API
 
 
+def print_output(worker, output, error):
+    print(output, error)
+
+
 def test():
-    from anaconda_ui.utils.qthelpers import qapplication
+    from anaconda_navigator.utils.qthelpers import qapplication
     app = qapplication()
     api = ClientAPI()
     api.login('goanpeca', 'asdasd', 'baby', '')
@@ -382,9 +427,11 @@ def test():
     api.login('asdkljasdh', 'asdasd', 'baby', '')
     api.login('asdkljasdh', 'asdasd', 'baby', '')
     api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.logout()
     app.exec_()
 
+
+#    from binstar_client import Binstar
+#    api = Binstar(domain='https://beta.anaconda.org/api')
 
 if __name__ == '__main__':
     test()

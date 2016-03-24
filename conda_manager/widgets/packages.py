@@ -133,7 +133,9 @@ class CondaPackagesWidget(QWidget):
 
     sig_worker_ready = Signal()
     sig_packages_ready = Signal()
-    sig_environment_created = Signal()
+    sig_environment_created = Signal(object, object)
+    sig_environment_removed = Signal(object, object)
+    sig_environment_cloned = Signal(object, object)
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
     sig_process_cancelled = Signal()
     sig_next_focus = Signal()
@@ -386,10 +388,42 @@ class CondaPackagesWidget(QWidget):
             logger.debug('')
 
         packages, apps = output
+#        worker = self.api.pip_list(prefix=self.prefix)
+#        worker.sig_finished.connect(self._pip_list_ready)
+        worker = self.api.client_packages(access='private')
+        worker.sig_finished.connect(self._user_private_packages_ready)
+        worker.packages = packages
+        worker.apps = apps
+
+    def _user_private_packages_ready(self, worker, output, error):
+        if error:
+            logger.error(error)
+        else:
+            logger.debug('')
+        packages = worker.packages
+        apps = worker.apps
         worker = self.api.pip_list(prefix=self.prefix)
         worker.sig_finished.connect(self._pip_list_ready)
         worker.packages = packages
         worker.apps = apps
+
+        #print(output, error)
+        private_packages = {}
+        if output:
+            all_private_packages = output
+            for item in all_private_packages:
+                name = item.get('name', '')
+                public = item.get('public', True)
+                package_types = item.get('package_types', [])
+                latest_version = item.get('latest_version', '')
+                if name and not public and 'conda' in package_types:
+                    private_packages[name] = {'versions': item.get('versions', []),
+                                              'app_entry': {},
+                                              'type': {},
+                                              'size': {},
+                                              'latest_version': latest_version,
+                                              }
+        worker.private_packages = private_packages
 
     def _pip_list_ready(self, worker, pip_packages, error):
         """
@@ -400,10 +434,12 @@ class CondaPackagesWidget(QWidget):
             logger.debug('')
 
         packages = worker.packages
+        private_packages = worker.private_packages
         linked_packages = self.api.conda_linked(prefix=self.prefix)
         data = self.api.client_prepare_packages_data(packages,
                                                      linked_packages,
-                                                     pip_packages)
+                                                     pip_packages,
+                                                     private_packages)
 
         combobox_index = self.combobox_filter.currentIndex()
         status = C.PACKAGE_STATUS[combobox_index]
@@ -500,10 +536,23 @@ class CondaPackagesWidget(QWidget):
         else:
             self.update_status(hide=True)
 
+        conda_error = None
+        conda_error_type = None
+        if output and isinstance(output, dict):
+            conda_error_type = output.get('error_type')
+            conda_error = output.get('error')
+
+            if conda_error_type or conda_error:
+                logger.error((conda_error_type, conda_error))
+
         dic = self._temporal_action_dic
 
         if dic['action'] == C.ACTION_CREATE:
-            self.sig_environment_created.emit()
+            self.sig_environment_created.emit(conda_error, conda_error_type)
+        elif dic['action'] == C.ACTION_CLONE:
+            self.sig_environment_cloned.emit(conda_error, conda_error_type)
+        elif dic['action'] == C.ACTION_REMOVE_ENV:
+            self.sig_environment_removed.emit(conda_error, conda_error_type)
 
         self.setup()
 
@@ -591,46 +640,53 @@ class CondaPackagesWidget(QWidget):
         """
         DEPRECTAED
         """
-        prefix = self.prefix
+        self._temporal_action_dic = dic
+#        prefix = self.prefix
+#
+#        if prefix == self.root_prefix:
+#            name = 'root'
+#        elif self.api.conda_environment_exists(prefix=prefix):
+#            name = osp.basename(prefix)
+#        else:
+#            name = prefix
 
-        if prefix == self.root_prefix:
-            name = 'root'
-        elif self.api.conda_environment_exists(prefix=prefix):
-            name = osp.basename(prefix)
-        else:
-            name = prefix
-
-        if 'pkg' in dic and 'dep' in dic:
-            pkgs = dic['pkg']
+        if 'pkgs' in dic and 'dep' in dic:
+            dep = dic['dep']
+            pkgs = dic['pkgs']
             if not isinstance(pkgs, list):
                 pkgs = [pkgs]
-            dep = dic['dep']
 
-        if (action == C.ACTION_INSTALL or action == C.ACTION_UPGRADE or
-           action == C.ACTION_DOWNGRADE):
-            status = _('Installing <b>') + dic['pkg'] + '</b>'
-            status = status + _(' into <i>') + name + '</i>'
-            worker = self.api.conda_install(prefix=prefix, pkgs=pkgs, dep=dep,
-                                            channels=self._active_channels)
-        elif action == C.ACTION_REMOVE:
-            status = (_('Removing <b>') + dic['pkg'] + '</b>' +
-                      _(' from <i>') + name + '</i>')
-            worker = self.api.conda_remove(pkgs[0], prefix=prefix)
+#        if (action == C.ACTION_INSTALL or action == C.ACTION_UPGRADE or
+#           action == C.ACTION_DOWNGRADE):
+#            status = _('Installing <b>') + dic['pkg'] + '</b>'
+#            status = status + _(' into <i>') + name + '</i>'
+#            worker = self.api.conda_install(prefix=prefix, pkgs=pkgs, dep=dep,
+#                                            channels=self._active_channels)
+#        elif action == C.ACTION_REMOVE:
+#            status = (_('Removing <b>') + dic['pkg'] + '</b>' +
+#                      _(' from <i>') + name + '</i>')
+#            worker = self.api.conda_remove(pkgs[0], prefix=prefix)
 
         # --- Environment management actions
-        elif action == C.ACTION_CREATE:
+        name = dic['name']
+        if action == C.ACTION_CREATE:
             status = _('Creating environment <b>') + name + '</b>'
-            worker = self.api.conda_create(prefix=prefix, pkgs=pkgs,
+            worker = self.api.conda_create(name=name, pkgs=pkgs,
                                            channels=self._active_channels)
         elif action == C.ACTION_CLONE:
-            status = (_('Cloning ') + '<i>' + dic['cloned from'] +
+            clone = dic['clone']
+            status = (_('Cloning ') + '<i>' + clone +
                       _('</i> into <b>') + name + '</b>')
+            worker = self.api.conda_clone(clone, name=name)
         elif action == C.ACTION_REMOVE_ENV:
             status = _('Removing environment <b>') + name + '</b>'
+            worker = self.api.conda_remove(name=name, all_=True)
 
         worker.sig_finished.connect(self._conda_process_ready)
+        worker.sig_partial.connect(self._partial_output_ready)
         self.update_status(hide=True, message=status, progress=None)
         self._temporal_action_dic = dic
+        return worker
 
     # Public API
     # -------------------------------------------------------------------------
@@ -1077,10 +1133,29 @@ class CondaPackagesWidget(QWidget):
         # BUT the api call should simply set that env as the env
         dic = {}
         dic['name'] = name
-        dic['pkg'] = packages
+        dic['prefix'] = prefix
+        dic['pkgs'] = packages
         dic['dep'] = True  # Not really needed but for the moment!
-        dic['action'] = C.CREATE
-        self._run_conda_process(C.CREATE, dic)
+        dic['action'] = C.ACTION_CREATE
+        return self._run_conda_process(dic['action'], dic)
+
+    def clone_environment(self, name=None, prefix=None, clone=None):
+        dic = {}
+        dic['name'] = name
+        dic['prefix'] = prefix
+        dic['clone'] = clone
+        dic['pkgs'] = None
+        dic['dep'] = True  # Not really needed but for the moment!
+        dic['action'] = C.ACTION_CLONE
+        return self._run_conda_process(dic['action'], dic)
+
+    def remove_environment(self, name=None, prefix=None):
+        dic = {}
+        dic['name'] = name
+        dic['pkgs'] = None
+        dic['dep'] = True  # Not really needed but for the moment!
+        dic['action'] = C.ACTION_REMOVE_ENV
+        return self._run_conda_process(dic['action'], dic)
 
 
 class CondaPackagesDialog(QDialog, CondaPackagesWidget):
@@ -1095,6 +1170,7 @@ class CondaPackagesDialog(QDialog, CondaPackagesWidget):
     sig_channels_updated = Signal(tuple, tuple)  # channels, active_channels
     sig_next_focus = Signal()
     sig_process_cancelled = Signal()
+    sig_packages_busy = Signal()
 
     def __init__(self,
                  parent=None,

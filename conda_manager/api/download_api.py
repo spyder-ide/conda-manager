@@ -288,6 +288,9 @@ class _RequestsDownloadAPI(QObject):
             r = requests.get(url, stream=True)
         except Exception as error:
             logger.error(str(error))
+            # Break if error found!
+#            self._sig_download_finished.emit(url, path)
+#            return path
 
         total_size = int(r.headers.get('Content-Length', 0))
 

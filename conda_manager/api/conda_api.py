@@ -226,6 +226,8 @@ class _CondaAPI(QObject):
     ROOT_PREFIX = None
     ENCODING = 'ascii'
     UTF8 = 'utf-8'
+    DEFAULT_CHANNELS = ['https://repo.continuum.io/pkgs/pro',
+                        'https://repo.continuum.io/pkgs/free']
 
     def __init__(self, parent=None):
         super(_CondaAPI, self).__init__()
@@ -514,11 +516,31 @@ class _CondaAPI(QObject):
 
         return self._call_and_parse(cmd_list)
 
+    def parse_token_channel(self, channel, token):
+        """
+        Adapt a channel to include the authentication token of the logged
+        user.
+
+        Ignore default channels
+        """
+        if token and channel not in self.DEFAULT_CHANNELS:
+            url_parts = channel.split('/')
+            start = url_parts[:-1]
+            middle = 't/{0}'.format(token)
+            end = url_parts[-1]
+            token_channel = '{0}/{1}/{2}'.format('/'.join(start), middle, end)
+            return token_channel
+        else:
+            return channel
+
     def install(self, name=None, prefix=None, pkgs=None, dep=True,
-                channels=None):
+                channels=None, token=None):
         """
         Install packages into an environment either by name or path with a
-        specified set of packages
+        specified set of packages.
+
+        If token is specified, the channels different from the defaults will
+        get the token appended.
         """
         logger.debug(str((prefix, pkgs, channels)))
 
@@ -542,6 +564,7 @@ class _CondaAPI(QObject):
 
             for channel in channels:
                 cmd_list.extend(['--channel'])
+                channel = self.parse_token_channel(channel, token)
                 cmd_list.extend([channel])
 
         # TODO: Fix temporal hack

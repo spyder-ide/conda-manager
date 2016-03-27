@@ -21,6 +21,7 @@ class LineEditSearch(QLineEdit):
     def __init__(self, *args, **kwargs):
         super(LineEditSearch, self).__init__(*args, **kwargs)
         self._empty = True
+        self._show_icons = False
         self.button_icon = ButtonSearch()
 
         self.button_icon.setDefault(True)
@@ -46,6 +47,10 @@ class LineEditSearch(QLineEdit):
         self.setStyleSheet('LineEditSearch '
                            '{{padding-right: {0}px;}}'.format(width))
 
+    def set_icon_visibility(self, value):
+        self._show_icons = value
+        self.update_box()
+
     def setProperty(self, name, value):
         super(LineEditSearch, self).setProperty(name, value)
         self.style().unpolish(self)
@@ -54,10 +59,12 @@ class LineEditSearch(QLineEdit):
 
     def update_box(self, text=None):
         if text:
-            self.button_icon.setIcon(qta.icon('fa.remove'))
+            if self._show_icons:
+                self.button_icon.setIcon(qta.icon('fa.remove'))
             self.button_icon.setProperty('_remove', True)
         else:
-            self.button_icon.setIcon(qta.icon('fa.search'))
+            if self._show_icons:
+                self.button_icon.setIcon(qta.icon('fa.search'))
             self.button_icon.setProperty('_remove', False)
         self._empty = not bool(text)
         self.button_icon.setDisabled(self._empty)

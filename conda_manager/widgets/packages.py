@@ -183,6 +183,7 @@ class CondaPackagesWidget(QWidget):
         self.apply_actions_dialog = None
         self.conda_errors = []
         self.message_box_error = None
+        self.token = None
 
         if channels:
             self._channels = channels
@@ -420,7 +421,6 @@ class CondaPackagesWidget(QWidget):
         worker.packages = packages
         worker.apps = apps
 
-        #print(output)
 #        private_packages = {}
 #        if output:
 #            all_private_packages = output
@@ -461,6 +461,7 @@ class CondaPackagesWidget(QWidget):
         for package in self.package_blacklist:
             if package in packages:
                 packages.pop(package)
+
             for i, row in enumerate(data):
                 if package == data[i][C.COL_NAME]:
                     data.pop(i)
@@ -494,11 +495,14 @@ class CondaPackagesWidget(QWidget):
         else:
             logger.debug('')
 
-        with open(path, 'r') as f:
-            data = f.read()
-        try:
-            self._metadata = json.loads(data)
-        except Exception:
+        if path and osp.isfile(path):
+            with open(path, 'r') as f:
+                data = f.read()
+            try:
+                self._metadata = json.loads(data)
+            except Exception:
+                self._metadata = {}
+        else:
             self._metadata = {}
         self.api.update_repodata(self._channels)
 
@@ -764,7 +768,8 @@ class CondaPackagesWidget(QWidget):
         else:
             logger.debug('')
 
-        self.package_blacklist = [p.lower() for p in blacklist]
+        if blacklist:
+            self.package_blacklist = [p.lower() for p in blacklist]
 
         if metadata:
             self._metadata = metadata
@@ -813,6 +818,9 @@ class CondaPackagesWidget(QWidget):
             self.prefix = self.get_prefix_envname(name)
         else:
             self.prefix = self.root_prefix
+
+    def set_token(self, token):
+        self.token = token
 
     def update_channels(self, channels, active_channels):
         """
@@ -998,7 +1006,8 @@ class CondaPackagesWidget(QWidget):
                     return lambda: self.api.conda_install(
                         prefix=prefix,
                         pkgs=pkgs,
-                        channels=self._active_channels)
+                        channels=self._active_channels,
+                        token=self.token)
                 self._multiple_process.append([status, trigger()])
 
             # Conda downgrade
@@ -1013,7 +1022,8 @@ class CondaPackagesWidget(QWidget):
                     return lambda: self.api.conda_install(
                         prefix=prefix,
                         pkgs=pkgs,
-                        channels=self._active_channels)
+                        channels=self._active_channels,
+                        token=self.token)
 
                 self._multiple_process.append([status, trigger()])
 
@@ -1029,7 +1039,8 @@ class CondaPackagesWidget(QWidget):
                     return lambda: self.api.conda_install(
                         prefix=prefix,
                         pkgs=pkgs,
-                        channels=self._active_channels)
+                        channels=self._active_channels,
+                        token=self.token)
 
                 self._multiple_process.append([status, trigger()])
 

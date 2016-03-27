@@ -177,7 +177,7 @@ class _ClientAPI(QObject):
                     all_packages[name] = temp_data
 
                 all_packages[name]['versions'].add(version)
-                all_packages[name]['size'][version] = data['size']
+                all_packages[name]['size'][version] = data.get('size', '')
 
                 # Only the latest builds will have the correct metadata for
                 # apps, so only store apps that have the app metadata
@@ -220,13 +220,11 @@ class _ClientAPI(QObject):
                     versions = p_data.get('versions', '') if p_data else []
                     private_versions = private_packages[pkg]['versions']
                     all_versions = sort_versions(list(set(versions + private_versions)))
-    #                print(pkg, all_versions)
                     packages[pkg]['versions'] = all_versions
                 else:
                     private_versions = sort_versions(private_packages[pkg]['versions'])
                     private_packages[pkg]['versions'] = private_versions
                     packages[pkg] = private_packages[pkg]
-    #                print(pkg, private_versions)
         else:
             private_packages = {}
 
@@ -457,7 +455,7 @@ class _ClientAPI(QObject):
         try:
             # Only the newer versions have extra keywords like `access`
             self._anaconda_client_api.user_packages(access='private')
-        except Exception as error:
+        except Exception:
             new_client = False
 
         return self._create_worker(method, logins=logins,
@@ -471,6 +469,10 @@ class _ClientAPI(QObject):
         List all the organizations a user has access to.
         """
         return self._anaconda_client_api.user(login=login)
+
+    def load_token(self, url):
+        token = binstar_client.utils.load_token(url)
+        return token
 
 
 CLIENT_API = None

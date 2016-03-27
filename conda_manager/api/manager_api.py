@@ -2,6 +2,7 @@
 """
 
 # Standard library imports
+import json
 import os
 import tempfile
 
@@ -81,7 +82,7 @@ class _ManagerAPI(QObject):
         self.client_packages = self._client_api.packages
         self.client_multi_packages = self._client_api.multi_packages
         self.client_organizations = self._client_api.organizations
-
+        self.client_load_token = self._client_api.load_token
 
     # --- Helper methods
     # -------------------------------------------------------------------------
@@ -143,23 +144,60 @@ class _ManagerAPI(QObject):
         self._repodata_files = []
         self.__counter = -1
 
-        for repo in checked_repos:
-            path = self._repo_url_to_path(repo)
-            self._files_downloaded.append(path)
-            self._repodata_files.append(path)
-#            worker = self.download_requests(repo, path)
-            worker = self.download_async(repo, path)
-            worker.url = repo
-            worker.path = path
-            worker.sig_finished.connect(self._repodata_downloaded)
+        if checked_repos:
+            for repo in checked_repos:
+                path = self._repo_url_to_path(repo)
+                self._files_downloaded.append(path)
+                self._repodata_files.append(path)
+    #            worker = self.download_requests(repo, path)
+                worker = self.download_async(repo, path)
+                worker.url = repo
+                worker.path = path
+                worker.sig_finished.connect(self._repodata_downloaded)
+        else:
+            # Empty, maybe there is no internet connection
+            # Load information from conda-meta and save that file
+            path = self._get_repodata_from_meta()
+            self._repodata_files = [path]
+            self._repodata_downloaded()
 
-    def _repodata_downloaded(self, worker, output, error):
+    def _get_repodata_from_meta(self):
+        path = os.sep.join([self.ROOT_PREFIX, 'conda-meta'])
+        packages = os.listdir(path)
+        meta_repodata = {}
+        for pkg in packages:
+            if pkg.endswith('.json'):
+                filepath = os.sep.join([path, pkg])
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+
+                if 'files' in data:
+                    data.pop('files')
+                if 'icondata' in data:
+                    data.pop('icondata')
+
+                name = pkg.replace('.json', '')
+                meta_repodata[name] = data
+
+        meta_repodata_path = os.sep.join([self._data_directory,
+                                          'offline.json'])
+        repodata = {'info': [],
+                    'packages': meta_repodata}
+
+        with open(meta_repodata_path, 'w') as f:
+            json.dump(repodata, f, sort_keys=True,
+                      indent=4, separators=(',', ': '))
+
+        return meta_repodata_path
+
+    def _repodata_downloaded(self, worker=None, output=None, error=None):
         """
         """
-        self._files_downloaded.remove(worker.path)
-
-        if worker.path in self._files_downloaded:
+        if worker:
             self._files_downloaded.remove(worker.path)
+
+            if worker.path in self._files_downloaded:
+                self._files_downloaded.remove(worker.path)
 
         if len(self._files_downloaded) == 0:
             self.sig_repodata_updated.emit(list(set(self._repodata_files)))

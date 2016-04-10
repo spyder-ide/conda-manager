@@ -56,7 +56,7 @@ class CondaPackagesModel(QAbstractTableModel):
             'icon.action.add': get_icon('conda_action_add.png'),
             'icon.action.upgrade': get_icon('conda_action_upgrade.png'),
             'icon.action.downgrade': get_icon('conda_action_downgrade.png'),
-            'icon.upgrade.arrow': get_icon('conda_action_upgrade.png'),
+            'icon.upgrade.arrow': get_icon('conda_upgrade_arrow.png'),
             'icon.python': get_icon('python.png').pixmap(QSize(16, 16)),
             'icon.anaconda': get_icon('anaconda.png').pixmap(QSize(16, 16)),
             'background.remove': QColor(128, 0, 0, 50),

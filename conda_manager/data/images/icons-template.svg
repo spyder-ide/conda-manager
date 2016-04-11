@@ -15,7 +15,7 @@
    version="1.1"
    inkscape:version="0.48.4 r9939"
    sodipodi:docname="icons-template.svg"
-   inkscape:export-filename="/home/goanpeca/Dropbox/it/repos/git/conda-manager/conda_manager/data/images/conda_action_installed.png"
+   inkscape:export-filename="/home/goanpeca/Dropbox/it/repos/git/conda-manager/conda_manager/data/images/conda_upgrade_arrow.png"
    inkscape:export-xdpi="90"
    inkscape:export-ydpi="90">
   <defs
@@ -27,16 +27,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="4"
-     inkscape:cx="146.95264"
-     inkscape:cy="43.126772"
+     inkscape:zoom="1.7042378"
+     inkscape:cx="143.78995"
+     inkscape:cy="-6.5147915"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
-     inkscape:window-width="1366"
-     inkscape:window-height="721"
-     inkscape:window-x="-2"
-     inkscape:window-y="-3"
+     inkscape:window-width="1309"
+     inkscape:window-height="744"
+     inkscape:window-x="57"
+     inkscape:window-y="24"
      inkscape:window-maximized="1"
      showguides="true"
      inkscape:guide-bbox="true" />
@@ -48,7 +48,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -182,5 +182,20 @@
          d="m 20.777825,1038.1101 -8.485116,-8.4851"
          style="fill:none;stroke:#000000;stroke-width:7.99999952;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
     </g>
+    <path
+       style="fill:#000000;stroke:#000080;stroke-width:7.99999904999999867;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;fill-opacity:0"
+       d="m 24.000006,1017.3622 0,22.0002"
+       id="path3927-9-5-0-0-5"
+       inkscape:connector-curvature="0" />
+    <path
+       style="fill:#000000;stroke:#000080;stroke-width:8;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;fill-opacity:0"
+       d="m 23.000006,1018.3624 -8,8"
+       id="path3954-7-9-4-2-8"
+       inkscape:connector-curvature="0" />
+    <path
+       style="fill:#000000;stroke:#000080;stroke-width:8;stroke-linecap:round;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;fill-opacity:0"
+       d="m 25.000006,1018.3624 8,8"
+       id="path3954-5-1-9-8-6-6"
+       inkscape:connector-curvature="0" />
   </g>
 </svg>

@@ -11,13 +11,13 @@ import os
 import sys
 
 # Third part imports
-from qtpy.QtCore import QObject, QTimer, QThread, QUrl, Signal, QByteArray
+from qtpy.QtCore import QByteArray, QObject, QTimer, QThread, QUrl, Signal
 from qtpy.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import requests
 
 # Local imports
-from conda_manager.utils.logs import logger
 from conda_manager.api.conda_api import CondaAPI
+from conda_manager.utils.logs import logger
 
 
 PY2 = sys.version[0] == '2'
@@ -94,7 +94,6 @@ class _DownloadAPI(QObject):
         self._get_requests = {}
         self._paths = {}
         self._workers = {}
-#        self._old_requests = {}
 
         self._manager = QNetworkAccessManager(self)
         self._timer = QTimer()
@@ -119,7 +118,6 @@ class _DownloadAPI(QObject):
                 w = self._workers[url]
                 if w.is_finished():
                     self._workers.pop(url)
-#                    self._old_requests.pop(url)
                     self._paths.pop(url)
                     if url in self._get_requests:
                         self._get_requests.pop(url)
@@ -136,8 +134,7 @@ class _DownloadAPI(QObject):
             worker = self._workers[url]
 
         if url in self._head_requests:
-            req = self._head_requests.pop(url)
-#            self._old_requests[url] = req
+            self._head_requests.pop(url)
             start_download = True
             header_pairs = reply.rawHeaderPairs()
             headers = {}
@@ -150,6 +147,7 @@ class _DownloadAPI(QObject):
             # Check if file exists
             if os.path.isfile(path):
                 file_size = os.path.getsize(path)
+
                 # Check if existing file matches size of requested file
                 start_download = file_size != total_size
 
@@ -181,18 +179,15 @@ class _DownloadAPI(QObject):
         worker = self._workers[url]
         path = self._paths[url]
 
-        if not os.path.isfile(path):
-            #data = data
-            if len(data):
-                with open(path, 'wb') as f:
-                    f.write(data)
+        if len(data):
+            with open(path, 'wb') as f:
+                f.write(data)
 
         # Clean up
         worker.finished = True
         worker.sig_download_finished.emit(url, path)
         worker.sig_finished.emit(worker, path, None)
-        req = self._get_requests.pop(url)
-#        self._old_requests[url] = req
+        self._get_requests.pop(url)
         self._workers.pop(url)
         self._paths.pop(url)
 

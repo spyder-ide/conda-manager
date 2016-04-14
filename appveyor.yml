@@ -16,8 +16,9 @@ install:
   - powershell .\\ci\\appveyor\\install.ps1
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PYTHON%\\Library\\bin;%PATH%"
   - "SET TEST_CI=True"
+  - python setup.py install --single-version-externally-managed --root=/
 
 build: false
 
 test_script:
-  - python conda-manager.py
+  - python ci\run_app.py

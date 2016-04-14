@@ -13,8 +13,8 @@ import os
 import platform
 import re
 import sys
-import yaml
 import time
+import yaml
 
 # Third party imports
 from qtpy.QtCore import QByteArray, QObject, QProcess, QTimer, Signal

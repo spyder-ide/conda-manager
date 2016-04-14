@@ -29,7 +29,9 @@ In this release 4 pull requests were merged
 
 ### Bugfixes
 
-* [Pull request 55](../../pull/55) - Add extra method to search box
+**Pull requests**
+
+* [PR 55](../../pull/55) - Add extra method to search box
 
 In this release 1 pull requests were merged
 

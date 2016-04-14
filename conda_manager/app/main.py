@@ -10,6 +10,7 @@ Application entry point.
 """
 
 # Standard library imports
+import os
 import sys
 
 # Local imports
@@ -18,11 +19,12 @@ from conda_manager.widgets.main_window import MainWindow
 
 
 # Set Windows taskbar icon
-try:
-    from ctypes import windll
-    windll.shell32.SetCurrentProcessExplicitAppUserModelID("conda-manager")
-except AttributeError:
-    pass
+if os.name == 'nt':
+    try:
+        from ctypes import windll
+        windll.shell32.SetCurrentProcessExplicitAppUserModelID("conda-manager")
+    except AttributeError:
+        pass
 
 
 def main():

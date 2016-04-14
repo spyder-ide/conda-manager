@@ -48,6 +48,7 @@ class ClientWorker(QObject):
         """
         error, output = None, None
         try:
+            time.sleep(0.1)
             output = self.method(*self.args, **self.kwargs)
         except Exception as err:
             logger.debug(str((self.method.__module__, self.method.__name__,

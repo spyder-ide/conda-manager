@@ -66,5 +66,5 @@ or
 
 .. _conda: https://github.com/conda/conda
 .. _spyder: https://github.com/spyder-ide/spyder
-.. _Changelog: https://github.com/spyder-ide/conda-manager/blob/master/CHANGELOG.rst
+.. _Changelog: https://github.com/spyder-ide/conda-manager/blob/master/CHANGELOG.md
 .. _Issue tracker: https://github.com/spyder-ide/conda-manager/issues

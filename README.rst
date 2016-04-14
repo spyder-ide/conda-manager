@@ -29,14 +29,14 @@ downgrade, installation and removal) of `conda`_ packages and environments.
 
 Standalone app
 --------------
-.. image:: https://github.com/spyder-ide/conda-manager/blob/master/img_src/screenshot.png
+.. image:: https://raw.githubusercontent.com/spyder-ide/conda-manager/master/img_src/screenshot.png
     :align: center
     :alt: Conda Package Manager
 
 
 Spyder plugin
 -------------
-.. image:: https://github.com/spyder-ide/conda-manager/blob/master/img_src/screenshot-spyder.png
+.. image:: https://raw.githubusercontent.com/spyder-ide/conda-manager/master/img_src/screenshot-spyder.png
     :align: center
     :alt: Conda Package Manager
 

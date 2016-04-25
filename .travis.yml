@@ -63,6 +63,6 @@ install:
       conda install -q -n test-environment qt pyside;
     fi
   - source activate test-environment
-  - python setup.py install --single-version-externally-managed --root=/
+  - python setup.py install --old-and-unmanageable
 script:
-  - python conda-manager.py
+  - conda-manager

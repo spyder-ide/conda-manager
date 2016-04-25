@@ -13,6 +13,7 @@ import os
 import platform
 import re
 import sys
+import time
 import yaml
 
 # Third party imports
@@ -107,10 +108,10 @@ class ProcessWorker(QObject):
         self._timer = QTimer()
         self._process = QProcess()
 
-        self._timer.setInterval(50)
+        self._timer.setInterval(150)
 
         self._timer.timeout.connect(self._communicate)
-        self._process.finished.connect(self._communicate)
+        # self._process.finished.connect(self._communicate)
         self._process.readyReadStandardOutput.connect(self._partial)
 
     def _partial(self):

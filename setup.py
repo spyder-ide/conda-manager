@@ -85,7 +85,7 @@ setup(
     long_description=get_readme(),
     entry_points={
         'gui_scripts': [
-            'condamanager = conda_manager.app.main:main'
+            'conda-manager = conda_manager.app.main:main'
         ]
     },
     classifiers=[
@@ -98,6 +98,8 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
-        'Topic :: Software Development :: Widget Sets'])
+        'Programming Language :: Python :: 3.5',
+        'Topic :: Software Development :: Widget Sets']
+)
+

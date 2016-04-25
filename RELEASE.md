@@ -2,6 +2,8 @@
 
 * git pull upstream
 
+* Update CHANGELOG.md
+
 * Update `_version.py` (set release version, remove 'dev0')
 
 * git add and git commit

@@ -1,6 +1,16 @@
 # -*- coding: utf-8 -*-
 
-from conda_manager.app import main
+import os.path as osp
+import sys
 
-if __name__ == '__main__':
-    main()
+# Get current dir
+print("Executing from source checkout")
+DEVPATH = osp.dirname(osp.abspath(__file__))
+
+# Patch sys.path
+sys.path.insert(0, DEVPATH)
+print("01. Added %s to sys.path" % DEVPATH)
+
+# Run the app
+from conda_manager.app import main
+main()

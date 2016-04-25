@@ -40,9 +40,8 @@ Spyder plugin
     :align: center
     :alt: Conda Package Manager
 
-This project also installs as plugin for `spyder`_ (Scientific PYthon
-Development EnviRonment) to manage conda packages from within the spyder
-application.
+This project also installs as a plugin for `Spyder`_ to manage conda packages
+from within the application.
 
 
 License
@@ -55,13 +54,13 @@ Installation
 ------------
 ::
 
-  pip install conda-manager
+  conda install conda-manager
 
 or
 
 ::
 
-  conda install conda-manager
+  pip install conda-manager
 
 
 .. _conda: https://github.com/conda/conda

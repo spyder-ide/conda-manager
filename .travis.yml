@@ -65,4 +65,4 @@ install:
   - source activate test-environment
   - python setup.py install --single-version-externally-managed --root=/
 script:
-  - python ci/run_app.py
+  - conda-manager

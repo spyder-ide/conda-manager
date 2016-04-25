@@ -21,4 +21,4 @@ install:
 build: false
 
 test_script:
-  - python ci\run_app.py
+  - conda-manager

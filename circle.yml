@@ -1,6 +1,14 @@
 # Uses https://github.com/dennybaa/circleci-helpers
 # To achieve a travis like build matrix
 
+machine:
+  environment:
+    TEST_CI: "True"
+    # Environment variables used by astropy helpers
+    CONDA_CHANNELS: "conda-forge spyder-ide"
+    CONDA_DEPENDENCIES: "anaconda-client pillow pyqt pytest pytest-cov pytest-qt pyyaml qt qtawesome qtpy requests"
+    PIP_DEPENDENCIES: "coveralls"
+
 dependencies:
   pre:
     - curl -fsSL https://git.io/v2Ifn | bash

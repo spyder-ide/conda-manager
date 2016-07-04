@@ -4,14 +4,19 @@ env:
   - TRAVIS_PYTHON_VERSION=3.5
 
 command:
-  - env | sort
-  - export TEST_CI="True"
-  - export CONDA_CHANNELS="conda-forge spyder-ide"
-  - export CONDA_DEPENDENCIES="anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
-  - export PIP_DEPENDENCIES="coveralls pytest-qt"
-  - export TRAVIS_OS_NAME="linux"
-  - echo $PYTHON_VERSION
   # Use Astropy ci helpers for initial setup
-  - git clone git://github.com/astropy/ci-helpers.git
-  - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
+  - if [ ! -d "ci-helpers" ]; then
+      git clone git://github.com/astropy/ci-helpers.git;
+    fi
+  - source ci-helpers/travis/setup_conda_linux.sh  # Use linux script
+  - # Install package on test environment
+  - PATH="$HOME/miniconda/bin:$PATH" /home/ubuntu/miniconda/envs/test/bin/python setup.py install 
+  - # Run program
+  - PATH="$HOME/miniconda/bin:$PATH" /home/ubuntu/miniconda/envs/test/bin/conda-manager
+  - # Run tests
+  - # Clean for the next test
+  - PATH="$HOME/miniconda/bin:$PATH" /home/ubuntu/miniconda/bin/conda remove --name test --all
+  - if [ -d "/home/ubuntu/miniconda" ]; then
+      rm -rf /home/ubuntu/miniconda;
+    fi
 

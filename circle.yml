@@ -3,35 +3,9 @@
 
 dependencies:
   pre:
-    - sudo -H pip install circleci-helpers
+    - curl -fsSL https://git.io/v2Ifn | bash
+
 test:
   override:
-    - ? | 
-          circle-matrix <<"EHD"
-            env:
-              - TRAVIS_PYTHON_VERSION=2.7
-              - TRAVIS_PYTHON_VERSION=3.4
-              - TRAVIS_PYTHON_VERSION=3.5
+    - circleci-matrix --config ci/circleci/.circleci-matrix.yml
 
-            before_script:
-              - env | sort
-              - export TEST_CI="True"
-              - export CONDA_CHANNELS="conda-forge spyder-ide"
-              - export CONDA_DEPENDENCIES="anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
-              - export PIP_DEPENDENCIES="coveralls pytest-qt"
-              - export TRAVIS_OS_NAME="linux"
-
-            script:
-              - echo $PYTHON_VERSION
-              # Use Astropy ci helpers for initial setup
-              - git clone git://github.com/astropy/ci-helpers.git
-              - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
-
-            after_script:
-              - conda-manager
-
-            #after_script:
-            #  - coveralls
-          EHD
-      :
-        parallel: true

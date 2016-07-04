@@ -1,4 +1,9 @@
-|license| |pypi version| |pypi download| |pypi versions| |Build status|
+conda-manager
+-------------
+
+|build status| |coverage| |quantified code| |scrutinizer|
+
+|license| |pypi version| |pypi download| |pypi versions|
 
 .. |license| image:: https://img.shields.io/pypi/l/conda-manager.svg
    :target: LICENSE.txt
@@ -12,10 +17,18 @@
 .. |pypi versions| image:: https://img.shields.io/pypi/pyversions/conda-manager.svg
    :target: https://pypi.python.org/pypi/conda-manager
    :alt: Supported Python version
-.. |Build status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
+.. |build status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager
    :alt: Travis-CI build status
-
+.. |quantified code| image:: https://www.quantifiedcode.com/api/v1/project/6afa8a77b3244446812b7a7a8e45a765/badge.svg
+   :target: https://www.quantifiedcode.com/app/project/6afa8a77b3244446812b7a7a8e45a765
+   :alt: Quantified Code issues
+.. |coverage| image:: https://coveralls.io/repos/github/spyder-ide/conda-manager/badge.svg?branch=master
+   :target: https://coveralls.io/github/spyder-ide/conda-manager?branch=master
+   :alt: Code coverage
+.. |scrutinizer| image:: https://scrutinizer-ci.com/g/spyder-ide/conda-manager/badges/quality-score.png?b=master
+   :target: https://scrutinizer-ci.com/g/spyder-ide/conda-manager/?branch=master
+   :alt: Scrutinizer Code Quality
 
 Description
 -----------

@@ -1,5 +1,11 @@
-"""
-"""
+# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------
+# Copyright © 2015- The Spyder Development Team
+# Copyright © 2014-2015 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
+# -----------------------------------------------------------------------------
+"""API for using the api (anaconda-client, downloads and conda)."""
 
 # Standard library imports
 import json
@@ -10,27 +16,27 @@ import tempfile
 from qtpy.QtCore import QObject, Signal
 
 # Local imports
-from conda_manager.api.conda_api import CondaAPI
 from conda_manager.api.client_api import ClientAPI
+from conda_manager.api.conda_api import CondaAPI
 from conda_manager.api.download_api import DownloadAPI, RequestsDownloadAPI
 
 
 class _ManagerAPI(QObject):
-    """
-    """
+    """Anaconda Manager API process worker."""
+
     sig_repodata_updated = Signal(object)
     sig_repodata_errored = Signal()
 
     def __init__(self):
-        """
-        """
+        """Anaconda Manager API process worker."""
         super(_ManagerAPI, self).__init__()
 
         # API's
-        self._client_api = ClientAPI()
         self._conda_api = CondaAPI()
-        self._download_api = DownloadAPI()
-        self._requests_download_api = RequestsDownloadAPI()
+        self._client_api = ClientAPI()
+        self._download_api = DownloadAPI(load_rc_func=self._conda_api.load_rc)
+        self._requests_download_api = RequestsDownloadAPI(
+            load_rc_func=self._conda_api.load_rc)
         self.ROOT_PREFIX = self._conda_api.ROOT_PREFIX
 
         # Vars
@@ -49,6 +55,8 @@ class _ManagerAPI(QObject):
         self.conda_install = self._conda_api.install
         self.conda_remove = self._conda_api.remove
         self.conda_terminate = self._conda_api.terminate_all_processes
+        self.conda_config_add = self._conda_api.config_add
+        self.conda_config_remove = self._conda_api.config_remove
         self.pip_list = self._conda_api.pip_list
         self.pip_remove = self._conda_api.pip_remove
 
@@ -62,13 +70,19 @@ class _ManagerAPI(QObject):
         self.conda_platform = self._conda_api.get_platform
 
         # These download methods return a worker
+        get_api_info = self._requests_download_api.get_api_info
+        is_valid_url = self._requests_download_api.is_valid_api_url
+        is_valid_channel = self._requests_download_api.is_valid_channel
+        terminate = self._requests_download_api.terminate
         self.download_requests = self._requests_download_api.download
         self.download_async = self._download_api.download
         self.download_async_terminate = self._download_api.terminate
         self.download_is_valid_url = self._requests_download_api.is_valid_url
-        self.download_is_valid_api_url = self._requests_download_api.is_valid_api_url
-        self.download_is_valid_channel = self._requests_download_api.is_valid_channel
-        self.download_requests_terminate = self._requests_download_api.terminate
+        self.download_is_valid_api_url = is_valid_url
+        self.download_get_api_info = lambda: get_api_info(
+            self._client_api.get_api_url())
+        self.download_is_valid_channel = is_valid_channel
+        self.download_requests_terminate = terminate
 
         # These client methods return a worker
         self.client_store_token = self._client_api.store_token
@@ -84,13 +98,14 @@ class _ManagerAPI(QObject):
         self.client_multi_packages = self._client_api.multi_packages
         self.client_organizations = self._client_api.organizations
         self.client_load_token = self._client_api.load_token
+        self.client_get_api_url = self._client_api.get_api_url
+        self.client_set_api_url = self._client_api.set_api_url
 
     # --- Helper methods
     # -------------------------------------------------------------------------
     def _set_repo_urls_from_channels(self, channels):
         """
-        Convert a channel into a normalized repo name including the local
-        platform.
+        Convert a channel into a normalized repo name including.
 
         Channels are assumed in normalized url form.
         """
@@ -104,9 +119,7 @@ class _ManagerAPI(QObject):
         return repos
 
     def _check_repos(self, repos):
-        """
-        Check if repodata urls are valid.
-        """
+        """Check if repodata urls are valid."""
         self._checking_repos = []
         self._valid_repos = []
 
@@ -117,8 +130,7 @@ class _ManagerAPI(QObject):
             self._checking_repos.append(repo)
 
     def _repos_checked(self, worker, output, error):
-        """
-        """
+        """Callback for _check_repos."""
         if worker.repo in self._checking_repos:
             self._checking_repos.remove(worker.repo)
 
@@ -129,9 +141,7 @@ class _ManagerAPI(QObject):
             self._download_repodata(self._valid_repos)
 
     def _repo_url_to_path(self, repo):
-        """
-        Convert a `repo` url to a file path for local storage.
-        """
+        """Convert a `repo` url to a file path for local storage."""
         repo = repo.replace('http://', '')
         repo = repo.replace('https://', '')
         repo = repo.replace('/', '_')
@@ -139,8 +149,7 @@ class _ManagerAPI(QObject):
         return os.sep.join([self._data_directory, repo])
 
     def _download_repodata(self, checked_repos):
-        """
-        """
+        """Dowload repodata."""
         self._files_downloaded = []
         self._repodata_files = []
         self.__counter = -1
@@ -150,7 +159,6 @@ class _ManagerAPI(QObject):
                 path = self._repo_url_to_path(repo)
                 self._files_downloaded.append(path)
                 self._repodata_files.append(path)
-    #            worker = self.download_requests(repo, path)
                 worker = self.download_async(repo, path)
                 worker.url = repo
                 worker.path = path
@@ -163,6 +171,7 @@ class _ManagerAPI(QObject):
             self._repodata_downloaded()
 
     def _get_repodata_from_meta(self):
+        """Generate repodata from local meta files."""
         path = os.sep.join([self.ROOT_PREFIX, 'conda-meta'])
         packages = os.listdir(path)
         meta_repodata = {}
@@ -192,8 +201,7 @@ class _ManagerAPI(QObject):
         return meta_repodata_path
 
     def _repodata_downloaded(self, worker=None, output=None, error=None):
-        """
-        """
+        """Callback for _download_repodata."""
         if worker:
             self._files_downloaded.remove(worker.path)
 
@@ -225,23 +233,14 @@ class _ManagerAPI(QObject):
         return repopaths
 
     def set_data_directory(self, data_directory):
-        """
-        Set the directory where repodata and metadata are stored.
-        """
+        """Set the directory where repodata and metadata are stored."""
         self._data_directory = data_directory
 
     def update_repodata(self, channels=None):
-        """
-        Update repodata defined `channels`. If no channels are provided,
-        the default channels are used.
-
-        When finished, this method emits the `sig_repodata_updated` signal
-        with a list of the downloaded files.
-        """
-        if channels is None:
-            channels = self.conda_get_condarc_channels()
-
-        repodata_urls = self._set_repo_urls_from_channels(channels)
+        """Update repodata from channels or use condarc channels if None."""
+        norm_channels = self.conda_get_condarc_channels(channels=channels,
+                                                        normalize=True)
+        repodata_urls = self._set_repo_urls_from_channels(norm_channels)
         self._check_repos(repodata_urls)
 
     def update_metadata(self):
@@ -253,13 +252,15 @@ class _ManagerAPI(QObject):
         if self._data_directory is None:
             raise Exception('Need to call `api.set_data_directory` first.')
 
-        metadata_url = 'http://repo.continuum.io/pkgs/metadata.json'
+        metadata_url = 'https://repo.continuum.io/pkgs/metadata.json'
         filepath = os.sep.join([self._data_directory, 'metadata.json'])
         worker = self.download_requests(metadata_url, filepath)
         return worker
 
-    def check_valid_channel(self, channel,
+    def check_valid_channel(self,
+                            channel,
                             conda_url='https://conda.anaconda.org'):
+        """Check if channel is valid."""
         if channel.startswith('https://') or channel.startswith('http://'):
             url = channel
         else:
@@ -273,14 +274,12 @@ class _ManagerAPI(QObject):
         worker.url = url
         return worker
 
-    def check_valid_api_url(self, url):
-        pass
-
 
 MANAGER_API = None
 
 
 def ManagerAPI():
+    """Manager API threaded worker."""
     global MANAGER_API
 
     if MANAGER_API is None:
@@ -289,30 +288,37 @@ def ManagerAPI():
     return MANAGER_API
 
 
-def finished(worker, output, error):
+# --- Local testing
+# -----------------------------------------------------------------------------
+def finished(worker, output, error):  # pragma: no cover
+    """Print information on test finished."""
     print(worker, output, error)
 
 
-def download_finished(url, path):
+def download_finished(url, path):  # pragma: no cover
+    """Print information on downlaod finished."""
     print(url, path)
 
 
-def repodata_updated(repos):
+def repodata_updated(repos):  # pragma: no cover
+    """Print information on repodata updated."""
     print(repos)
 
 
-def test():
+def test():  # pragma: no cover
+    """Main local test."""
     from conda_manager.utils.qthelpers import qapplication
+
     app = qapplication()
     api = ManagerAPI()
-#    api.sig_repodata_updated.connect(repodata_updated)
+    api.sig_repodata_updated.connect(repodata_updated)
     data_directory = tempfile.mkdtemp()
     api.set_data_directory(data_directory)
-#    worker = api.update_metadata()
-#    worker.sig_download_finished.connect(download_finished)
+    worker = api.update_metadata()
+    worker.sig_download_finished.connect(download_finished)
     api.update_repodata()
     app.exec_()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     test()

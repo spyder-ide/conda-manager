@@ -6,7 +6,7 @@ sudo: false
 env:
   global:
     - TEST_CI="True"
-    - CONDA_CHANNELS="spyder-ide"
+    - CONDA_CHANNELS="conda-forge spyder-ide"
     - CONDA_DEPENDENCIES="anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
     - PIP_DEPENDENCIES="coveralls pytest-qt"
 

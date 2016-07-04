@@ -22,7 +22,7 @@ from qtpy.QtWidgets import (QDialog, QHBoxLayout, QFrame, QListWidget,
                             QListWidgetItem, QVBoxLayout)
 
 # Local imports
-from conda_manager.api import ManagerAPI
+from conda_manager.api import AnacondaAPI
 from conda_manager.widgets import (ButtonPackageChannelAdd,
                                    ButtonPackageChannelRemove,
                                    ButtonPackageChannelUpdate)

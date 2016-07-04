@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
 from conda_manager.models.dependencies import CondaDependenciesModel
 from conda_manager.utils import constants as C
 from conda_manager.utils.py3compat import to_text_string
-from conda_manager.api import ManagerAPI
+from conda_manager.api import AnacondaAPI
 
 _ = gettext.gettext
 

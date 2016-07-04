@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout,
                             QMessageBox, QPushButton, QVBoxLayout, QWidget)
 
 # Local imports
-from conda_manager.api import ManagerAPI
+from conda_manager.api import AnacondaAPI
 from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
@@ -169,7 +169,7 @@ class CondaPackagesWidget(QWidget):
         self._hide_widgets = False
         self._metadata = extra_metadata  # From repo.continuum
         self._metadata_links = {}        # Bundled metadata
-        self.api = ManagerAPI()
+        self.api = AnacondaAPI()
         self.busy = False
         self.data_directory = data_directory
         self.conda_url = conda_url

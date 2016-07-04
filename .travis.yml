@@ -26,9 +26,9 @@ matrix:
     - os: osx
       language: generic
       env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PyQt5
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt5
+#    - os: osx
+#      language: generic
+#      env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt5
     - os: osx
       language: generic
       env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PyQt5

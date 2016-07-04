@@ -1,3 +1,6 @@
+# Uses https://github.com/dennybaa/circleci-helpers
+# To achieve a travis like build matrix
+
 dependencies:
   pre:
     - sudo -H pip install circleci-helpers
@@ -6,28 +9,29 @@ test:
     - ? | 
           circle-matrix <<"EHD"
             env:
-              - PYTHON_VERSION=2.7
-              - PYTHON_VERSION=3.4
-              - PYTHON_VERSION=3.5
+              - TRAVIS_PYTHON_VERSION=2.7
+              - TRAVIS_PYTHON_VERSION=3.4
+              - TRAVIS_PYTHON_VERSION=3.5
 
             before_script:
               - env | sort
-              #- cd "$VERSION"
-              #- export image="$IMAGE:$VERSION"
+              - export TEST_CI="True"
+              - export CONDA_CHANNELS="conda-forge spyder-ide"
+              - export CONDA_DEPENDENCIES="anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
+              - export PIP_DEPENDENCIES="coveralls pytest-qt"
+              - export TRAVIS_OS_NAME="linux"
 
             script:
               - echo $PYTHON_VERSION
-              #- test "$(head -n1 Dockerfile)" = "FROM $image-scm"
-              #  && test "$(head -n1 scm/Dockerfile)" = "FROM $image-curl"
-              #  && [[ "$(head -n1 curl/Dockerfile)" == 'FROM centos:'*
-              #     || "$(head -n1 curl/Dockerfile)" == 'FROM fedora:'* ]]
-              #- docker build -t "$image-curl" curl
-              #- docker build -t "$image-scm" scm
-              #- docker build -t "$image" .
-              #- ~/official-images/test/run.sh "$image"
+              # Use Astropy ci helpers for initial setup
+              - git clone git://github.com/astropy/ci-helpers.git
+              - source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh
 
             after_script:
-              #- docker images
+              - conda-manager
+
+            #after_script:
+            #  - coveralls
           EHD
       :
         parallel: true

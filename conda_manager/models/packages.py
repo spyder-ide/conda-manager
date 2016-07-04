@@ -57,6 +57,7 @@ class CondaPackagesModel(QAbstractTableModel):
             'icon.action.upgrade': get_icon('conda_action_upgrade.png'),
             'icon.action.downgrade': get_icon('conda_action_downgrade.png'),
             'icon.upgrade.arrow': get_icon('conda_upgrade_arrow.png'),
+            'spacer': get_icon('spacer.png'),
             'icon.python': get_icon('python.png').pixmap(QSize(16, 16)),
             'icon.anaconda': get_icon('anaconda.png').pixmap(QSize(16, 16)),
             'background.remove': QColor(128, 0, 0, 50),
@@ -160,8 +161,8 @@ class CondaPackagesModel(QAbstractTableModel):
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
             elif column in [C.COL_VERSION] and is_upgradable:
                 return to_qvariant(int(Qt.AlignLeft | Qt.AlignVCenter))
-            else:
-                return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
+            # else:
+            #     return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
         elif role == Qt.DecorationRole:
             if column == C.COL_ACTION:
                 if action == C.ACTION_NONE:
@@ -234,8 +235,11 @@ class CondaPackagesModel(QAbstractTableModel):
                         return to_qvariant(P['icon.downgrade.active'])
                 else:
                     return to_qvariant(P['icon.downgrade.inactive'])
-            elif column == C.COL_VERSION and is_upgradable:
+            elif column == C.COL_VERSION:
+                if is_upgradable:
                     return to_qvariant(P['icon.upgrade.arrow'])
+                else:
+                    return to_qvariant(P['spacer'])
         elif role == Qt.ToolTipRole:
             if column == C.COL_INSTALL and status == C.NOT_INSTALLED:
                 return to_qvariant(_('Install package'))

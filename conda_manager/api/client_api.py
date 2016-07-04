@@ -1,34 +1,40 @@
 # -*- coding: utf-8 -*-
-
-# -*- coding: utf-8 -*-
-
-"""
-"""
+# -----------------------------------------------------------------------------
+# Copyright © 2015- The Spyder Development Team
+# Copyright © 2014-2015 Gonzalo Peña-Castellanos (@goanpeca)
+#
+# Licensed under the terms of the MIT License
+# -----------------------------------------------------------------------------
+"""Worker threads for using the anaconda-client api."""
 
 # Standard library imports
 from collections import deque
 import bz2
-import logging
 import json
+import logging
 import os
 import time
 
 # Third party imports
+from binstar_client.utils import get_config, set_config
 from qtpy.QtCore import QObject, QThread, QTimer, Signal
 import binstar_client
 
 # Local imports
 from conda_manager.api.conda_api import CondaAPI
-from conda_manager.utils.py3compat import to_text_string
-from conda_manager.utils import sort_versions
 from conda_manager.utils import constants as C
+from conda_manager.utils import sort_versions
 from conda_manager.utils.logs import logger
+from conda_manager.utils.py3compat import to_text_string
 
 
 class ClientWorker(QObject):
+    """Anaconda Client API process worker."""
+
     sig_finished = Signal(object, object, object)
 
     def __init__(self, method, args, kwargs):
+        """Anaconda Client API process worker."""
         super(ClientWorker, self).__init__()
         self.method = method
         self.args = args
@@ -36,16 +42,11 @@ class ClientWorker(QObject):
         self._is_finished = False
 
     def is_finished(self):
-        """
-        Return wether or not the worker has finished or not executing its
-        current process.
-        """
+        """Return wether or not the worker has finished running the task."""
         return self._is_finished
 
     def start(self):
-        """
-        Start the worker process.
-        """
+        """Start the worker process."""
         error, output = None, None
         try:
             time.sleep(0.1)
@@ -69,10 +70,10 @@ class ClientWorker(QObject):
 
 
 class _ClientAPI(QObject):
-    """
-    """
+    """Anaconda Client API wrapper."""
 
     def __init__(self):
+        """Anaconda Client API wrapper."""
         super(QObject, self).__init__()
         self._anaconda_client_api = binstar_client.utils.get_server_api(
             log_level=logging.NOTSET)
@@ -86,9 +87,7 @@ class _ClientAPI(QObject):
         self._timer.timeout.connect(self._clean)
 
     def _clean(self):
-        """
-        Periodically check for inactive workers and remove their references.
-        """
+        """Check for inactive workers and remove their references."""
         if self._workers:
             for w in self._workers:
                 if w.is_finished():
@@ -102,17 +101,14 @@ class _ClientAPI(QObject):
             self._timer.stop()
 
     def _start(self):
-        """
-        """
+        """Take avalaible worker from the queue and start it."""
         if len(self._queue) == 1:
             thread = self._queue.popleft()
             thread.start()
             self._timer.start()
 
     def _create_worker(self, method, *args, **kwargs):
-        """
-        Create a worker for this client to be run in a separate thread.
-        """
+        """Create a worker for this client to be run in a separate thread."""
         # FIXME: this might be heavy...
         thread = QThread()
         worker = ClientWorker(method, args, kwargs)
@@ -126,13 +122,16 @@ class _ClientAPI(QObject):
         self._start()
         return worker
 
-    def _load_repodata(self, filepaths, extra_data={}, metadata={}):
+    @staticmethod
+    def _load_repodata(filepaths, extra_data=None, metadata=None):
+        """Load all the available pacakges information.
+
+        For downloaded repodata files (repo.continuum.io), additional
+        data provided (anaconda cloud), and additional metadata and merge into
+        a single set of packages and apps.
         """
-        Load all the available pacakges information for downloaded repodata
-        files (repo.continuum.io), additional data provided (anaconda cloud),
-        and additional metadata and merge into a single set of packages and
-        apps.
-        """
+        extra_data = extra_data if extra_data else {}
+        metadata = metadata if metadata else {}
         repodata = []
         for filepath in filepaths:
             compressed = filepath.endswith('.bz2')
@@ -182,13 +181,12 @@ class _ClientAPI(QObject):
 
                 # Only the latest builds will have the correct metadata for
                 # apps, so only store apps that have the app metadata
-                if data.get('type', None):
-                    all_packages[name]['type'][version] = data.get(
-                        'type', None)
+                if data.get('type'):
+                    all_packages[name]['type'][version] = data.get('type')
                     all_packages[name]['app_entry'][version] = data.get(
-                        'app_entry', None)
+                        'app_entry')
                     all_packages[name]['app_type'][version] = data.get(
-                        'app_type', None)
+                        'app_type')
 
         all_apps = {}
         for name in all_packages:
@@ -196,7 +194,7 @@ class _ClientAPI(QObject):
             all_packages[name]['versions'] = versions[:]
 
             for version in versions:
-                has_type = all_packages[name].get('type', None)
+                has_type = all_packages[name].get('type')
                 # Has type in this case implies being an app
                 if has_type:
                     all_apps[name] = all_packages[name].copy()
@@ -208,22 +206,27 @@ class _ClientAPI(QObject):
 
         return all_packages, all_apps
 
-    def _prepare_model_data(self, packages, linked, pip=[],
-                            private_packages={}):
-        """
-        """
+    @staticmethod
+    def _prepare_model_data(packages, linked, pip=None,
+                            private_packages=None):
+        """Prepare model data for the packages table model."""
+        pip = pip if pip else []
+        private_packages = private_packages if private_packages else {}
+
         data = []
 
         if private_packages is not None:
             for pkg in private_packages:
                 if pkg in packages:
-                    p_data = packages.get(pkg, None)
+                    p_data = packages.get(pkg)
                     versions = p_data.get('versions', '') if p_data else []
                     private_versions = private_packages[pkg]['versions']
-                    all_versions = sort_versions(list(set(versions + private_versions)))
+                    all_versions = sort_versions(list(set(versions +
+                                                          private_versions)))
                     packages[pkg]['versions'] = all_versions
                 else:
-                    private_versions = sort_versions(private_packages[pkg]['versions'])
+                    private_versions = sort_versions(
+                        private_packages[pkg]['versions'])
                     private_packages[pkg]['versions'] = private_versions
                     packages[pkg] = private_packages[pkg]
         else:
@@ -248,7 +251,7 @@ class _ClientAPI(QObject):
                                 )
 
         for name in packages_names:
-            p_data = packages.get(name, None)
+            p_data = packages.get(name)
 
             summary = p_data.get('summary', '') if p_data else ''
             url = p_data.get('home', '') if p_data else ''
@@ -304,54 +307,40 @@ class _ClientAPI(QObject):
     # --- Public API
     # -------------------------------------------------------------------------
     def login(self, username, password, application, application_url):
-        """
-        Login to anaconda cloud.
-        """
+        """Login to anaconda cloud."""
         logger.debug(str((username, application, application_url)))
         method = self._anaconda_client_api.authenticate
         return self._create_worker(method, username, password, application,
                                    application_url)
 
     def logout(self):
-        """
-        Logout from anaconda cloud.
-        """
+        """Logout from anaconda cloud."""
         logger.debug('Logout')
         method = self._anaconda_client_api.remove_authentication
         return self._create_worker(method)
 
-    def authentication(self):
+    def load_repodata(self, filepaths, extra_data=None, metadata=None):
         """
-        """
-#        logger.debug('')
-        method = self._anaconda_client_api.user
-        return self._create_worker(method)
+        Load all the available pacakges information for downloaded repodata.
 
-    def load_repodata(self, filepaths, extra_data={}, metadata={}):
-        """
-        Load all the available pacakges information for downloaded repodata
-        files (repo.continuum.io), additional data provided (anaconda cloud),
-        and additional metadata and merge into a single set of packages and
-        apps.
+        Files include repo.continuum.io, additional data provided (anaconda
+        cloud), and additional metadata and merge into a single set of packages
+        and apps.
         """
         logger.debug(str((filepaths)))
         method = self._load_repodata
         return self._create_worker(method, filepaths, extra_data=extra_data,
                                    metadata=metadata)
 
-    def prepare_model_data(self, packages, linked, pip=[],
-                           private_packages={}):
-        """
-        """
+    def prepare_model_data(self, packages, linked, pip=None,
+                           private_packages=None):
+        """Prepare downloaded package info along with pip pacakges info."""
         logger.debug('')
         return self._prepare_model_data(packages, linked, pip=pip,
                                         private_packages=private_packages)
-#        method = self._prepare_model_data
-#        return self._create_worker(method, packages, linked, pip)
 
     def set_domain(self, domain='https://api.anaconda.org'):
-        """
-        """
+        """Reset current api domain."""
         logger.debug(str((domain)))
         config = binstar_client.utils.get_config()
         config['url'] = domain
@@ -362,21 +351,28 @@ class _ClientAPI(QObject):
 
         return self.user()
 
-    def store_token(self, token):
-        """
-        """
-        class args:
-            site = None
-        binstar_client.utils.store_token(token, args)
+    @staticmethod
+    def store_token(token):
+        """Store authentication user token."""
+        class Args:
+            """Enum."""
 
-    def remove_token(self):
-        """
-        """
-        class args:
             site = None
-        binstar_client.utils.remove_token(args)
+
+        binstar_client.utils.store_token(token, Args)
+
+    @staticmethod
+    def remove_token():
+        """Remove authentication user token."""
+        class Args:
+            """Enum."""
+
+            site = None
+
+        binstar_client.utils.remove_token(Args)
 
     def user(self):
+        """Return current logged user information."""
         try:
             user = self._anaconda_client_api.user()
         except Exception:
@@ -384,22 +380,21 @@ class _ClientAPI(QObject):
         return user
 
     def domain(self):
+        """Return current domain."""
         return self._anaconda_client_api.domain
 
     def packages(self, login=None, platform=None, package_type=None,
                  type_=None, access=None):
+        """Return all the available packages for a given user.
+
+        Parameters
+        ----------
+        type_: Optional[str]
+            Only find packages that have this conda `type`, (i.e. 'app').
+        access : Optional[str]
+            Only find packages that have this access level (e.g. 'private',
+            'authenticated', 'public').
         """
-        :param type_: only find packages that have this conda `type`
-           (i.e. 'app')
-        :param access: only find packages that have this access level
-           (e.g. 'private', 'authenticated', 'public')
-        """
-#        data = self._anaconda_client_api.user_packages(
-#            login=login,
-#            platform=platform,
-#            package_type=package_type,
-#            type_=type_,
-#            access=access)
         logger.debug('')
         method = self._anaconda_client_api.user_packages
         return self._create_worker(method, login=login, platform=platform,
@@ -408,6 +403,7 @@ class _ClientAPI(QObject):
 
     def _multi_packages(self, logins=None, platform=None, package_type=None,
                         type_=None, access=None, new_client=True):
+        """Return the private packages for a given set of usernames/logins."""
         private_packages = {}
 
         if not new_client:
@@ -430,7 +426,8 @@ class _ClientAPI(QObject):
                     if name in private_packages:
                         versions = private_packages.get('versions', []),
                         new_versions = item.get('versions', []),
-                        vers = sort_versions(list(set(versions + new_versions )))
+                        vers = sort_versions(list(set(versions +
+                                                      new_versions)))
                         private_packages[name]['versions'] = vers
                         private_packages[name]['latest_version'] = vers[-1]
                     else:
@@ -439,16 +436,13 @@ class _ClientAPI(QObject):
                             'app_entry': {},
                             'type': {},
                             'size': {},
-                            'latest_version': latest_version,
-                            }
+                            'latest_version': latest_version, }
 
         return private_packages
 
     def multi_packages(self, logins=None, platform=None, package_type=None,
                        type_=None, access=None):
-        """
-        Get all the private packages for a given set of usernames (logins)
-        """
+        """Return the private packages for a given set of usernames/logins."""
         logger.debug('')
         method = self._multi_packages
         new_client = True
@@ -466,20 +460,33 @@ class _ClientAPI(QObject):
                                    new_client=new_client)
 
     def organizations(self, login=None):
-        """
-        List all the organizations a user has access to.
-        """
+        """List all the organizations a user has access to."""
         return self._anaconda_client_api.user(login=login)
 
-    def load_token(self, url):
+    @staticmethod
+    def load_token(url):
+        """Load saved token for a given url api site."""
         token = binstar_client.utils.load_token(url)
         return token
+
+    @staticmethod
+    def get_api_url():
+        """Get the anaconda client url configuration."""
+        return get_config().get('url', 'https://api.anaconda.org')
+
+    @staticmethod
+    def set_api_url(url):
+        """Set the anaconda client url configuration."""
+        data = get_config()
+        data['url'] = url
+        set_config(data)
 
 
 CLIENT_API = None
 
 
 def ClientAPI():
+    """Client API threaded worker."""
     global CLIENT_API
 
     if CLIENT_API is None:
@@ -488,31 +495,26 @@ def ClientAPI():
     return CLIENT_API
 
 
-def print_output(worker, output, error):
+def print_output(worker, output, error):  # pragma: no cover
+    """Test helper print function."""
     print(output, error)
 
 
-def test():
-    from anaconda_navigator.utils.qthelpers import qapplication
+def test():  # pragma: no cover
+    """Local main test."""
+    from conda_manager.utils.qthelpers import qapplication
+
     app = qapplication()
     api = ClientAPI()
-#    api.login('goanpeca', 'asdasd', 'baby', '')
-#    api.login('bruce', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-#    api.login('asdkljasdh', 'asdasd', 'baby', '')
-
+    api.login('goanpeca', 'asdasd', 'baby', '')
+    api.login('bruce', 'asdasd', 'baby', '')
     api.set_domain(domain='https://api.beta.anaconda.org')
     worker = api.multi_packages(logins=['goanpeca'])
     worker.sig_finished.connect(print_output)
     worker = api.organizations(login='goanpeca')
-
+    print(api.get_api_url())
     app.exec_()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     test()

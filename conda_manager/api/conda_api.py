@@ -471,6 +471,25 @@ class _CondaAPI(QObject):
         return self._call_and_parse(cmd_list,
                                     abspath=kwargs.get('abspath', True))
 
+
+    def create_from_yaml(self, name, yamlfile):
+        """
+        Create new environment using conda-env to allow creation to a yaml spec.
+
+        Unlike other methods, this calls conda-env, and requires a named
+        environment and uses channels as defined in rcfiles.
+
+        Parameters
+        ----------
+        name : string
+            Environment name
+        yamlfile : string
+            Path to yaml file with package spec (as created by conda env export
+        """
+        logger.debug(str((name, yamlfile)))
+        cmd_list = ['env', 'create', '-n', name, '-f', yamlfile]
+        return self._call_and_parse(cmd_list)
+
     def create(self, name=None, prefix=None, pkgs=None, channels=None):
         """
         Create an environment either by name or path with a specified set of

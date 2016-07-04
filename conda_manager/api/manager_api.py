@@ -42,6 +42,7 @@ class _ManagerAPI(QObject):
 
         # Expose some methods for convenient access. Methods return a worker
         self.conda_create = self._conda_api.create
+        self.conda_create_yaml = self._conda_api.create_from_yaml
         self.conda_clone = self._conda_api.clone_environment
         self.conda_dependencies = self._conda_api.dependencies
         self.conda_get_condarc_channels = self._conda_api.get_condarc_channels

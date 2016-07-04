@@ -3,6 +3,7 @@
 language: python
 sudo: false
 
+env:
   global:
     - TEST_CI="True"
     - CONDA_CHANNELS="spyder-ide"

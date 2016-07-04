@@ -1134,7 +1134,7 @@ def ready_print(worker, output, error):  # pragma : no cover
 
 def test():  # pragma : no cover
     """Run local test."""
-    from anaconda_navigator.utils.qthelpers import qapplication
+    from conda_manager.utils.qthelpers import qapplication
 
     app = qapplication()
     conda_api = CondaAPI()

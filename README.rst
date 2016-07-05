@@ -14,7 +14,7 @@ Project details
 .. |appveyor status| image:: https://ci.appveyor.com/api/projects/status/rl83o71yf06h40cj?svg=true
    :target: https://ci.appveyor.com/project/goanpeca/conda-manager
    :alt: Appveyor build status
-.. |circleci status| .. image:: https://circleci.com/gh/spyder-ide/conda-manager/tree/master.svg?style=svg
+.. |circleci status| image:: https://circleci.com/gh/spyder-ide/conda-manager/tree/master.svg?style=shield
    :target: https://circleci.com/gh/spyder-ide/conda-manager/tree/master
    :alt: Circle-CI build status
 .. |quantified code| image:: https://www.quantifiedcode.com/api/v1/project/6afa8a77b3244446812b7a7a8e45a765/badge.svg
@@ -35,7 +35,7 @@ Project details
 .. |pypi download| image:: https://img.shields.io/pypi/dm/conda-manager.svg
    :target: https://pypi.python.org/pypi/conda-manager
    :alt: Number of PyPI downloads
-.. |pypi versions| image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
+.. |gitter| image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
    :target: https://gitter.im/spyder-ide/public
    :alt: Join the chat at https://gitter.im/spyder-ide/public
 

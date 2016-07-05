@@ -6,7 +6,7 @@ Build Status
 Project details
 ---------------
 
-|license| |pypi version| |pypi download| |pypi version| |gitter|
+|license| |pypi version| |pypi download| |gitter|
 
 .. |travis status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager

@@ -51,7 +51,7 @@ install:
   # Install the selected Qt version
   - if "%USE_QT_API%" == "QtPy4" conda install qt pyqt
   - if "%USE_QT_API%" == "QtPy5" conda install qt5 pyqt5
-  - "git branch"
+  - "%CMD_IN_ENV% python setup.py develop"
 
 # Not a .NET project, we build in the install step instead
 build: false

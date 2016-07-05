@@ -2,7 +2,7 @@ machine:
   environment:
     # Used by qthelpers to close widgets after a defined time
     TEST_CI: "True"
-    # Python versions to tests (max 4)
+    # Python versions to tests (Maximumg of 4 different versions)
     PY_VERSIONS: "2.7 3.4 3.5"
     # Environment variables used by astropy helpers
     TRAVIS_OS_NAME: "linux"

@@ -4,6 +4,9 @@ matrix:
 environment:
 
   global:
+    # Used by qthelpers to close widgets after a defined time
+    TEST_CI: True
+    # Environment variables used by astropy helpers
     PYTHON: "C:\\conda"
     CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\ci-helpers\\appveyor\\windows_sdk.cmd"
     PYTHON_ARCH: "64" # needs to be set for CMD_IN_ENV to succeed. If a mix
@@ -12,7 +15,6 @@ environment:
     CONDA_DEPENDENCIES: "anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
     CONDA_CHANNELS: "conda-forge spyder-ide"
     PIP_DEPENDENCIES_2: "coveralls pytest-qt"  # Fix when fixed upstream
-    TEST_CI_APP: True
 
   matrix:
     - PYTHON_VERSION: "2.7"

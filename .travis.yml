@@ -5,7 +5,9 @@ sudo: false
 
 env:
   global:
+    # Used by qthelpers to close widgets after a defined time
     - TEST_CI="True"
+    # Environment variables used by astropy helpers
     - CONDA_CHANNELS="conda-forge spyder-ide"
     - CONDA_DEPENDENCIES="anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
     - PIP_DEPENDENCIES="coveralls pytest-qt"

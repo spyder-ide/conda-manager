@@ -1,25 +1,22 @@
-conda-manager
--------------
+Build Status
+------------
 
-|build status| |coverage| |quantified code| |scrutinizer|
+|travis status| |appveyor status| |circleci status| |coverage| |quantified code| |scrutinizer|
 
-|license| |pypi version| |pypi download| |pypi versions|
+Project details
+---------------
 
-.. |license| image:: https://img.shields.io/pypi/l/conda-manager.svg
-   :target: LICENSE.txt
-   :alt: License
-.. |pypi version| image:: https://img.shields.io/pypi/v/conda-manager.svg
-   :target: https://pypi.python.org/pypi/conda-manager/
-   :alt: Latest PyPI version
-.. |pypi download| image:: https://img.shields.io/pypi/dm/conda-manager.svg
-   :target: https://pypi.python.org/pypi/conda-manager
-   :alt: Number of PyPI downloads
-.. |pypi versions| image:: https://img.shields.io/pypi/pyversions/conda-manager.svg
-   :target: https://pypi.python.org/pypi/conda-manager
-   :alt: Supported Python version
-.. |build status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
+|license| |pypi version| |pypi download| |pypi versions| |gitter|
+
+.. |travis status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager
    :alt: Travis-CI build status
+.. |appveyor status| image:: https://ci.appveyor.com/api/projects/status/rl83o71yf06h40cj?svg=true
+   :target: https://ci.appveyor.com/project/goanpeca/conda-manager
+   :alt: Appveyor build status
+.. |circleci status| image:: https://circleci.com/gh/spyder-ide/conda-manager/tree/master.svg?style=shield
+   :target: https://circleci.com/gh/spyder-ide/conda-manager/tree/master
+   :alt: Circle-CI build status
 .. |quantified code| image:: https://www.quantifiedcode.com/api/v1/project/6afa8a77b3244446812b7a7a8e45a765/badge.svg
    :target: https://www.quantifiedcode.com/app/project/6afa8a77b3244446812b7a7a8e45a765
    :alt: Quantified Code issues
@@ -29,6 +26,19 @@ conda-manager
 .. |scrutinizer| image:: https://scrutinizer-ci.com/g/spyder-ide/conda-manager/badges/quality-score.png?b=master
    :target: https://scrutinizer-ci.com/g/spyder-ide/conda-manager/?branch=master
    :alt: Scrutinizer Code Quality
+.. |license| image:: https://img.shields.io/pypi/l/conda-manager.svg
+   :target: LICENSE.txt
+   :alt: License
+.. |pypi version| image:: https://img.shields.io/pypi/v/conda-manager.svg
+   :target: https://pypi.python.org/pypi/conda-manager/
+   :alt: Latest PyPI version
+.. |pypi download| image:: https://img.shields.io/pypi/dm/conda-manager.svg
+   :target: https://pypi.python.org/pypi/conda-manager
+   :alt: Number of PyPI downloads
+.. |gitter| image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
+   :target: https://gitter.im/spyder-ide/public
+   :alt: Join the chat at https://gitter.im/spyder-ide/public
+
 
 Description
 -----------

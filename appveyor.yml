@@ -1,24 +1,66 @@
-# https://ci.appveyor.com/project/goanpeca/conda-manager
+matrix:
+  fast_finish: true
 
 environment:
-  matrix:
-    - PYTHON:         "C:\\Python27_64"
-      PYTHON_VERSION: "2.7"
-      PYTHON_ARCH:    "64"
-      USE_QT_API:     "PyQt4"
 
-    - PYTHON:         "C:\\Python35_64"
-      PYTHON_VERSION: "3.5"
-      PYTHON_ARCH:    "64"
-      USE_QT_API:     "PyQt4"
+  global:
+    # Used by qthelpers to close widgets after a defined time
+    TEST_CI: True
+    # Environment variables used by astropy helpers
+    PYTHON: "C:\\conda"
+    CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\ci-helpers\\appveyor\\windows_sdk.cmd"
+    PYTHON_ARCH: "64" # needs to be set for CMD_IN_ENV to succeed. If a mix
+                      # of 32 bit and 64 bit builds are needed, move this
+                      # to the matrix section.
+    CONDA_DEPENDENCIES: "anaconda-client pillow pytest pytest-cov pyyaml qtawesome qtpy requests"
+    CONDA_CHANNELS: "conda-forge spyder-ide"
+    PIP_DEPENDENCIES_2: "coveralls pytest-qt"  # Fix when fixed upstream
+
+  matrix:
+    - PYTHON_VERSION: "2.7"
+      USE_QT_API: "QtPy4"
+    - PYTHON_VERSION: "3.4"
+      USE_QT_API: "QtPy4"
+    - PYTHON_VERSION: "3.5"
+      USE_QT_API: "QtPy4"
+#    - PYTHON_VERSION: "2.7"
+#      USE_QT_API: "QtPy5"
+#    - PYTHON_VERSION: "3.4"
+#      USE_QT_API: "QtPy5"
+#    - PYTHON_VERSION: "3.5"
+#      USE_QT_API: "QtPy5"
+
+platform:
+  -x64
 
 install:
-  - powershell .\\ci\\appveyor\\install.ps1
-  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PYTHON%\\Library\\bin;%PATH%"
-  - "SET TEST_CI=True"
-  - python setup.py install --old-and-unmanageable
+  # If there is a newer build queued for the same PR, cancel this one.
+  # The AppVeyor 'rollout builds' option is supposed to serve the same
+  # purpose but it is problematic because it tends to cancel builds pushed
+  # directly to master instead of just PR builds (or the converse).
+  # credits: JuliaLang developers.
+#  - ps: if ($env:APPVEYOR_PULL_REQUEST_NUMBER -and $env:APPVEYOR_BUILD_NUMBER -ne ((Invoke-RestMethod `
+#      https://ci.appveyor.com/api/projects/$env:APPVEYOR_ACCOUNT_NAME/$env:APPVEYOR_PROJECT_SLUG/history?recordsNumber=50).builds | `
+#      Where-Object pullRequestId -eq $env:APPVEYOR_PULL_REQUEST_NUMBER)[0].buildNumber) { `
+#        throw "There are newer queued builds for this pull request, failing early." }
+  # Astropy ci-helpers. See https://github.com/astropy/ci-helpers
+  - "git clone git://github.com/astropy/ci-helpers.git"
+  - "powershell ci-helpers/appveyor/install-miniconda.ps1"
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  - "activate test"
+  # Install pip dependencies.
+  - "pip install %PIP_DEPENDENCIES_2%"
+  # Install the selected Qt version
+  - if "%USE_QT_API%" == "QtPy4" conda install qt pyqt
+  - if "%USE_QT_API%" == "QtPy5" conda install qt5 pyqt5
+  - "python setup.py develop"
 
+# Not a .NET project, we build in the install step instead
 build: false
 
 test_script:
   - conda-manager
+
+#on_success:
+#  - "%CMD_IN_ENV% coveralls"  # For now only report coveralls on Travis-CI
+

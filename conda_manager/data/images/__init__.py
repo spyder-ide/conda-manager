@@ -13,3 +13,5 @@ import os
 
 
 IMG_PATH = os.path.dirname(os.path.realpath(__file__))
+
+PATH_CONDA_LOGO = os.path.join(IMG_PATH, 'conda-logo.png')

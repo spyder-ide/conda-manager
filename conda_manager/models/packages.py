@@ -83,11 +83,11 @@ class CondaPackagesModel(QAbstractTableModel):
 
         if index.isValid():
             if column in [C.COL_START, C.COL_END]:
-                # return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+#                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 return Qt.ItemFlags(Qt.ItemIsEnabled)
             else:
-                # return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-                return Qt.ItemFlags(Qt.ItemIsEnabled)
+                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+#                return Qt.ItemFlags(Qt.ItemIsEnabled)
         else:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
 
@@ -291,20 +291,8 @@ class CondaPackagesModel(QAbstractTableModel):
             if orientation == Qt.Horizontal:
                 return to_qvariant(int(Qt.AlignHCenter | Qt.AlignVCenter))
             return to_qvariant(int(Qt.AlignRight | Qt.AlignVCenter))
-        elif role == Qt.ToolTipRole:
-            column = section
-            if column == C.COL_PACKAGE_TYPE:
-                return to_qvariant(_('Package type: Conda, Pip'))
-            elif column == C.COL_INSTALL:
-                return to_qvariant(_('Install/Remove package'))
-            elif column == C.COL_REMOVE:
-                return to_qvariant(_('Remove package'))
-            elif column == C.COL_UPGRADE:
-                return to_qvariant(_('Upgrade package'))
-            elif column == C.COL_DOWNGRADE:
-                return to_qvariant(_('Downgrade package'))
 
-        if orientation == Qt.Horizontal:
+        elif role == Qt.DisplayRole and orientation == Qt.Horizontal:
             if section == C.COL_PACKAGE_TYPE:
                 return to_qvariant(_("T"))
             if section == C.COL_NAME:

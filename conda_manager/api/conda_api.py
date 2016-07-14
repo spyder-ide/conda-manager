@@ -402,7 +402,7 @@ class _CondaAPI(QObject):
 
         return valid_envs
 
-    def get_prefix_envname(self, name):
+    def get_prefix_envname(self, name, log=False):
         """Return full prefix path of environment defined by `name`."""
         prefix = None
         if name == 'root':

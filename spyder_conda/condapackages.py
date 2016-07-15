@@ -145,13 +145,13 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         main = self.main
         main.add_dockwidget(self)
 
-        if getattr(main.projectexplorer, 'sig_project_closed', False):
-            pe = main.projectexplorer
-            pe.condamanager = self
-            pe.sig_project_closed.connect(self.project_closed)
-            pe.sig_project_loaded.connect(self.project_loaded)
-            self.sig_worker_ready.connect(self._after_load)
-            self.sig_environment_created.connect(pe.sig_environment_created)
+        #if getattr(main.projectexplorer, 'sig_project_closed', False):
+        #    pe = main.projectexplorer
+        #    pe.condamanager = self
+        #    pe.sig_project_closed.connect(self.project_closed)
+        #    pe.sig_project_loaded.connect(self.project_loaded)
+        #    self.sig_worker_ready.connect(self._after_load)
+        #    self.sig_environment_created.connect(pe.sig_environment_created)
 
         self.sig_channels_updated.connect(self._save_channel_settings)
 

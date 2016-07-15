@@ -27,19 +27,20 @@ class LineEditSearch(QLineEdit):
         self.button_icon.setDefault(True)
         self.button_icon.setFocusPolicy(Qt.NoFocus)
 
-        layout = QHBoxLayout()
-        layout.addWidget(self.button_icon, 0, Qt.AlignRight)
-        layout.setSpacing(0)
-        layout.addSpacing(2)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
+#        layout = QHBoxLayout()
+#        layout.addWidget(self.button_icon, 0, Qt.AlignRight)
+#        layout.setSpacing(0)
+#        layout.addSpacing(2)
+#        layout.setContentsMargins(0, 0, 0, 0)
+#        self.setLayout(layout)
 
         # Signals
         self.textEdited.connect(self.update_box)
         self.button_icon.clicked.connect(self.clear_text)
+        self.button_icon.setVisible(False)
 
         self.update_box(None)
-        self.set_icon_size(16, 16)
+#        self.set_icon_size(16, 16)
         self.setTabOrder(self, self.button_icon)
 
     def set_icon_size(self, width, height):

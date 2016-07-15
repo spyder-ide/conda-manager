@@ -1,26 +1,26 @@
 # -*- coding:utf-8 -*-
-#
-# Copyright © 2015 The Spyder Development Team
+# -----------------------------------------------------------------------------
+# Copyright © 2015- The Spyder Development Team
 # Copyright © 2014 Gonzalo Peña-Castellanos (@goanpeca)
 #
 # Licensed under the terms of the MIT License
+# -----------------------------------------------------------------------------
+"""Conda Package Manager Plugin."""
 
-"""
-Conda Package Manager Plugin.
-"""
 # Standard library imports
 import gettext
 import os.path as osp
 
 # Third party imports
 from qtpy.QtCore import Qt, Signal
-from qtpy.QtWidgets import QGridLayout, QGroupBox, QMessageBox, QVBoxLayout
+from qtpy.QtGui import QIcon
+from qtpy.QtWidgets import QGroupBox, QMessageBox, QVBoxLayout
 from spyderlib.plugins import SpyderPluginMixin, PluginConfigPage
-from spyderlib.utils import icon_manager as ima
 
 # Local imports
+from conda_manager.api.manager_api import ManagerAPI
 from conda_manager.data import images
-from conda_manager.widgets import CondaPackagesWidget
+from conda_manager.widgets.packages import CondaPackagesWidget
 
 
 _ = gettext.gettext
@@ -28,60 +28,71 @@ _ = gettext.gettext
 
 class CondaPackagesConfigPage(PluginConfigPage):
     """ """
+    
     def setup_page(self):
-        network_group = QGroupBox(_("Network settings"))
-        self.checkbox_proxy = self.create_checkbox(_("Use network proxy"),
-                                                   'use_proxy_flag',
-                                                   default=False)
-        server = self.create_lineedit(_('Server'), 'server', default='',
-                                      alignment=Qt.Horizontal)
-        port = self.create_lineedit(_('Port'), 'port', default='',
-                                    alignment=Qt.Horizontal)
-        user = self.create_lineedit(_('User'), 'user', default='',
-                                    alignment=Qt.Horizontal)
-        password = self.create_lineedit(_('Password'), 'password', default='',
-                                        alignment=Qt.Horizontal)
+        self.api = ManagerAPI()
+        self.set_option('api', self.api.client_get_api_url())
+        self.apply_callback = self.apply_setting_options
 
-        self.widgets = [server, port, user, password]
+        group_api = QGroupBox(_("Anaconda client"))
+        self.lineedit_api = self.create_lineedit(_('API url'), 'api',
+                                                 alignment=Qt.Horizontal)
 
+#        group_network = QGroupBox(_("Network proxy"))
+#        checkbox_proxy = self.create_checkbox(_("Use custom proxy"),
+#                                              'use_network_proxy',
+#                                              default=False)
+#        server = self.create_lineedit(_('Server'), 'server', default='',
+#                                      alignment=Qt.Horizontal)
+#        port = self.create_lineedit(_('Port'), 'port', default='',
+#                                    alignment=Qt.Horizontal)
+#        user = self.create_lineedit(_('User'), 'user', default='',
+#                                    alignment=Qt.Horizontal)
+#        password = self.create_lineedit(_('Password'), 'password', default='',
+#                                        alignment=Qt.Horizontal)
+        
         # Layouts
-        network_layout = QGridLayout()
-        network_layout.addWidget(self.checkbox_proxy, 0, 0)
-        network_layout.addWidget(server.label, 1, 0)
-        network_layout.addWidget(server.textbox, 1, 1)
-        network_layout.addWidget(port.label, 1, 2)
-        network_layout.addWidget(port.textbox, 1, 3)
-        network_layout.addWidget(user.label, 2, 0)
-        network_layout.addWidget(user.textbox, 2, 1)
-        network_layout.addWidget(password.label, 2, 2)
-        network_layout.addWidget(password.textbox, 2, 3)
-        network_group.setLayout(network_layout)
+        layout_api = QVBoxLayout()
+        layout_api.addWidget(self.lineedit_api )
+        group_api.setLayout(layout_api)
+
+#        layout_proxy = QGridLayout()
+#        layout_proxy.addWidget(checkbox_proxy, 0, 0, 1, 2)
+#        layout_proxy.addWidget(server.label, 1, 0)
+#        layout_proxy.addWidget(server.textbox, 1, 1)
+#        layout_proxy.addWidget(port.label, 1, 2)
+#        layout_proxy.addWidget(port.textbox, 1, 3)
+#        layout_proxy.addWidget(user.label, 2, 0)
+#        layout_proxy.addWidget(user.textbox, 2, 1)
+#        layout_proxy.addWidget(password.label, 2, 2)
+#        layout_proxy.addWidget(password.textbox, 2, 3)
+#        group_network.setLayout(layout_proxy)
 
         vlayout = QVBoxLayout()
-        vlayout.addWidget(network_group)
+        vlayout.addWidget(group_api)
+#        vlayout.addWidget(group_network)
         vlayout.addStretch(1)
         self.setLayout(vlayout)
+#
+#        # Setup
+#        checked = self.get_option('use_network_proxy', default=False)
+#        checkbox_proxy.toggled.connect(server.textbox.setEnabled)
+#        checkbox_proxy.toggled.connect(port.textbox.setEnabled)
+#        checkbox_proxy.toggled.connect(user.textbox.setEnabled)
+#        checkbox_proxy.toggled.connect(password.textbox.setEnabled)
+#        server.textbox.setEnabled(checked)
+#        port.textbox.setEnabled(checked)
+#        user.textbox.setEnabled(checked)
+#        password.textbox.setEnabled(checked)
 
-        # Signals
-        self.checkbox_proxy.clicked.connect(self.proxy_settings)
-        self.proxy_settings()
-
-    def proxy_settings(self):
-        """ """
-        state = self.checkbox_proxy.checkState()
-        disabled = True
-
-        if state == 2:
-            disabled = False
-        elif state == 0:
-            disabled = True
-
-        for widget in self.widgets:
-            widget.setDisabled(disabled)
+    def apply_setting_options(self):
+        # TODO: Check value is valid. Add this functionality to configdialog
+        self.api.client_set_api_url(self.lineedit_api.textbox.text())
 
 
 class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     """Conda package manager based on conda and conda-api."""
+
     CONF_SECTION = 'conda_manager'
     CONFIGWIDGET_CLASS = CondaPackagesConfigPage
 
@@ -107,12 +118,11 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
     # ------ SpyderPluginWidget API -------------------------------------------
     def get_plugin_title(self):
         """Return widget title"""
-        return _("Conda package manager")
+        return _("Conda manager")
 
     def get_plugin_icon(self):
         """Return widget icon"""
-        path = images.__path__[0]
-        return ima.icon('condapackages', icon_path=path)
+        return QIcon(images.PATH_CONDA_LOGO)        
 
     def get_focus_widget(self):
         """

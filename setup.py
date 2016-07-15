@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Setup script for conda-manager
-"""
+"""Setup script for conda-manager."""
 
-from setuptools import setup, find_packages
+# Standard library imports
 import os
 import os.path as osp
 import sys
+
+# Third party imports
+from setuptools import setup, find_packages
 
 
 # Check for Python 3
@@ -70,8 +71,9 @@ setup(
     name='conda-manager',
     version=version_ns['__version__'],
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
-    package_data={LIBNAME: get_package_data(LIBNAME, EXTLIST)},
-    namespace_packages=['spyplugins'],
+    package_data={LIBNAME: get_package_data(LIBNAME, EXTLIST),
+                  'spyder_conda': get_package_data('spyder_conda', EXTLIST),
+                  },
     keywords=["Qt PyQt4 PyQt5 PySide conda conda-api binstar"],
     install_requires=REQUIREMENTS,
     url='https://github.com/spyder-ide/conda-manager',
@@ -102,4 +104,3 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Topic :: Software Development :: Widget Sets']
 )
-

@@ -472,6 +472,7 @@ class _RequestsDownloadAPI(QObject):
         try:
             r = requests.get(url, stream=True, proxies=self.proxy_servers)
         except Exception as error:
+            print('ERROR', 'here', error)
             logger.error(str(error))
             # Break if error found!
 #            self._sig_download_finished.emit(url, path)
@@ -654,7 +655,7 @@ def test():  # pragma: no cover
             ]
     path = os.sep.join([os.path.expanduser('~'), 'testing-download'])
     app = qapplication()
-    api = DownloadAPI()
+    api = RequestsDownloadAPI()
 
     for i, url in enumerate(urls):
         filepath = os.path.join(path, str(i) + '.json.bz2')
@@ -662,23 +663,23 @@ def test():  # pragma: no cover
         worker.sig_finished.connect(ready_print)
         print('Downloading', url, filepath)
 
-    path = os.sep.join([os.path.expanduser('~'), 'testing-download-requests'])
-    api = RequestsDownloadAPI()
-    urls += ['asdasdasdad']
-    for i, url in enumerate(urls):
-        worker = api.is_valid_url(url)
-        worker.url = url
-        worker.sig_finished.connect(ready_print)
-        filepath = os.path.join(path, str(i) + '.json.bz2')
-        worker = api.download(url, path=filepath, force=True)
-        worker.sig_finished.connect(ready_print)
-
-    api = RequestsDownloadAPI()
-    print(api._is_valid_api_url('https://api.anaconda.org'))
-    print(api._is_valid_api_url('https://conda.anaconda.org'))
-    print(api._is_valid_channel('https://google.com'))
-    print(api._is_valid_channel('https://conda.anaconda.org/continuumcrew'))
-    print(api.get_api_info('https://api.anaconda.org'))
+#    path = os.sep.join([os.path.expanduser('~'), 'testing-download-requests'])
+#    api = RequestsDownloadAPI()
+#    urls += ['asdasdasdad']
+#    for i, url in enumerate(urls):
+#        worker = api.is_valid_url(url)
+#        worker.url = url
+#        worker.sig_finished.connect(ready_print)
+#        filepath = os.path.join(path, str(i) + '.json.bz2')
+#        worker = api.download(url, path=filepath, force=True)
+#        worker.sig_finished.connect(ready_print)
+#
+#    api = RequestsDownloadAPI()
+#    print(api._is_valid_api_url('https://api.anaconda.org'))
+#    print(api._is_valid_api_url('https://conda.anaconda.org'))
+#    print(api._is_valid_channel('https://google.com'))
+#    print(api._is_valid_channel('https://conda.anaconda.org/continuumcrew'))
+#    print(api.get_api_info('https://api.anaconda.org'))
     sys.exit(app.exec_())
 
 

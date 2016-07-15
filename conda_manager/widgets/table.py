@@ -31,45 +31,47 @@ from conda_manager.utils.qthelpers import add_actions, create_action
 
 
 _ = gettext.gettext
-HIDE_COLUMNS = [const.COL_STATUS, const.COL_URL, const.COL_LICENSE,
-                const.COL_REMOVE, const.COL_ACTION_VERSION]
+HIDE_COLUMNS = [const.COL_START, const.COL_STATUS, const.COL_URL,
+                const.COL_LICENSE, const.COL_REMOVE, const.COL_ACTION_VERSION,
+                const.COL_END]
 
 
 class CustomDelegate(QItemDelegate):
-    def paint(self, painter, option, index):
-        QItemDelegate.paint(self, painter, option, index)
-        column = index.column()
-        row = index.row()
-        rect = option.rect
-
-        # Draw borders
-        pen = QPen()
-        pen.setWidth(1)
-        pen.setColor(QColor('#cdcdcd'))
-        painter.setPen(pen)
-        painter.drawLine(rect.topLeft(), rect.topRight())
-
-        if (row == self.current_hover_row() or row == self.current_row() and
-                (self.has_focus_or_context())):
-            brush = QBrush(Qt.SolidPattern)
-            brush.setColor(QColor(255, 255, 255, 100))
-            painter.fillRect(rect, brush)
-            if row == self.current_row() and column in [const.COL_START]:
-                pen = QPen()
-                pen.setWidth(10)
-                pen.setColor(QColor('#7cbb4c'))
-                painter.setPen(pen)
-                dyt = QPoint(0, 5)
-                dyb = QPoint(0, 4)
-                painter.drawLine(rect.bottomLeft()-dyb, rect.topLeft()+dyt)
-
-    def sizeHint(self, style, model_index):
-        column = model_index.column()
-        if column in [const.COL_PACKAGE_TYPE] + [const.ACTION_COLUMNS,
-                                                 const.COL_PACKAGE_TYPE]:
-            return QSize(24, 24)
-        else:
-            return QItemDelegate.sizeHint(self, style, model_index)
+    pass
+#    def paint(self, painter, option, index):
+#        QItemDelegate.paint(self, painter, option, index)
+#        column = index.column()
+#        row = index.row()
+#        rect = option.rect
+#
+#        # Draw borders
+#        pen = QPen()
+#        pen.setWidth(1)
+#        pen.setColor(QColor('#cdcdcd'))
+#        painter.setPen(pen)
+#        painter.drawLine(rect.topLeft(), rect.topRight())
+#
+#        if (row == self.current_hover_row() or row == self.current_row() and
+#                (self.has_focus_or_context())):
+#            brush = QBrush(Qt.SolidPattern)
+#            brush.setColor(QColor(255, 255, 255, 100))
+#            painter.fillRect(rect, brush)
+#            if row == self.current_row() and column in [const.COL_START]:
+#                pen = QPen()
+#                pen.setWidth(10)
+#                pen.setColor(QColor('#7cbb4c'))
+#                painter.setPen(pen)
+#                dyt = QPoint(0, 5)
+#                dyb = QPoint(0, 4)
+#                painter.drawLine(rect.bottomLeft()-dyb, rect.topLeft()+dyt)
+#
+#    def sizeHint(self, style, model_index):
+#        column = model_index.column()
+#        if column in [const.COL_PACKAGE_TYPE] + [const.ACTION_COLUMNS,
+#                                                 const.COL_PACKAGE_TYPE]:
+#            return QSize(24, 24)
+#        else:
+#            return QItemDelegate.sizeHint(self, style, model_index)
 
 
 class TableCondaPackages(QTableView):
@@ -112,14 +114,12 @@ class TableCondaPackages(QTableView):
         self.proxy_model = None
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-#        self.setSelectionBehavior(QAbstractItemView.NoSelection)
-#        self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.setSelectionMode(QAbstractItemView.NoSelection)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.verticalHeader().hide()
         self.setSortingEnabled(True)
         self.setMouseTracking(True)
 
-#        self.setAlternatingRowColors(True)
+        self.setAlternatingRowColors(True)
         self._delegate.current_row = self.current_row
         self._delegate.current_hover_row = self.current_hover_row
         self._delegate.update_index = self.update
@@ -128,6 +128,7 @@ class TableCondaPackages(QTableView):
         self.setShowGrid(False)
         self.setWordWrap(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.horizontalHeader().setStretchLastSection(True)
 
         # Header setup
         self._hheader = self.horizontalHeader()
@@ -135,9 +136,9 @@ class TableCondaPackages(QTableView):
             self._hheader.setSectionResizeMode(self._hheader.Fixed)
         else:
             self._hheader.setResizeMode(self._hheader.Fixed)
-        self._hheader.setStyleSheet("""QHeaderView {border: 0px;
-                                                    border-radius: 0px;};
-                                                    """)
+#        self._hheader.setStyleSheet("""QHeaderView {border: 0px;
+#                                                    border-radius: 0px;};
+#                                                    """)
         self.sortByColumn(const.COL_NAME, Qt.AscendingOrder)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()

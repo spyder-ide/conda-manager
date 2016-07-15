@@ -21,7 +21,8 @@ import sys
 # Third party imports
 from qtpy.QtCore import QEvent, QSize, Qt, Signal
 from qtpy.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout,
-                            QMessageBox, QPushButton, QVBoxLayout, QWidget)
+                            QMessageBox, QPushButton, QVBoxLayout, QWidget,
+                            QToolButton)
 
 # Local imports
 from conda_manager.api import ManagerAPI
@@ -29,13 +30,8 @@ from conda_manager.utils import get_conf_path, get_module_data_path
 from conda_manager.utils import constants as C
 from conda_manager.utils.logs import logger
 from conda_manager.utils.py3compat import configparser as cp
-from conda_manager.widgets import (ButtonPackageApply, ButtonPackageCancel,
-                                   ButtonPackageChannels, ButtonPackageClear,
-                                   ButtonPackageOk, ButtonPackageUpdate,
-                                   DropdownPackageFilter, FramePackageBottom,
-                                   FramePackageTop, LabelPackageStatus,
-                                   ProgressBarPackage,
-                                   )
+from conda_manager.widgets import (DropdownPackageFilter, FramePackageTop,
+                                   LabelPackageStatus, ProgressBarPackage)
 
 from conda_manager.widgets.dialogs.actions import CondaPackageActionDialog
 from conda_manager.widgets.dialogs.channels import DialogChannels
@@ -192,15 +188,23 @@ class CondaPackagesWidget(QWidget):
             self._channels = self.api.conda_get_condarc_channels()
             self._active_channels = self._channels[:]
 
+        try:
+            import spyderlib.utils.icon_manager as ima
+            icon_options = ima.icon('tooloptions')
+        except Exception:
+            import qtawesome as qta
+            icon_options = qta.icon('fa.cog')
+
         # Widgets
         self.cancel_dialog = ClosePackageManagerDialog
         self.bbox = QDialogButtonBox(Qt.Horizontal)
-        self.button_cancel = ButtonPackageCancel('Cancel')
-        self.button_channels = ButtonPackageChannels(_('Channels'))
-        self.button_ok = ButtonPackageOk(_('Ok'))
-        self.button_update = ButtonPackageUpdate(_('Update package index...'))
-        self.button_apply = ButtonPackageApply(_('Apply'))
-        self.button_clear = ButtonPackageClear(_('Clear'))
+        self.button_cancel = QPushButton('Cancel')
+        self.button_channels = QPushButton(_('Channels'))
+        self.button_ok = QPushButton(_('Ok'))
+        self.button_update = QPushButton(_('Update index...'))
+        self.button_apply = QPushButton(_('Apply'))
+        self.button_clear = QPushButton(_('Clear'))
+        self.button_options = QToolButton()
         self.combobox_filter = DropdownPackageFilter(self)
         self.frame_top = FramePackageTop()
         self.frame_bottom = FramePackageTop()
@@ -210,18 +214,19 @@ class CondaPackagesWidget(QWidget):
         self.textbox_search = LineEditSearch(self)
         self.widgets = [self.button_update, self.button_channels,
                         self.combobox_filter, self.textbox_search, self.table,
-                        self.button_ok, self.button_apply, self.button_clear]
+                        self.button_ok, self.button_apply, self.button_clear,
+                        self.button_options]
         self.table_first_row = FirstRowWidget(
             widget_before=self.textbox_search)
         self.table_last_row = LastRowWidget(
             widgets_after=[self.button_apply, self.button_clear,
                            self.button_cancel, self.combobox_filter])
 
-        # Widgets setup
-        for button in [self.button_cancel, self.button_apply,
-                       self.button_clear, self.button_ok, self.button_update,
-                       self.button_channels]:
-            button.setDefault(True)
+        # Widget setup
+        self.button_options.setPopupMode(QToolButton.InstantPopup)
+        self.button_options.setIcon(icon_options)
+        self.button_options.setAutoRaise(True)
+
         max_height = self.status_bar.fontMetrics().height()
         max_width = self.textbox_search.fontMetrics().width('M'*23)
         self.bbox.addButton(self.button_ok, QDialogButtonBox.ActionRole)
@@ -229,7 +234,6 @@ class CondaPackagesWidget(QWidget):
         self.button_ok.setDefault(True)
         self.button_ok.setMaximumSize(QSize(0, 0))
         self.button_ok.setVisible(False)
-        self.button_channels.setCheckable(True)
         self.combobox_filter.addItems([k for k in C.COMBOBOX_VALUES_ORDERED])
         self.combobox_filter.setMinimumWidth(120)
         self.progress_bar.setMaximumHeight(max_height*1.2)
@@ -253,8 +257,7 @@ class CondaPackagesWidget(QWidget):
         top_layout.addWidget(self.button_update)
         top_layout.addWidget(self.textbox_search)
         top_layout.addStretch()
-        top_layout.setContentsMargins(0, 0, 0, 0)
-        self.frame_top.setLayout(top_layout)
+        top_layout.addWidget(self.button_options)
 
         middle_layout = QVBoxLayout()
         middle_layout.addWidget(self.table_first_row)
@@ -268,13 +271,12 @@ class CondaPackagesWidget(QWidget):
         bottom_layout.addWidget(self.button_cancel)
         bottom_layout.addWidget(self.button_apply)
         bottom_layout.addWidget(self.button_clear)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        self.frame_bottom.setLayout(bottom_layout)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(self.frame_top)
+        layout.addLayout(top_layout)
         layout.addLayout(middle_layout)
-        layout.addWidget(self.frame_bottom)
+        layout.addLayout(bottom_layout)
+        layout.addSpacing(6)
         self.setLayout(layout)
 
         self.setTabOrder(self.combobox_filter, self.button_channels)
@@ -1130,17 +1132,17 @@ class CondaPackagesWidget(QWidget):
         """
         Returns the active environment prefix.
         """
-        return self._prefix
+        return self.prefix
 
     def get_environment_name(self):
         """
         Returns the active environment name if it is located in the default
         conda environments directory, otherwise it returns the prefix.
         """
-        name = osp.basename(self._prefix)
+        name = osp.basename(self.prefix)
 
         if not (name and self.api.environment_exists(name=name)):
-            name = self._prefix
+            name = self.prefix
 
         return name
 
@@ -1193,7 +1195,14 @@ class CondaPackagesWidget(QWidget):
         dic['action'] = C.ACTION_REMOVE_ENV
         return self._run_conda_process(dic['action'], dic)
 
+    # New api
+    def show_login_dialog(self):
+        pass
 
+    def show_options_menu(self):
+        pass
+
+        
 class CondaPackagesDialog(QDialog, CondaPackagesWidget):
     """
     Conda packages dialog.
@@ -1276,8 +1285,9 @@ def test_dialog():
     """Run conda packages widget test"""
     from conda_manager.utils.qthelpers import qapplication
     app = qapplication()
-    dialog = CondaPackagesDialog(name='root')
-    sys.exit(dialog.exec_())
+    widget = CondaPackagesDialog(name='root')
+    widget.show()
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':

@@ -164,7 +164,7 @@ def encode(text, orig_coding):
         try:
             return text.encode(coding), coding
         except (UnicodeError, LookupError):
-            raise RuntimeError("Incorrect encoding (%s)" % coding)
+            raise RuntimeError("Incorrect encoding ({0})".format(coding))
     if (orig_coding and orig_coding.endswith('-default') or
        orig_coding.endswith('-guessed')):
         coding = orig_coding.replace("-default", "")

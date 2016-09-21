@@ -160,12 +160,11 @@ class TableCondaPackages(QTableView):
         # Custom Proxy Model setup
         self.proxy_model.setDynamicSortFilter(True)
 
-        filter_text = \
-            (lambda row, text, status: (
-             all([t in row[const.COL_NAME].lower() for t in
-                 to_text_string(text).lower().split()]) or
-             all([t in row[const.COL_DESCRIPTION].lower() for t in
-                 to_text_string(text).split()])))
+        filter_text = (lambda row, text, status: (
+             all(t in row[const.COL_NAME].lower() for t in
+                 to_text_string(text).lower().split()) or
+             all(t in row[const.COL_DESCRIPTION].lower() for t in
+                 to_text_string(text).split())))
 
         filter_status = (lambda row, text, status:
                          to_text_string(row[const.COL_STATUS]) in

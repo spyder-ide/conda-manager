@@ -684,10 +684,9 @@ class TableCondaPackages(QTableView):
                     number_of_actions += len(data)
             self.sig_actions_updated.emit(number_of_actions)
 
-    def open_url(self, url):
-        """
-        Open link from action in default operating system browser.
-        """
+    @staticmethod
+    def open_url(url):
+        """Open link from action in default operating system browser."""
         if url is None:
             return
         QDesktopServices.openUrl(QUrl(url))

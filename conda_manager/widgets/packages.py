@@ -54,7 +54,8 @@ class FirstRowWidget(QPushButton):
         QPushButton.__init__(self)
         self.widget_before = widget_before
 
-    def sizeHint(self):
+    @staticmethod
+    def sizeHint():
         return QSize(0, 0)
 
     def focusInEvent(self, event):
@@ -109,7 +110,8 @@ class LastRowWidget(QPushButton):
         else:
             return QPushButton.event(self, event)
 
-    def sizeHint(self):
+    @staticmethod
+    def sizeHint():
         return QSize(0, 0)
 
 

@@ -78,17 +78,16 @@ class CondaPackagesModel(QAbstractTableModel):
         if palette:
             self._palette.update(palette)
 
-    def flags(self, index):
+    @staticmethod
+    def flags(index):
         """Override Qt method"""
         column = index.column()
 
         if index.isValid():
             if column in [C.COL_START, C.COL_END]:
-#                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 return Qt.ItemFlags(Qt.ItemIsEnabled)
             else:
                 return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-#                return Qt.ItemFlags(Qt.ItemIsEnabled)
         else:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
 
@@ -280,7 +279,8 @@ class CondaPackagesModel(QAbstractTableModel):
 
         return to_qvariant()
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    @staticmethod
+    def headerData(section, orientation, role=Qt.DisplayRole):
         """Override Qt method"""
         if role == Qt.TextAlignmentRole:
             if orientation == Qt.Horizontal:
@@ -305,7 +305,8 @@ class CondaPackagesModel(QAbstractTableModel):
         """Override Qt method"""
         return len(self._rows)
 
-    def columnCount(self, index=QModelIndex()):
+    @staticmethod
+    def columnCount(index=QModelIndex()):
         """Override Qt method"""
         return len(C.COLUMNS)
 

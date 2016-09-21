@@ -116,11 +116,13 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         self.initialize_plugin()
 
     # ------ SpyderPluginWidget API -------------------------------------------
-    def get_plugin_title(self):
+    @staticmethod
+    def get_plugin_title():
         """Return widget title"""
         return _("Conda manager")
 
-    def get_plugin_icon(self):
+    @staticmethod
+    def get_plugin_icon():
         """Return widget icon"""
         return QIcon(images.PATH_CONDA_LOGO)        
 
@@ -131,7 +133,8 @@ class CondaPackages(CondaPackagesWidget, SpyderPluginMixin):
         """
         return self.textbox_search
 
-    def get_plugin_actions(self):
+    @staticmethod
+    def get_plugin_actions():
         """Return a list of actions related to plugin"""
         return []
 

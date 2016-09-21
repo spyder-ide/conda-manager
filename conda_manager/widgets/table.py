@@ -143,13 +143,13 @@ class TableCondaPackages(QTableView):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()
 
-    def setup_model(self, packages, data, metadata_links={}):
+    def setup_model(self, packages, data, metadata_links=None):
         """ """
         self.proxy_model = MultiColumnSortFilterProxy(self)
         self.source_model = CondaPackagesModel(self, packages, data)
         self.proxy_model.setSourceModel(self.source_model)
         self.setModel(self.proxy_model)
-        self.metadata_links = metadata_links
+        self.metadata_links = metadata_links if metadata_links else {}
 
         # FIXME: packages sizes... move to a better place?
         packages_sizes = {}

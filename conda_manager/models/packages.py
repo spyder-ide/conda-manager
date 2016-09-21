@@ -73,7 +73,8 @@ class CondaPackagesModel(QAbstractTableModel):
         end = self.index(row, column)
         self.dataChanged.emit(start, end)
 
-    def update_style_palette(self, palette={}):
+    def update_style_palette(self, palette=None):
+        """Update style palette for conda-manager extension."""
         if palette:
             self._palette.update(palette)
 

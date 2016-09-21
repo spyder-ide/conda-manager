@@ -147,7 +147,7 @@ class CondaPackagesWidget(QWidget):
                  conda_api_url='https://api.anaconda.org',
                  setup=True,
                  data_directory=None,
-                 extra_metadata={}):
+                 extra_metadata=None):
 
         super(CondaPackagesWidget, self).__init__(parent)
 
@@ -163,7 +163,7 @@ class CondaPackagesWidget(QWidget):
         self._parent = parent
         self._current_action_name = ''
         self._hide_widgets = False
-        self._metadata = extra_metadata  # From repo.continuum
+        self._metadata = extra_metadata if extra_metadata else {}
         self._metadata_links = {}        # Bundled metadata
         self.api = ManagerAPI()
         self.busy = False
@@ -745,7 +745,7 @@ class CondaPackagesWidget(QWidget):
 
     # --- Non UI API
     # -------------------------------------------------------------------------
-    def setup(self, check_updates=False, blacklist=[], metadata={}):
+    def setup(self, check_updates=False, blacklist=None, metadata=None):
         """
         Setup packages.
 
@@ -772,9 +772,9 @@ class CondaPackagesWidget(QWidget):
 
         if blacklist:
             self.package_blacklist = [p.lower() for p in blacklist]
-
-        if metadata:
-            self._metadata = metadata
+        else:
+            blacklist = []
+        self._metadata = metadata if metadata else {}
 
         self._current_model_index = self.table.currentIndex()
         self._current_table_scroll = self.table.verticalScrollBar().value()
@@ -837,9 +837,11 @@ class CondaPackagesWidget(QWidget):
                                            tuple(active_channels))
             self.setup(check_updates=True)
 
-    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
-                           palette={}):
+    def update_style_sheet(self, style_sheet=None, extra_dialogs=None,
+                           palette=None):
         if style_sheet:
+            extra_dialogs = extra_dialogs if extra_dialogs else {}
+            palette = palette if palette else {}
             self.style_sheet = style_sheet
             self.table.update_style_palette(palette=palette)
             self.textbox_search.update_style_sheet(style_sheet)
@@ -1165,11 +1167,12 @@ class CondaPackagesWidget(QWidget):
 
     # --- Conda actions
     # -------------------------------------------------------------------------
-    def create_environment(self, name=None, prefix=None, packages=['python']):
+    def create_environment(self, name=None, prefix=None, packages=None):
         """ """
         # If environment exists already? GUI should take care of this
         # BUT the api call should simply set that env as the env
         dic = {}
+        packages = packages if packages else ['python']
         dic['name'] = name
         dic['prefix'] = prefix
         dic['pkgs'] = packages

@@ -61,10 +61,10 @@ class SearchLineEdit(QLineEdit):
 
     def _toggle_visibility(self):
         """ """
-        if len(self.text()) == 0:
-            self.button_clear.setVisible(False)
-        else:
+        if self.text():
             self.button_clear.setVisible(True)
+        else:
+            self.button_clear.setVisible(False)
 
     def sizeHint(self):
         return QSize(200, self._pixmap_icon.height())

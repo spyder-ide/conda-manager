@@ -37,7 +37,7 @@ class CondaDependenciesModel(QAbstractTableModel):
         self._timer_dots = ['.  ', '.. ', '...', '   ']
         self._timer_counter = 0
 
-        if len(dic) == 0:
+        if not dic:
             self._timer.start(650)
             self._rows = [[_(u'Resolving dependencies     '), u'', u'', u'']]
             self._bold_rows.append(0)

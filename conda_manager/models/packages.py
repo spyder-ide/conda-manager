@@ -255,8 +255,7 @@ class CondaPackagesModel(QAbstractTableModel):
                     return to_qvariant(_('Conda package'))
                 elif type_ == C.PIP_PACKAGE:
                     return to_qvariant(_('Python package'))
-            elif column == C.COL_VERSION:
-                if is_upgradable:
+            elif column == C.COL_VERSION and is_upgradable:
                     return to_qvariant(_('Update available'))
         elif role == Qt.ForegroundRole:
             palette = QPalette()
@@ -269,12 +268,11 @@ class CondaPackagesModel(QAbstractTableModel):
                     color = palette.color(QPalette.Mid)
                     color = P['foreground.not.installed']
                     return to_qvariant(color)
-            elif column in [C.COL_VERSION]:
-                if is_upgradable:
+            elif column in [C.COL_VERSION] and is_upgradable:
                     return to_qvariant(P['foreground.upgrade'])
 
-        elif role == Qt.SizeHintRole:
-            if column in C.ACTION_COLUMNS + [C.COL_PACKAGE_TYPE]:
+        elif (role == Qt.SizeHintRole and column in
+              C.ACTION_COLUMNS + [C.COL_PACKAGE_TYPE]):
                 return to_qvariant(QSize(24, 24))
 
         return to_qvariant()

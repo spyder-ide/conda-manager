@@ -463,7 +463,7 @@ class TableCondaPackages(QTableView):
                 if not versions:
                     versions = [version]
 
-                action = actions.get(column, None)
+                action = actions.get(column)
 
                 if type_ == const.CONDA_PACKAGE:
                     self.sig_conda_action_requested.emit(name, action, version,

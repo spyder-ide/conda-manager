@@ -6,7 +6,7 @@ Build Status
 Project details
 ---------------
 
-|license| |pypi version| |pypi download| |gitter|
+|license| |pypi version| |gitter|
 
 .. |travis status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager
@@ -32,9 +32,6 @@ Project details
 .. |pypi version| image:: https://img.shields.io/pypi/v/conda-manager.svg
    :target: https://pypi.python.org/pypi/conda-manager/
    :alt: Latest PyPI version
-.. |pypi download| image:: https://img.shields.io/pypi/dm/conda-manager.svg
-   :target: https://pypi.python.org/pypi/conda-manager
-   :alt: Number of PyPI downloads
 .. |gitter| image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
    :target: https://gitter.im/spyder-ide/public
    :alt: Join the chat at https://gitter.im/spyder-ide/public

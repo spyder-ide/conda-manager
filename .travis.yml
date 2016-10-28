@@ -1,6 +1,18 @@
 # https://travis-ci.com/spyder-ide/conda-manager
-language: python
+
+# We set the language to c because python isn't supported on the MacOS X nodes
+# on Travis. However, the language ends up being irrelevant anyway, since we
+# install Python ourselves using conda.
+language: c
+
 sudo: false
+
+branches:
+  only:
+    - master
+
+os:
+  - osx
 
 env:
   global:
@@ -10,42 +22,21 @@ env:
     - CONDA_DEPENDENCIES="anaconda-client pillow pyyaml qtawesome qtpy requests"
     - PIP_DEPENDENCIES="coveralls pytest-qt"
 
-matrix:
-  include:
+  matrix:
     # PyQt5
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PyQt5
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt5
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PyQt5
+    - env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PyQt5
+    - env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt5
+    - env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PyQt5
     # PySide2
-#    - os: osx
-#      language: generic
-#      env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PySide2
-#    - os: osx
-#      language: generic
-#      env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PySide2
-#    - os: osx
-#      language: generic
-#      env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PySide2
+#    - env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PySide2
+#    - env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PySide2
+#    - env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PySide2
     # PyQt4
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PyQt4
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt4
-    - os: osx
-      language: generic
-      env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PyQt4
+    - env: TRAVIS_PYTHON_VERSION=3.5 USE_QT_API=PyQt4
+    - env: TRAVIS_PYTHON_VERSION=3.4 USE_QT_API=PyQt4
+    - env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PyQt4
     # PySide
-#    - os: osx
-#      language: generic
-#      env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PySide
+#    - env: TRAVIS_PYTHON_VERSION=2.7 USE_QT_API=PySide
 
 
 install:

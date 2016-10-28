@@ -33,8 +33,8 @@ Project details
    :target: https://pypi.python.org/pypi/conda-manager/
    :alt: Latest PyPI version
 .. |gitter| image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
-   :target: https://gitter.im/spyder-ide/public
-   :alt: Join the chat at https://gitter.im/spyder-ide/public
+   :target: https://gitter.im/spyder-ide/conda-manager
+   :alt: Join the chat at https://gitter.im/spyder-ide/conda-manager
 
 
 Description

@@ -1,14 +1,15 @@
+# https://circleci.com/gh/spyder-ide/conda-manager
 machine:
   environment:
     # Used by qthelpers to close widgets after a defined time
     TEST_CI: "True"
     # Python versions to tests (Maximum of 4 different versions)
-    PY_VERSIONS: "2.7 3.4 3.5"
+    PY_VERSIONS: "3.5 3.4 2.7"
     # Environment variables used by astropy helpers
     TRAVIS_OS_NAME: "linux"
-    CONDA_CHANNELS: "conda-forge spyder-ide"
-    CONDA_DEPENDENCIES: "anaconda-client pillow pyqt pytest pytest-cov pytest-qt pyyaml qt qtawesome qtpy requests"
-    PIP_DEPENDENCIES: "coveralls"
+    CONDA_DEPENDENCIES: >
+      anaconda-client pillow pyqt pyyaml qtawesome qtpy requests
+    PIP_DEPENDENCIES: "coveralls pytest-qt"
 
 dependencies:
   override:
@@ -18,10 +19,25 @@ dependencies:
       echo -e "PYTHON = $TRAVIS_PYTHON_VERSION \n============" &&
       git clone git://github.com/astropy/ci-helpers.git &&
       source ci-helpers/travis/setup_conda_$TRAVIS_OS_NAME.sh &&
-      PATH="$HOME/miniconda/bin:$PATH" "$HOME/miniconda/envs/test/bin/python" setup.py install;
+      export PATH="$HOME/miniconda/bin:$PATH" &&
+      source activate test &&
+      conda install ciocheck -c conda-forge &&
+      python setup.py develop;
 
 test:
   override:
-    - PATH="$HOME/miniconda/bin:$PATH" "$HOME/miniconda/envs/test/bin/conda-manager": # note the colon
+    # Check style
+    - export PATH="$HOME/miniconda/bin:$PATH" && source activate test && ciocheck conda_manager: # note the colon
         parallel: true
-
+    # Check PyQt5
+    - export PATH="$HOME/miniconda/bin:$PATH" && source activate test && conda install qt=5.* pyqt=5.* && conda-manager: # note the colon
+        parallel: true
+    # Check PySide2
+#    - export PATH="$HOME/miniconda/bin:$PATH" && source activate test && conda install qt=5.* pyside2 && conda-manager: # note the colon
+#        parallel: true
+    # Check PyQt4
+    - export PATH="$HOME/miniconda/bin:$PATH" && source activate test && conda install qt=4.* pyqt=4.* && conda-manager: # note the colon
+        parallel: true
+    # Check Pyside
+    - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then export PATH="$HOME/miniconda/bin:$PATH" && source activate test && conda install qt=4.* pyside && conda-manager; fi: # note the colon
+        parallel: true

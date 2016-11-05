@@ -87,3 +87,8 @@ or
 .. _spyder: https://github.com/spyder-ide/spyder
 .. _Changelog: https://github.com/spyder-ide/conda-manager/blob/master/CHANGELOG.md
 .. _Issue tracker: https://github.com/spyder-ide/conda-manager/issues
+
+
+.. image:: https://badges.gitter.im/spyder-ide/conda-manager.svg
+   :alt: Join the chat at https://gitter.im/spyder-ide/conda-manager
+   :target: https://gitter.im/spyder-ide/conda-manager?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge

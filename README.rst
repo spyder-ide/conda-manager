@@ -11,8 +11,8 @@ Project details
 .. |travis status| image:: https://travis-ci.org/spyder-ide/conda-manager.svg?branch=master
    :target: https://travis-ci.org/spyder-ide/conda-manager
    :alt: Travis-CI build status
-.. |appveyor status| image:: https://ci.appveyor.com/api/projects/status/rl83o71yf06h40cj?svg=true
-   :target: https://ci.appveyor.com/project/goanpeca/conda-manager
+.. |appveyor status| image:: https://ci.appveyor.com/api/projects/status/fcfvh9rn0kc303ty?svg=true
+   :target: https://ci.appveyor.com/project/spyder-ide/conda-manager
    :alt: Appveyor build status
 .. |circleci status| image:: https://circleci.com/gh/spyder-ide/conda-manager/tree/master.svg?style=shield
    :target: https://circleci.com/gh/spyder-ide/conda-manager/tree/master

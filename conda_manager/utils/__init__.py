@@ -129,7 +129,7 @@ def sort_versions(versions=(), reverse=False, sep=u'.'):
     # replace letters found by a negative number
     replace_dic = {}
     alpha = sorted(alpha, reverse=True)
-    if len(alpha):
+    if alpha:
         replace_dic = dict(zip(alpha, list(range(-1, -(len(alpha)+1), -1))))
 
     # Complete with zeros based on longest item and replace alphas with number

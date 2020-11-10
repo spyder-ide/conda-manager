@@ -37,7 +37,7 @@ class CondaDependenciesModel(QAbstractTableModel):
         self._timer_dots = ['.  ', '.. ', '...', '   ']
         self._timer_counter = 0
 
-        if len(dic) == 0:
+        if not dic:
             self._timer.start(650)
             self._rows = [[_(u'Resolving dependencies     '), u'', u'', u'']]
             self._bold_rows.append(0)
@@ -121,7 +121,8 @@ class CondaDependenciesModel(QAbstractTableModel):
 
         return packages
 
-    def flags(self, index):
+    @staticmethod
+    def flags(index):
         """Override Qt method"""
         if not index.isValid():
             return Qt.ItemIsEnabled
@@ -174,7 +175,8 @@ class CondaDependenciesModel(QAbstractTableModel):
         """Override Qt method."""
         return len(self._rows)
 
-    def columnCount(self, index=QModelIndex()):
+    @staticmethod
+    def columnCount(index=QModelIndex()):
         """Override Qt method."""
         return 4
 

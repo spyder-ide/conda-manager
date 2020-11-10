@@ -116,23 +116,28 @@ class MainWindow(QMainWindow):
         """ """
         self.packages.set_environment(prefix=prefix)
 
-    def add_env(self):
+    @staticmethod
+    def add_env():
         """ """
         # TODO:
 
-    def clone_env(self):
+    @staticmethod
+    def clone_env():
         """ """
         # TODO:
 
-    def remove_env(self):
+    @staticmethod
+    def remove_env():
         """ """
         # TODO:
 
-    def preferences(self):
+    @staticmethod
+    def preferences():
         """ """
         # TODO:
 
-    def report_issue(self):
+    @staticmethod
+    def report_issue():
         if PY3:
             from urllib.parse import quote
         else:

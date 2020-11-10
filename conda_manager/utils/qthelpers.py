@@ -27,7 +27,7 @@ def qapplication(translate=True, test_time=3):
     if translate:
         install_translator(app)
 
-    test_travis = os.environ.get('TEST_CI', None)
+    test_travis = os.environ.get('TEST_CI')
     if test_travis is not None:
         timer_shutdown = QTimer(app)
         timer_shutdown.timeout.connect(app.quit)

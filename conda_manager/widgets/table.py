@@ -143,13 +143,13 @@ class TableCondaPackages(QTableView):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.hide_columns()
 
-    def setup_model(self, packages, data, metadata_links={}):
+    def setup_model(self, packages, data, metadata_links=None):
         """ """
         self.proxy_model = MultiColumnSortFilterProxy(self)
         self.source_model = CondaPackagesModel(self, packages, data)
         self.proxy_model.setSourceModel(self.source_model)
         self.setModel(self.proxy_model)
-        self.metadata_links = metadata_links
+        self.metadata_links = metadata_links if metadata_links else {}
 
         # FIXME: packages sizes... move to a better place?
         packages_sizes = {}
@@ -160,16 +160,18 @@ class TableCondaPackages(QTableView):
         # Custom Proxy Model setup
         self.proxy_model.setDynamicSortFilter(True)
 
-        filter_text = \
-            (lambda row, text, status: (
-             all([t in row[const.COL_NAME].lower() for t in
-                 to_text_string(text).lower().split()]) or
-             all([t in row[const.COL_DESCRIPTION].lower() for t in
-                 to_text_string(text).split()])))
+        
+        def filter_text(row, text, status):
+            name_match = all(t in row[const.COL_NAME].lower() for t in
+                             to_text_string(text).lower().split())
+            desc_match = all(t in row[const.COL_DESCRIPTION].lower() for t in
+                             to_text_string(text).split())
+            return name_match or desc_match
 
-        filter_status = (lambda row, text, status:
-                         to_text_string(row[const.COL_STATUS]) in
-                         to_text_string(status))
+        def filter_status(row, text, status):
+            status_value = to_text_string(row[const.COL_STATUS])
+            return status_value in to_text_string(status)
+
         self.model().add_filter_function('status-search', filter_status)
         self.model().add_filter_function('text-search', filter_text)
 
@@ -463,7 +465,7 @@ class TableCondaPackages(QTableView):
                 if not versions:
                     versions = [version]
 
-                action = actions.get(column, None)
+                action = actions.get(column)
 
                 if type_ == const.CONDA_PACKAGE:
                     self.sig_conda_action_requested.emit(name, action, version,
@@ -682,10 +684,9 @@ class TableCondaPackages(QTableView):
                     number_of_actions += len(data)
             self.sig_actions_updated.emit(number_of_actions)
 
-    def open_url(self, url):
-        """
-        Open link from action in default operating system browser.
-        """
+    @staticmethod
+    def open_url(url):
+        """Open link from action in default operating system browser."""
         if url is None:
             return
         QDesktopServices.openUrl(QUrl(url))

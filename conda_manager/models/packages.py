@@ -73,21 +73,21 @@ class CondaPackagesModel(QAbstractTableModel):
         end = self.index(row, column)
         self.dataChanged.emit(start, end)
 
-    def update_style_palette(self, palette={}):
+    def update_style_palette(self, palette=None):
+        """Update style palette for conda-manager extension."""
         if palette:
             self._palette.update(palette)
 
-    def flags(self, index):
+    @staticmethod
+    def flags(index):
         """Override Qt method"""
         column = index.column()
 
         if index.isValid():
             if column in [C.COL_START, C.COL_END]:
-#                return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 return Qt.ItemFlags(Qt.ItemIsEnabled)
             else:
                 return Qt.ItemFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-#                return Qt.ItemFlags(Qt.ItemIsEnabled)
         else:
             return Qt.ItemFlags(Qt.ItemIsEnabled)
 
@@ -196,10 +196,8 @@ class CondaPackagesModel(QAbstractTableModel):
                         return to_qvariant(P['icon.add.pressed'])
                     else:
                         return to_qvariant(P['icon.add.active'])
-                elif (status == C.INSTALLED or
-                      status == C.UPGRADABLE or
-                      status == C.DOWNGRADABLE or
-                      status == C.MIXGRADABLE):
+                elif status in [C.INSTALLED, C.UPGRADABLE, C.DOWNGRADABLE,
+                                C.MIXGRADABLE]:
                     if r:
                         return to_qvariant(P['icon.remove.pressed'])
                     else:
@@ -207,10 +205,8 @@ class CondaPackagesModel(QAbstractTableModel):
                 else:
                     return to_qvariant(P['icon.add.inactive'])
             elif column == C.COL_REMOVE:
-                if (status == C.INSTALLED or
-                    status == C.UPGRADABLE or
-                    status == C.DOWNGRADABLE or
-                   status == C.MIXGRADABLE):
+                if status in [C.INSTALLED, C.UPGRADABLE, C.DOWNGRADABLE,
+                              C.MIXGRADABLE]:
                     if r:
                         return to_qvariant(P['icon.remove.pressed'])
                     else:
@@ -218,8 +214,7 @@ class CondaPackagesModel(QAbstractTableModel):
                 else:
                     return to_qvariant(P['icon.remove.inactive'])
             elif column == C.COL_UPGRADE:
-                if status == C.UPGRADABLE or \
-                  status == C.MIXGRADABLE:
+                if status in [C.UPGRADABLE, C.MIXGRADABLE]:
                     if u:
                         return to_qvariant(P['icon.upgrade.pressed'])
                     else:
@@ -227,8 +222,7 @@ class CondaPackagesModel(QAbstractTableModel):
                 else:
                     return to_qvariant(P['icon.upgrade.inactive'])
             elif column == C.COL_DOWNGRADE:
-                if status == C.DOWNGRADABLE or \
-                  status == C.MIXGRADABLE:
+                if status in [C.DOWNGRADABLE, C.MIXGRADABLE]:
                     if d:
                         return to_qvariant(P['icon.downgrade.pressed'])
                     else:
@@ -243,26 +237,25 @@ class CondaPackagesModel(QAbstractTableModel):
         elif role == Qt.ToolTipRole:
             if column == C.COL_INSTALL and status == C.NOT_INSTALLED:
                 return to_qvariant(_('Install package'))
-            elif column == C.COL_INSTALL and (status == C.INSTALLED or
-                                              status == C.UPGRADABLE or
-                                              status == C.DOWNGRADABLE or
-                                              status == C.MIXGRADABLE):
+            elif column == C.COL_INSTALL and (status in [C.INSTALLED,
+                                                         C.UPGRADABLE,
+                                                         C.DOWNGRADABLE,
+                                                         C.MIXGRADABLE]):
                 return to_qvariant(_('Remove package'))
-            elif column == C.COL_UPGRADE and (status == C.INSTALLED or
-                                              status == C.UPGRADABLE or
-                                              status == C.MIXGRADABLE):
+            elif column == C.COL_UPGRADE and (status in [C.INSTALLED,
+                                                         C.UPGRADABLE,
+                                                         C.MIXGRADABLE]):
                 return to_qvariant(_('Upgrade package'))
-            elif column == C.COL_DOWNGRADE and (status == C.INSTALLED or
-                                                status == C.DOWNGRADABLE or
-                                                status == C.MIXGRADABLE):
+            elif column == C.COL_DOWNGRADE and (status in [C.INSTALLED,
+                                                           C.DOWNGRADABLE,
+                                                           C.MIXGRADABLE]):
                 return to_qvariant(_('Downgrade package'))
             elif column == C.COL_PACKAGE_TYPE:
                 if type_ == C.CONDA_PACKAGE:
                     return to_qvariant(_('Conda package'))
                 elif type_ == C.PIP_PACKAGE:
                     return to_qvariant(_('Python package'))
-            elif column == C.COL_VERSION:
-                if is_upgradable:
+            elif column == C.COL_VERSION and is_upgradable:
                     return to_qvariant(_('Update available'))
         elif role == Qt.ForegroundRole:
             palette = QPalette()
@@ -275,17 +268,17 @@ class CondaPackagesModel(QAbstractTableModel):
                     color = palette.color(QPalette.Mid)
                     color = P['foreground.not.installed']
                     return to_qvariant(color)
-            elif column in [C.COL_VERSION]:
-                if is_upgradable:
+            elif column in [C.COL_VERSION] and is_upgradable:
                     return to_qvariant(P['foreground.upgrade'])
 
-        elif role == Qt.SizeHintRole:
-            if column in [C.ACTION_COLUMNS] + [C.COL_PACKAGE_TYPE]:
+        elif (role == Qt.SizeHintRole and column in
+              C.ACTION_COLUMNS + [C.COL_PACKAGE_TYPE]):
                 return to_qvariant(QSize(24, 24))
 
         return to_qvariant()
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    @staticmethod
+    def headerData(section, orientation, role=Qt.DisplayRole):
         """Override Qt method"""
         if role == Qt.TextAlignmentRole:
             if orientation == Qt.Horizontal:
@@ -310,7 +303,8 @@ class CondaPackagesModel(QAbstractTableModel):
         """Override Qt method"""
         return len(self._rows)
 
-    def columnCount(self, index=QModelIndex()):
+    @staticmethod
+    def columnCount(index=QModelIndex()):
         """Override Qt method"""
         return len(C.COLUMNS)
 

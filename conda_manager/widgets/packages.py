@@ -54,7 +54,8 @@ class FirstRowWidget(QPushButton):
         QPushButton.__init__(self)
         self.widget_before = widget_before
 
-    def sizeHint(self):
+    @staticmethod
+    def sizeHint():
         return QSize(0, 0)
 
     def focusInEvent(self, event):
@@ -109,7 +110,8 @@ class LastRowWidget(QPushButton):
         else:
             return QPushButton.event(self, event)
 
-    def sizeHint(self):
+    @staticmethod
+    def sizeHint():
         return QSize(0, 0)
 
 
@@ -147,7 +149,7 @@ class CondaPackagesWidget(QWidget):
                  conda_api_url='https://api.anaconda.org',
                  setup=True,
                  data_directory=None,
-                 extra_metadata={}):
+                 extra_metadata=None):
 
         super(CondaPackagesWidget, self).__init__(parent)
 
@@ -163,7 +165,7 @@ class CondaPackagesWidget(QWidget):
         self._parent = parent
         self._current_action_name = ''
         self._hide_widgets = False
-        self._metadata = extra_metadata  # From repo.continuum
+        self._metadata = extra_metadata if extra_metadata else {}
         self._metadata_links = {}        # Bundled metadata
         self.api = ManagerAPI()
         self.busy = False
@@ -516,8 +518,8 @@ class CondaPackagesWidget(QWidget):
         logger.error(str(error))
 
         if output and isinstance(output, dict):
-            conda_error_type = output.get('error_type', None)
-            conda_error = output.get('error', None)
+            conda_error_type = output.get('error_type')
+            conda_error = output.get('error')
 
             if conda_error_type or conda_error:
                 self.conda_errors.append((conda_error_type, conda_error))
@@ -591,10 +593,10 @@ class CondaPackagesWidget(QWidget):
         progress = (0, 0)
 
         if isinstance(output, dict):
-            progress = (output.get('progress', None),
-                        output.get('maxval', None))
-            name = output.get('name', None)
-            fetch = output.get('fetch', None)
+            progress = (output.get('progress'),
+                        output.get('maxval'))
+            name = output.get('name')
+            fetch = output.get('fetch')
 
             if fetch:
                 message = "Downloading <b>{0}</b>...".format(fetch)
@@ -745,7 +747,7 @@ class CondaPackagesWidget(QWidget):
 
     # --- Non UI API
     # -------------------------------------------------------------------------
-    def setup(self, check_updates=False, blacklist=[], metadata={}):
+    def setup(self, check_updates=False, blacklist=None, metadata=None):
         """
         Setup packages.
 
@@ -772,9 +774,9 @@ class CondaPackagesWidget(QWidget):
 
         if blacklist:
             self.package_blacklist = [p.lower() for p in blacklist]
-
-        if metadata:
-            self._metadata = metadata
+        else:
+            blacklist = []
+        self._metadata = metadata if metadata else {}
 
         self._current_model_index = self.table.currentIndex()
         self._current_table_scroll = self.table.verticalScrollBar().value()
@@ -837,20 +839,20 @@ class CondaPackagesWidget(QWidget):
                                            tuple(active_channels))
             self.setup(check_updates=True)
 
-    def update_style_sheet(self, style_sheet=None, extra_dialogs={},
-                           palette={}):
+    def update_style_sheet(self, style_sheet=None, extra_dialogs=None,
+                           palette=None):
         if style_sheet:
+            extra_dialogs = extra_dialogs if extra_dialogs else {}
+            palette = palette if palette else {}
             self.style_sheet = style_sheet
             self.table.update_style_palette(palette=palette)
             self.textbox_search.update_style_sheet(style_sheet)
             self.setStyleSheet(style_sheet)
 
         if extra_dialogs:
-            cancel_dialog = extra_dialogs.get('cancel_dialog', None)
-            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog',
-                                                     None)
-            message_box_error = extra_dialogs.get('message_box_error',
-                                                  None)
+            cancel_dialog = extra_dialogs.get('cancel_dialog')
+            apply_actions_dialog = extra_dialogs.get('apply_actions_dialog')
+            message_box_error = extra_dialogs.get('message_box_error')
             if cancel_dialog:
                 self.cancel_dialog = cancel_dialog
             if apply_actions_dialog:
@@ -1165,11 +1167,12 @@ class CondaPackagesWidget(QWidget):
 
     # --- Conda actions
     # -------------------------------------------------------------------------
-    def create_environment(self, name=None, prefix=None, packages=['python']):
+    def create_environment(self, name=None, prefix=None, packages=None):
         """ """
         # If environment exists already? GUI should take care of this
         # BUT the api call should simply set that env as the env
         dic = {}
+        packages = packages if packages else ['python']
         dic['name'] = name
         dic['prefix'] = prefix
         dic['pkgs'] = packages

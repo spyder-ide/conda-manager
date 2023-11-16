@@ -1,3 +1,8 @@
+Important Note
+--------------
+
+This doens't work with Spyder 5 or above.
+
 Build Status
 ------------
 
